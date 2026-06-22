@@ -214,6 +214,10 @@ footer p {
   margin-bottom: 18px;
 }
 
+.section-note {
+  color: var(--muted);
+}
+
 .focus-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -285,6 +289,59 @@ footer p {
   gap: 10px;
 }
 
+.directory-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.directory-group {
+  padding: 18px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel);
+  box-shadow: var(--shadow);
+}
+
+.directory-group ul {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.directory-group li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  gap: 8px;
+  align-items: center;
+  min-height: 36px;
+  padding: 8px 0;
+  border-top: 1px solid var(--line);
+}
+
+.directory-group li:first-child {
+  border-top: 0;
+}
+
+.directory-group span {
+  min-width: 0;
+  font-weight: 700;
+}
+
+.directory-group a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 30px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 4px 8px;
+  background: color-mix(in srgb, var(--panel) 86%, var(--soft));
+  font-weight: 700;
+  text-decoration: none;
+}
+
 footer {
   display: flex;
   align-items: center;
@@ -317,7 +374,8 @@ footer p {
 
   .hero,
   .focus-grid,
-  .project-grid {
+  .project-grid,
+  .directory-grid {
     grid-template-columns: 1fr;
   }
 
@@ -358,6 +416,15 @@ footer p {
 
   .identity-panel p {
     font-size: 14px;
+  }
+
+  .directory-group li {
+    grid-template-columns: 1fr;
+    align-items: start;
+  }
+
+  .directory-group a {
+    width: fit-content;
   }
 
   footer {
