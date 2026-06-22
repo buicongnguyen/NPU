@@ -299,6 +299,12 @@ footer p {
   margin-bottom: 0;
 }
 
+.footer-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
 @media (max-width: 860px) {
   .site-header {
     align-items: flex-start;
