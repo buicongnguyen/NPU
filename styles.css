@@ -10,7 +10,7 @@
   --blue: #244d8f;
   --gold: #8a6200;
   --soft: #e9f5f1;
-  --shadow: 0 16px 38px rgba(29, 39, 56, 0.08);
+  --shadow: 0 8px 22px rgba(29, 39, 56, 0.06);
 }
 
 @media (prefers-color-scheme: dark) {
@@ -63,7 +63,7 @@ footer {
   align-items: center;
   justify-content: space-between;
   gap: 20px;
-  padding: 24px 0;
+  padding: 16px 0;
 }
 
 .brand {
@@ -86,7 +86,7 @@ nav {
   display: flex;
   flex-wrap: wrap;
   justify-content: flex-end;
-  gap: 8px;
+  gap: 6px;
 }
 
 nav a,
@@ -98,7 +98,7 @@ nav a,
   min-height: 38px;
   border: 1px solid var(--line);
   border-radius: 6px;
-  padding: 7px 12px;
+  padding: 6px 10px;
   background: var(--panel);
   color: var(--text);
   font-weight: 700;
@@ -108,16 +108,16 @@ nav a,
 .hero {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(280px, 380px);
-  gap: 28px;
+  gap: 20px;
   align-items: center;
-  min-height: 560px;
-  padding: 40px 0 52px;
+  min-height: 430px;
+  padding: 28px 0 34px;
   border-top: 1px solid var(--line);
   border-bottom: 1px solid var(--line);
 }
 
 .eyebrow {
-  margin: 0 0 10px;
+  margin: 0 0 8px;
   color: var(--accent);
   font-size: 13px;
   font-weight: 800;
@@ -134,22 +134,22 @@ p {
 
 h1 {
   max-width: 760px;
-  margin-bottom: 16px;
-  font-size: clamp(44px, 7vw, 78px);
-  line-height: 0.98;
+  margin-bottom: 12px;
+  font-size: clamp(42px, 6vw, 68px);
+  line-height: 1;
   letter-spacing: 0;
 }
 
 h2 {
-  margin-bottom: 12px;
-  font-size: 30px;
+  margin-bottom: 8px;
+  font-size: 26px;
   line-height: 1.15;
   letter-spacing: 0;
 }
 
 h3 {
-  margin-bottom: 8px;
-  font-size: 19px;
+  margin-bottom: 6px;
+  font-size: 17px;
   line-height: 1.25;
   letter-spacing: 0;
 }
@@ -157,14 +157,14 @@ h3 {
 .lede {
   max-width: 720px;
   color: var(--muted);
-  font-size: 20px;
+  font-size: 18px;
 }
 
 .hero-actions {
   display: flex;
   flex-wrap: wrap;
-  gap: 10px;
-  margin-top: 26px;
+  gap: 8px;
+  margin-top: 18px;
 }
 
 .button {
@@ -181,8 +181,8 @@ h3 {
 
 .identity-panel {
   display: grid;
-  gap: 18px;
-  padding: 20px;
+  gap: 14px;
+  padding: 16px;
   border: 1px solid var(--line);
   border-radius: 8px;
   background: var(--panel);
@@ -191,7 +191,7 @@ h3 {
 
 .portrait {
   width: 100%;
-  max-width: 220px;
+  max-width: 170px;
   aspect-ratio: 1;
   border: 1px solid var(--line);
   border-radius: 8px;
@@ -206,12 +206,12 @@ footer p {
 }
 
 .section {
-  padding: 48px 0 0;
+  padding: 30px 0 0;
 }
 
 .section-heading {
   max-width: 780px;
-  margin-bottom: 18px;
+  margin-bottom: 12px;
 }
 
 .section-note {
@@ -220,8 +220,8 @@ footer p {
 
 .focus-grid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 14px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
 }
 
 .focus-grid article,
@@ -233,28 +233,51 @@ footer p {
 }
 
 .focus-grid article {
-  padding: 18px;
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr);
+  column-gap: 10px;
+  align-items: start;
+  padding: 12px;
 }
 
 .focus-grid span {
   display: inline-flex;
-  margin-bottom: 14px;
+  grid-row: 1 / span 2;
+  margin-bottom: 0;
   color: var(--blue);
   font-weight: 800;
+}
+
+.focus-grid h3 {
+  margin-bottom: 4px;
+}
+
+.focus-grid p {
+  font-size: 14px;
+  line-height: 1.42;
 }
 
 .project-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 14px;
+  gap: 10px;
 }
 
 .project-card {
   display: flex;
   flex-direction: column;
   justify-content: space-between;
-  min-height: 250px;
-  padding: 18px;
+  min-height: 168px;
+  padding: 12px;
+}
+
+.project-card h3 {
+  margin-bottom: 4px;
+}
+
+.project-card p {
+  font-size: 14px;
+  line-height: 1.45;
 }
 
 .project-card.featured {
@@ -263,7 +286,7 @@ footer p {
 }
 
 .tag {
-  margin-bottom: 10px;
+  margin-bottom: 6px;
   color: var(--gold);
   font-size: 13px;
   font-weight: 800;
@@ -273,30 +296,30 @@ footer p {
 .project-links {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
-  margin-top: 18px;
+  gap: 6px;
+  margin-top: 12px;
 }
 
 .project-links a {
-  min-height: 34px;
-  padding: 6px 10px;
+  min-height: 30px;
+  padding: 4px 8px;
   color: var(--accent);
 }
 
 .index-list {
   display: flex;
   flex-wrap: wrap;
-  gap: 10px;
+  gap: 8px;
 }
 
 .directory-grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 14px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
 }
 
 .directory-group {
-  padding: 18px;
+  padding: 10px;
   border: 1px solid var(--line);
   border-radius: 8px;
   background: var(--panel);
@@ -305,7 +328,7 @@ footer p {
 
 .directory-group ul {
   display: grid;
-  gap: 8px;
+  gap: 0;
   margin: 0;
   padding: 0;
   list-style: none;
@@ -314,10 +337,10 @@ footer p {
 .directory-group li {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto auto;
-  gap: 8px;
+  gap: 6px;
   align-items: center;
-  min-height: 36px;
-  padding: 8px 0;
+  min-height: 26px;
+  padding: 4px 0;
   border-top: 1px solid var(--line);
 }
 
@@ -327,17 +350,19 @@ footer p {
 
 .directory-group span {
   min-width: 0;
+  font-size: 13px;
   font-weight: 700;
 }
 
 .directory-group a {
   display: inline-flex;
   align-items: center;
-  min-height: 30px;
+  min-height: 26px;
   border: 1px solid var(--line);
   border-radius: 6px;
-  padding: 4px 8px;
+  padding: 2px 7px;
   background: color-mix(in srgb, var(--panel) 86%, var(--soft));
+  font-size: 13px;
   font-weight: 700;
   text-decoration: none;
 }
@@ -347,8 +372,8 @@ footer {
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  padding: 32px 0 42px;
-  margin-top: 42px;
+  padding: 24px 0 32px;
+  margin-top: 30px;
   border-top: 1px solid var(--line);
 }
 
@@ -395,6 +420,13 @@ footer p {
   }
 }
 
+@media (max-width: 1040px) and (min-width: 861px) {
+  .focus-grid,
+  .directory-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
 @media (max-width: 560px) {
   h1 {
     font-size: 40px;
@@ -419,12 +451,12 @@ footer p {
   }
 
   .directory-group li {
-    grid-template-columns: 1fr;
-    align-items: start;
+    grid-template-columns: minmax(0, 1fr) auto auto;
+    align-items: center;
   }
 
   .directory-group a {
-    width: fit-content;
+    width: auto;
   }
 
   footer {
