@@ -1,0 +1,327 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Bui Cong Nguyen's NPU systems and compiler page: resume match, Tenstorrent tt-buda and tt-metal exploration, coursework, and useful NPU compiler resources.">
+  <title>NPU Systems, Tenstorrent, and Compiler Notes | Bui Cong Nguyen</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="site-header">
+    <a class="brand" href="index.html#top" aria-label="Bui Cong Nguyen home">
+      <img src="https://avatars.githubusercontent.com/u/72680210?v=4" alt="Bui Cong Nguyen avatar">
+      <span>Bui Cong Nguyen</span>
+    </a>
+    <nav aria-label="Primary navigation">
+      <a href="index.html">Home</a>
+      <a href="#resume-match">Resume Match</a>
+      <a href="#coursework">Coursework</a>
+      <a href="#resources">Resources</a>
+      <a href="https://github.com/buicongnguyen">GitHub</a>
+    </nav>
+  </header>
+
+  <main id="top">
+    <section class="hero npu-hero content-hero">
+      <div class="hero-copy">
+        <p class="eyebrow">NPU compiler | Tenstorrent | edge AI</p>
+        <h1>NPU Systems, Compiler Work, and Tenstorrent Notes</h1>
+        <p class="lede">
+          A focused page connecting my resume to Neural Processing Unit work: compiler optimization,
+          Tenstorrent <code>tt-buda</code> and <code>tt-metal</code> exploration, model deployment, computer vision workloads,
+          embedded inference, and hardware-aware software.
+        </p>
+        <div class="hero-actions">
+          <a class="button" href="#tenstorrent">Tenstorrent Work</a>
+          <a class="button secondary" href="#coursework">Related Coursework</a>
+          <a class="button secondary" href="#resources">Useful NPU Links</a>
+        </div>
+      </div>
+    </section>
+
+    <section id="resume-match" class="section">
+      <div class="section-heading">
+        <p class="eyebrow">From resume</p>
+        <h2>Why NPU Fits My Background</h2>
+        <p class="section-note">
+          The resume explicitly lists work as a Researcher NPU Compiler Software Engineer at
+          BOS Semiconductor, focused on optimizing an NPU compiler for Neural Network Processing Unit systems.
+        </p>
+      </div>
+
+      <div class="evidence-grid">
+        <article>
+          <span>Resume</span>
+          <h3>NPU compiler optimization</h3>
+          <p>
+            The role connects directly to compiler passes, model lowering, profiling, and deployment
+            constraints for automotive and edge AI acceleration.
+          </p>
+        </article>
+        <article>
+          <span>Samsung</span>
+          <h3>Computer vision and mobile AI</h3>
+          <p>
+            OCR, accessibility vision, object tracking, barcode detection, stereo and TOF calibration,
+            OpenCV, PyTorch, Android JNI, and power-sensitive production features.
+          </p>
+        </article>
+        <article>
+          <span>Cadence</span>
+          <h3>EDA routing and algorithms</h3>
+          <p>
+            Nano-routing work in Innovus used C++, TCL, Linux debugging, graph search, and runtime reduction,
+            which transfers well to compiler graph optimization and scheduling.
+          </p>
+        </article>
+        <article>
+          <span>Argosdyne</span>
+          <h3>Robotics and realtime systems</h3>
+          <p>
+            Drone control, ROS 2, MQTT telemetry, object detection, and multi-platform services are useful
+            context for edge devices that need local AI inference.
+          </p>
+        </article>
+        <article>
+          <span>KAIST</span>
+          <h3>PhD/MS computer science foundation</h3>
+          <p>
+            Image processing, computer vision, information hiding, digital forensics, networks, software
+            engineering, and algorithms provide the academic base for NPU workload analysis.
+          </p>
+        </article>
+        <article>
+          <span>Stack</span>
+          <h3>C++, Python, PyTorch, OpenCV</h3>
+          <p>
+            The resume's strongest implementation stack is close to the practical NPU path:
+            C++ runtime code, Python model tooling, PyTorch models, and OpenCV-heavy vision pipelines.
+          </p>
+        </article>
+      </div>
+    </section>
+
+    <section id="tenstorrent" class="section">
+      <div class="section-heading">
+        <p class="eyebrow">Hands-on exploration</p>
+        <h2>Tenstorrent <code>tt-buda</code> and <code>tt-metal</code></h2>
+        <p class="section-note">
+          My NPU learning path includes hands-on attempts with Tenstorrent's open-source stack. This is useful
+          because it connects high-level model compilation to the lower-level kernel and memory model that
+          determines real accelerator performance.
+        </p>
+      </div>
+
+      <div class="evidence-grid compact">
+        <article>
+          <span><code>tt-buda</code></span>
+          <h3>High-level model compiler path</h3>
+          <p>
+            Tried the BUDA/PyBuda path for compiling AI/ML models from frameworks such as PyTorch,
+            TensorFlow, ONNX, and TFLite to Tenstorrent hardware. The repository is now archived, so it is
+            best treated as historical compiler-stack experience.
+          </p>
+        </article>
+        <article>
+          <span><code>tt-metal</code></span>
+          <h3>Low-level programming model</h3>
+          <p>
+            Tried and studied the TT-Metalium route for C++ kernels, Tensix cores, explicit data movement, memory
+            layout, tiling, circular buffers, and host-to-device execution. This is the most relevant path
+            for understanding performance beyond a model-import API.
+          </p>
+        </article>
+        <article>
+          <span>Bridge</span>
+          <h3>Compiler to runtime thinking</h3>
+          <p>
+            The key learning point is the bridge from graph-level optimizations to hardware execution:
+            operator decomposition, tiling, sharding, buffer placement, NOC movement, and profiling.
+          </p>
+        </article>
+        <article>
+          <span>Next</span>
+          <h3>Follow current Tenstorrent stack</h3>
+          <p>
+            Since <code>tt-buda</code> is archived, the practical continuation is <code>tt-metal</code>, TT-NN, and TT-Forge,
+            Tenstorrent's newer MLIR-based compiler stack.
+          </p>
+        </article>
+      </div>
+    </section>
+
+    <section id="coursework" class="section">
+      <div class="section-heading">
+        <p class="eyebrow">Coursework map</p>
+        <h2>Related Study Areas for NPU Work</h2>
+        <p class="section-note">
+          NPU work sits between compiler engineering, parallel architecture, deep learning, quantization,
+          runtime systems, and application-level computer vision.
+        </p>
+      </div>
+
+      <div class="learning-map">
+        <article>
+          <h3>Already represented in the resume</h3>
+          <ul>
+            <li>Algorithms, graph search, BFS, DFS, dynamic programming, hashing, and linked lists.</li>
+            <li>Image processing, computer vision, OCR, object tracking, stereo calibration, and TOF workflows.</li>
+            <li>Machine learning and deep learning through Samsung internal coursework and PyTorch projects.</li>
+            <li>Software engineering across Windows, Linux, Android, realtime systems, and production debugging.</li>
+            <li>Networks, wireless communication, telemetry, and embedded device communication context.</li>
+          </ul>
+        </article>
+
+        <article>
+          <h3>Best continuation coursework</h3>
+          <ul>
+            <li>Computer architecture: memory hierarchy, SIMD, caches, DMA, accelerators, and data movement.</li>
+            <li>Compiler design: IR, SSA, lowering, legalization, scheduling, allocation, and backend codegen.</li>
+            <li>Parallel programming: OpenMP, CUDA concepts, kernels, tiling, synchronization, and profiling.</li>
+            <li>Efficient AI: pruning, quantization, sparsity, distillation, operator fusion, and graph partitioning.</li>
+            <li>Runtime systems: drivers, execution providers, buffer management, profiling, and deployment tooling.</li>
+          </ul>
+        </article>
+      </div>
+
+      <div class="pipeline">
+        <div>
+          <strong>Model</strong>
+          <span>PyTorch, TensorFlow, ONNX</span>
+        </div>
+        <div>
+          <strong>Graph</strong>
+          <span>Normalize, fuse, quantize</span>
+        </div>
+        <div>
+          <strong>Compiler IR</strong>
+          <span>MLIR, TVM, XLA, vendor IR</span>
+        </div>
+        <div>
+          <strong>Backend</strong>
+          <span>Tile, schedule, allocate, lower</span>
+        </div>
+        <div>
+          <strong>Runtime</strong>
+          <span>Driver, EP, memory, profiling</span>
+        </div>
+      </div>
+    </section>
+
+    <section id="resources" class="section">
+      <div class="section-heading">
+        <p class="eyebrow">Useful websites</p>
+        <h2>NPU and AI Compiler Resources</h2>
+        <p class="section-note">
+          These links emphasize official documentation and durable learning material for practical NPU compiler work.
+        </p>
+      </div>
+
+      <div class="resource-grid">
+        <article class="directory-group">
+          <h3>Tenstorrent</h3>
+          <ul>
+            <li><span>Tenstorrent developer hub</span><a href="https://tenstorrent.com/en/developers">Open</a></li>
+            <li><span><code>tt-metal</code> GitHub repository</span><a href="https://github.com/tenstorrent/tt-metal">Open</a></li>
+            <li><span>TT-Metalium documentation</span><a href="https://docs.tenstorrent.com/tt-metal/latest/tt-metalium/index.html">Open</a></li>
+            <li><span>TT-Metalium getting started</span><a href="https://docs.tenstorrent.com/tt-metal/latest/tt-metalium/get_started/get_started.html">Open</a></li>
+            <li><span><code>tt-buda</code> archive</span><a href="https://github.com/tenstorrent/tt-buda">Open</a></li>
+            <li><span>TT-Forge MLIR compiler stack</span><a href="https://tenstorrent.com/en/software/tt-forge">Open</a></li>
+          </ul>
+        </article>
+
+        <article class="directory-group">
+          <h3>NPU Platforms</h3>
+          <ul>
+            <li><span>BOS Semiconductor Eagle-N product notes</span><a href="https://www.bos-semi.com/product">Open</a></li>
+            <li><span>Microsoft NPU development for Copilot+ PCs</span><a href="https://learn.microsoft.com/en-us/windows/ai/npu-devices/">Open</a></li>
+            <li><span>Intel Linux NPU driver</span><a href="https://github.com/intel/linux-npu-driver">Open</a></li>
+            <li><span>AMD Ryzen AI Software</span><a href="https://www.amd.com/en/developer/resources/ryzen-ai-software.html">Open</a></li>
+            <li><span>ONNX Runtime Vitis AI Execution Provider</span><a href="https://onnxruntime.ai/docs/execution-providers/Vitis-AI-ExecutionProvider.html">Open</a></li>
+          </ul>
+        </article>
+
+        <article class="directory-group">
+          <h3>Compiler Stacks</h3>
+          <ul>
+            <li><span>LLVM MLIR</span><a href="https://mlir.llvm.org/">Open</a></li>
+            <li><span>MLIR documentation</span><a href="https://mlir.llvm.org/docs/">Open</a></li>
+            <li><span>Apache TVM</span><a href="https://tvm.apache.org/">Open</a></li>
+            <li><span>OpenXLA XLA compiler</span><a href="https://openxla.org/xla">Open</a></li>
+            <li><span>IREE compiler and runtime</span><a href="https://iree.dev/">Open</a></li>
+          </ul>
+        </article>
+
+        <article class="directory-group">
+          <h3>Courses</h3>
+          <ul>
+            <li><span>MIT 6.5940 TinyML and Efficient Deep Learning</span><a href="https://hanlab.mit.edu/courses/2024-fall-65940">Open</a></li>
+            <li><span>Stanford CS149 Parallel Computing</span><a href="https://cs149.stanford.edu/">Open</a></li>
+            <li><span>CMU 15-418 Parallel Computer Architecture</span><a href="https://www.cs.cmu.edu/~418/">Open</a></li>
+            <li><span>UC Berkeley CS 182 Deep Learning</span><a href="https://cs182sp21.github.io/">Open</a></li>
+          </ul>
+        </article>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-heading">
+        <p class="eyebrow">Portfolio direction</p>
+        <h2>Project Ideas That Match This Page</h2>
+      </div>
+
+      <div class="project-grid">
+        <article class="project-card">
+          <div>
+            <p class="tag">Compiler lab</p>
+            <h3>Tenstorrent operator study notes</h3>
+            <p>
+              Document small experiments from <code>tt-metal</code>: simple kernels, tiling, memory movement,
+              circular buffers, matrix multiplication, and host/device profiling observations.
+            </p>
+          </div>
+        </article>
+        <article class="project-card">
+          <div>
+            <p class="tag">Vision demo</p>
+            <h3>ONNX vision model deployment path</h3>
+            <p>
+              Revisit resume OCR and computer vision experience with a model export path:
+              PyTorch to ONNX, graph inspection, quantization, and accelerator runtime notes.
+            </p>
+          </div>
+        </article>
+        <article class="project-card">
+          <div>
+            <p class="tag">Learning hub</p>
+            <h3>NPU compiler study tracker</h3>
+            <p>
+              Extend the existing computer science study app with flashcards for MLIR, TVM,
+              scheduling, quantization, bufferization, and execution providers.
+            </p>
+          </div>
+        </article>
+        <article class="project-card">
+          <div>
+            <p class="tag">Robotics AI</p>
+            <h3>ROS 2 perception deployment notes</h3>
+            <p>
+              Connect drone/robotics experience to local AI inference by documenting how perception
+              nodes move from PyTorch to ONNX and onto accelerator-backed runtime paths.
+            </p>
+          </div>
+        </article>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <p>Built from resume evidence, NPU compiler work, Tenstorrent exploration, and official NPU ecosystem references.</p>
+    <div class="footer-links">
+      <a href="index.html">Home</a>
+      <a href="https://github.com/buicongnguyen/buicongnguyen.github.io">Source</a>
+    </div>
+  </footer>
+</body>
+</html>
