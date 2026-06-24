@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="Bui Cong Nguyen's NPU systems and compiler page: resume match, Tenstorrent tt-buda and tt-metal exploration, coursework, and useful NPU compiler resources.">
+  <meta name="description" content="Bui Cong Nguyen's NPU systems and compiler page: resume match, Tenstorrent tt-buda and tt-metal exploration, TT-Metalium terminology, diagrams, coursework, and technical resources.">
   <title>NPU Systems, Tenstorrent, and Compiler Notes | Bui Cong Nguyen</title>
   <link rel="stylesheet" href="styles.css">
 </head>
@@ -16,6 +16,9 @@
     <nav aria-label="Primary navigation">
       <a href="index.html">Home</a>
       <a href="#resume-match">Resume Match</a>
+      <a href="#deep-dive">Deep Dive</a>
+      <a href="#tech-reports">Tech Reports</a>
+      <a href="#terminology">Terminology</a>
       <a href="#coursework">Coursework</a>
       <a href="#resources">Resources</a>
       <a href="https://github.com/buicongnguyen">GitHub</a>
@@ -34,8 +37,8 @@
         </p>
         <div class="hero-actions">
           <a class="button" href="#tenstorrent">Tenstorrent Work</a>
-          <a class="button secondary" href="#coursework">Related Coursework</a>
-          <a class="button secondary" href="#resources">Useful NPU Links</a>
+          <a class="button secondary" href="#deep-dive">Technical Deep Dive</a>
+          <a class="button secondary" href="#resources">Technical Docs</a>
         </div>
       </div>
     </section>
@@ -107,20 +110,20 @@
         <p class="eyebrow">Hands-on exploration</p>
         <h2>Tenstorrent <code>tt-buda</code> and <code>tt-metal</code></h2>
         <p class="section-note">
-          My NPU learning path includes hands-on attempts with Tenstorrent's open-source stack. This is useful
-          because it connects high-level model compilation to the lower-level kernel and memory model that
-          determines real accelerator performance.
+          My NPU learning path includes hands-on attempts with Tenstorrent's open-source stack. The important
+          lesson is the full vertical path: model import, compiler lowering, graph scheduling, tile layout,
+          explicit data movement, and kernel execution on a grid of Tensix cores.
         </p>
       </div>
 
       <div class="evidence-grid compact">
         <article>
           <span><code>tt-buda</code></span>
-          <h3>High-level model compiler path</h3>
+          <h3>Archived high-level compiler path</h3>
           <p>
             Tried the BUDA/PyBuda path for compiling AI/ML models from frameworks such as PyTorch,
-            TensorFlow, ONNX, and TFLite to Tenstorrent hardware. The repository is now archived, so it is
-            best treated as historical compiler-stack experience.
+            TensorFlow, ONNX, and TFLite to Tenstorrent hardware. The repository was archived in February
+            2026, so it is best treated as historical compiler-stack experience and a bridge to TT-Forge.
           </p>
         </article>
         <article>
@@ -136,8 +139,9 @@
           <span>Bridge</span>
           <h3>Compiler to runtime thinking</h3>
           <p>
-            The key learning point is the bridge from graph-level optimizations to hardware execution:
-            operator decomposition, tiling, sharding, buffer placement, NOC movement, and profiling.
+            The key learning point is how graph-level optimizations become hardware execution:
+            operator decomposition, tiling, sharding, buffer placement, NoC movement, runtime arguments,
+            synchronization, and profiling.
           </p>
         </article>
         <article>
@@ -148,6 +152,334 @@
             Tenstorrent's newer MLIR-based compiler stack.
           </p>
         </article>
+      </div>
+    </section>
+
+    <section id="deep-dive" class="section">
+      <div class="section-heading">
+        <p class="eyebrow">From TT-Metalium docs</p>
+        <h2>Technical Deep Dive</h2>
+        <p class="section-note">
+          TT-Metalium exposes more hardware detail than a typical framework runtime. That makes it valuable
+          for NPU compiler study because the programmer sees where compiler decisions land: core placement,
+          tile layout, SRAM buffering, NoC transfers, and kernel synchronization.
+        </p>
+      </div>
+
+      <div class="deep-grid">
+        <article>
+          <h3>1. Tensix is a grid-first accelerator model</h3>
+          <p>
+            Tenstorrent describes the accelerator as a grid of specialized compute nodes called Tensix cores.
+            Each core includes local L1 SRAM, two NoC interfaces, data movement control, a matrix engine/FPU,
+            a vector engine/SFPU, pack/unpack hardware, and small RISC-V controllers that issue commands
+            to those engines.
+          </p>
+          <p>
+            This is different from CUDA-style SIMT thinking. Instead of hiding latency behind many threads,
+            the Metalium mental model is software-pipelined dataflow: explicitly move tiles, overlap movement
+            with compute, and keep useful intermediate data close to the core.
+          </p>
+        </article>
+
+        <article>
+          <h3>2. The basic operation is reader -> compute -> writer</h3>
+          <p>
+            A typical TT-Metalium program creates three kernel roles. The reader data-movement kernel moves
+            tiles from DRAM or another core into L1 circular buffers. The compute kernel waits on those buffers,
+            runs tile operations through FPU/SFPU engines, and pushes output tiles to another circular buffer.
+            The writer data-movement kernel drains output tiles and writes them back to DRAM or sends them onward.
+          </p>
+          <p>
+            The compiler lesson is direct: an NPU backend is not only selecting arithmetic instructions. It must
+            schedule producer-consumer movement, buffer capacity, tile order, and synchronization so compute does
+            not stall on memory.
+          </p>
+        </article>
+
+        <article>
+          <h3>3. Circular buffers are the local synchronization contract</h3>
+          <p>
+            Circular buffers are small FIFO queues in core-local SRAM. They are the connection point between
+            data movement kernels and compute kernels. Calls such as <code>cb_reserve_back</code>,
+            <code>get_write_ptr</code>, <code>cb_push_back</code>, <code>cb_wait_front</code>, and
+            <code>cb_pop_front</code> express producer-consumer ownership.
+          </p>
+          <p>
+            In performance terms, the circular buffer depth controls how much movement and compute can overlap.
+            Too little buffering starves compute. Too much buffering wastes scarce L1 SRAM that could hold other
+            intermediate data.
+          </p>
+        </article>
+
+        <article>
+          <h3>4. Tiles and page size are core compiler concerns</h3>
+          <p>
+            Tenstorrent hardware is optimized around tiled tensors. A common tile shape is 32x32 elements.
+            A tensor may be converted from row-major host layout into a tiled layout so the matrix/vector engines
+            can consume data efficiently. Padding can be required when dimensions are not tile aligned.
+          </p>
+          <p>
+            This makes <code>page_size</code>, tensor layout, tilization, untilization, and sharding more than
+            storage details. They become backend decisions that affect NoC traffic, L1 residency, and whether
+            the compute engine receives data in the shape it wants.
+          </p>
+        </article>
+
+        <article>
+          <h3>5. NoC and memory placement replace hidden caches</h3>
+          <p>
+            TT-Metalium documentation emphasizes explicit data placement. The model is not "trust the cache."
+            DRAM, local L1 SRAM, remote core SRAM, interleaved buffers, and sharded tensors are visible design
+            choices. The NoC moves data between those locations.
+          </p>
+          <p>
+            For an NPU compiler engineer, this maps to locality decisions: keep reused blocks close to the
+            consuming core, use multicast when many cores need the same data, shard tensors when the access
+            pattern matches the core grid, and avoid unnecessary trips to DRAM.
+          </p>
+        </article>
+
+        <article>
+          <h3>6. Work distribution is explicit SPMD</h3>
+          <p>
+            TT-Metalium supports SPMD, but the developer or compiler decides which cores receive work and which
+            runtime arguments each core sees. Utilities such as <code>split_work_to_cores</code> help divide
+            tiles across available cores, but the program still needs correct per-core arguments.
+          </p>
+          <p>
+            This is exactly where compiler scheduling meets runtime setup: a graph partition becomes core ranges,
+            tile ranges, reader/writer offsets, per-core work counts, and no-op behavior for unused cores.
+          </p>
+        </article>
+      </div>
+    </section>
+
+    <section id="graphs" class="section">
+      <div class="section-heading">
+        <p class="eyebrow">Graphs</p>
+        <h2>How the Stack and Kernels Fit Together</h2>
+        <p class="section-note">
+          These diagrams are simplified study graphs based on the TT-Metalium docs. They are not vendor block
+          diagrams, but they show the concepts I would track when studying or optimizing an NPU compiler path.
+        </p>
+      </div>
+
+      <div class="diagram-grid">
+        <article class="diagram-card">
+          <h3>Tenstorrent software stack</h3>
+          <div class="stack-graph" aria-label="Tenstorrent software stack from model frameworks to hardware">
+            <div>PyTorch / ONNX / TensorFlow</div>
+            <div>TT-Forge / TT-MLIR<br><span>current compiler path</span></div>
+            <div>TT-NN<br><span>Python tensor and op library</span></div>
+            <div>TT-Metalium<br><span>C++ kernels and runtime</span></div>
+            <div>Tensix hardware<br><span>NoC, L1, FPU, SFPU</span></div>
+          </div>
+          <p>
+            <code>tt-buda</code> historically lived near the high-level compiler layer. Current study should
+            follow TT-Forge/TT-MLIR for compilation and TT-Metalium for hardware-level execution.
+          </p>
+        </article>
+
+        <article class="diagram-card">
+          <h3>Single-core kernel dataflow</h3>
+          <div class="flow-graph" aria-label="Reader compute writer kernel flow">
+            <div>
+              <strong>DRAM</strong>
+              <span>input tensor pages</span>
+            </div>
+            <div>
+              <strong>Reader kernel</strong>
+              <span>NoC read into L1</span>
+            </div>
+            <div>
+              <strong>Input CBs</strong>
+              <span>small tile FIFOs</span>
+            </div>
+            <div>
+              <strong>Compute kernel</strong>
+              <span>FPU/SFPU tile ops</span>
+            </div>
+            <div>
+              <strong>Output CB</strong>
+              <span>packed result tiles</span>
+            </div>
+            <div>
+              <strong>Writer kernel</strong>
+              <span>NoC write out</span>
+            </div>
+          </div>
+          <p>
+            The main optimization question is whether the reader and writer can keep the compute engine fed
+            without wasting L1 capacity or issuing unnecessary NoC traffic.
+          </p>
+        </article>
+
+        <article class="diagram-card wide">
+          <h3>Compiler backend decision graph</h3>
+          <div class="decision-graph" aria-label="Compiler backend decisions for NPU execution">
+            <div>
+              <strong>Graph lowering</strong>
+              <span>operators, shapes, dtypes</span>
+            </div>
+            <div>
+              <strong>Layout choice</strong>
+              <span>row-major, tiled, padded</span>
+            </div>
+            <div>
+              <strong>Placement</strong>
+              <span>DRAM, L1, sharded</span>
+            </div>
+            <div>
+              <strong>Kernel split</strong>
+              <span>reader, compute, writer</span>
+            </div>
+            <div>
+              <strong>Core mapping</strong>
+              <span>SPMD groups, ranges</span>
+            </div>
+            <div>
+              <strong>Runtime args</strong>
+              <span>addresses, tile counts</span>
+            </div>
+            <div>
+              <strong>Profiling loop</strong>
+              <span>stalls, bandwidth, reuse</span>
+            </div>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <section id="tech-reports" class="section">
+      <div class="section-heading">
+        <p class="eyebrow">Tech reports</p>
+        <h2>Tenstorrent Tech Reports Study Map</h2>
+        <p class="section-note">
+          The <code>tt-metal/tech_reports</code> folder is the best place to go deeper than API usage.
+          It explains why layouts, sharding, memory movement, profiling, and scale-out design matter.
+        </p>
+      </div>
+
+      <div class="report-grid">
+        <article>
+          <h3>Tensor and memory layouts</h3>
+          <p>
+            Study this first. It defines row-major versus tiled tensor layout, pages, interleaved memory,
+            L1/DRAM storage, and the 32x32 tile shape that TT-Metalium exposes to model code.
+          </p>
+          <a href="https://github.com/tenstorrent/tt-metal/blob/main/tech_reports/tensor_layouts/tensor_layouts.md">Open report</a>
+        </article>
+        <article>
+          <h3>Tensor sharding</h3>
+          <p>
+            Explains height, width, block, and experimental ND sharding. This is directly relevant to compiler
+            partitioning: a graph tile range becomes shard shapes, core ranges, and local L1 ownership.
+          </p>
+          <a href="https://github.com/tenstorrent/tt-metal/blob/main/tech_reports/tensor_sharding/tensor_sharding.md">Open report</a>
+        </article>
+        <article>
+          <h3>Matrix engine and GEMM FLOPS</h3>
+          <p>
+            These reports connect arithmetic peak to practical GEMM performance. Important terms are
+            matrix engine, FPU, math fidelity, LoFi/HiFi modes, data type, matrix dimensions, and roofline.
+          </p>
+          <a href="https://github.com/tenstorrent/tt-metal/blob/main/tech_reports/GEMM_FLOPS/GEMM_FLOPS.md">Open GEMM</a>
+          <a href="https://github.com/tenstorrent/tt-metal/blob/main/tech_reports/matrix_engine/matrix_engine.md">Open matrix engine</a>
+        </article>
+        <article>
+          <h3>Data formats</h3>
+          <p>
+            Covers bfloat16 to block-float conversion and bfloat8/bfloat4/bfloat2 style formats. For compiler
+            work, this links quantization, bandwidth, accuracy, packing, and conversion behavior.
+          </p>
+          <a href="https://github.com/tenstorrent/tt-metal/blob/main/tech_reports/data_formats/data_formats.md">Open report</a>
+        </article>
+        <article>
+          <h3>CNNs on Tenstorrent chips</h3>
+          <p>
+            Shows convolution as matrix multiplication, then explains sliding windows, sharded local tensors,
+            halo data movement, activation/weight blocking, double buffering, and conv2d TT-NN configuration.
+          </p>
+          <a href="https://github.com/tenstorrent/tt-metal/blob/main/tech_reports/CNNs/ttcnn.md">Open report</a>
+        </article>
+        <article>
+          <h3>FlashAttention</h3>
+          <p>
+            A strong example of algorithm plus hardware co-design. The report applies chunked attention,
+            online softmax, causal scheduling, L1 sharding, and asynchronous data movement on Wormhole.
+          </p>
+          <a href="https://github.com/tenstorrent/tt-metal/blob/main/tech_reports/FlashAttention/FlashAttention.md">Open report</a>
+        </article>
+        <article>
+          <h3>Profiler and performance counters</h3>
+          <p>
+            Profiling is where compiler hypotheses become evidence. Track FPU/SFPU utilization, pack/unpack
+            activity, instruction stalls, L1 traffic, backpressure, and operation-level traces.
+          </p>
+          <a href="https://github.com/tenstorrent/tt-metal/blob/main/tech_reports/MetalProfiler/metal-profiler.md">Open profiler</a>
+          <a href="https://github.com/tenstorrent/tt-metal/blob/main/tech_reports/PerfCounters/perf-counters.md">Open counters</a>
+        </article>
+        <article>
+          <h3>Trace, command queues, and model optimization</h3>
+          <p>
+            Metal Trace records dispatch commands to reduce host overhead. Multiple command queues can overlap
+            input writes with device execution, which is useful when model invocation gaps dominate runtime.
+          </p>
+          <a href="https://github.com/tenstorrent/tt-metal/blob/main/tech_reports/AdvancedPerformanceOptimizationsForModels/AdvancedPerformanceOptimizationsForModels.md">Open report</a>
+        </article>
+        <article>
+          <h3>Scale-out: Ethernet and TT-Fabric</h3>
+          <p>
+            The older Ethernet guide is marked outdated, but still teaches explicit chip-to-chip data movement.
+            TT-Fabric is the current architecture direction: data plane, control plane, NoC for intra-device
+            routing, and Ethernet for inter-device routing.
+          </p>
+          <a href="https://github.com/tenstorrent/tt-metal/blob/main/tech_reports/TT-Fabric/TT-Fabric-Architecture.md">Open TT-Fabric</a>
+          <a href="https://github.com/tenstorrent/tt-metal/blob/main/tech_reports/EthernetMultichip/BasicEthernetGuide.md">Open Ethernet</a>
+        </article>
+      </div>
+
+      <div class="report-flow" aria-label="Study order for Tenstorrent technical reports">
+        <div><strong>Layout</strong><span>tile, page, dtype</span></div>
+        <div><strong>Placement</strong><span>L1, DRAM, shard</span></div>
+        <div><strong>Kernel</strong><span>reader, compute, writer</span></div>
+        <div><strong>Model Op</strong><span>GEMM, conv, attention</span></div>
+        <div><strong>Profile</strong><span>stall, bandwidth, util</span></div>
+        <div><strong>Scale</strong><span>mesh, fabric, Ethernet</span></div>
+      </div>
+    </section>
+
+    <section id="terminology" class="section">
+      <div class="section-heading">
+        <p class="eyebrow">Terminology</p>
+        <h2>TT-Metalium Terms to Know</h2>
+        <p class="section-note">
+          This glossary turns Tenstorrent documentation terms into NPU compiler study notes.
+        </p>
+      </div>
+
+      <div class="term-grid">
+        <article><h3>Tensix processor</h3><p>The full accelerator chip or device organization built from a grid of nodes, including Tensix compute cores plus memory, PCIe, Ethernet, and management nodes.</p></article>
+        <article><h3>Tensix core</h3><p>The compute tile/node. It contains local L1 SRAM, NoC interfaces, RISC-V controllers, matrix/vector engines, and pack/unpack hardware.</p></article>
+        <article><h3>L1 SRAM</h3><p>Core-local scratchpad memory used for circular buffers, temporary tiles, and kernel code. It is explicit storage, not a transparent cache.</p></article>
+        <article><h3>NoC</h3><p>Network-on-Chip. The on-chip interconnect used to move data among DRAM, Tensix cores, and other device resources.</p></article>
+        <article><h3>Tile</h3><p>A hardware-friendly tensor block, commonly 32x32 elements, used by matrix and vector engines for efficient local computation.</p></article>
+        <article><h3>Tilize / untilize</h3><p>Conversion between row-major host-style layout and Tenstorrent tiled layout. This can happen on device to reduce host-side overhead.</p></article>
+        <article><h3>Circular buffer (CB)</h3><p>A small FIFO queue in L1 SRAM. Reader, compute, and writer kernels use CBs to exchange tiles safely and asynchronously.</p></article>
+        <article><h3>Reader kernel</h3><p>A data movement kernel that usually reads tiles from DRAM or another core into input circular buffers.</p></article>
+        <article><h3>Compute kernel</h3><p>The kernel that issues FPU/SFPU work, consumes input circular buffers, writes destination registers, and packs result tiles.</p></article>
+        <article><h3>Writer kernel</h3><p>A data movement kernel that waits for output circular buffers and writes result tiles to DRAM or another destination.</p></article>
+        <article><h3>FPU / matrix engine</h3><p>The matrix/tensor computation engine used for tile operations such as matmul and elementwise arithmetic.</p></article>
+        <article><h3>SFPU / vector engine</h3><p>The vector unit for scalar/vector style functions such as exp, log, sin, comparisons, and custom SFPI operations.</p></article>
+        <article><h3>Pack / unpack</h3><p>Hardware stages that move tiles between circular buffers, engine registers, and output buffers in the format the engines expect.</p></article>
+        <article><h3>Runtime arguments</h3><p>Per-kernel and per-core parameters such as buffer addresses, tile counts, work offsets, and core-specific ranges.</p></article>
+        <article><h3>SPMD</h3><p>Single Program, Multiple Data. Multiple cores run the same kernel program with different runtime arguments and tile ranges.</p></article>
+        <article><h3>Multicast</h3><p>A data movement pattern that sends the same data to multiple cores, useful for reuse in multi-core matmul and attention-like workloads.</p></article>
+        <article><h3>Interleaved memory</h3><p>A default memory placement style that spreads pages across memory controllers for balanced access.</p></article>
+        <article><h3>Sharded tensor</h3><p>A tensor distributed across multiple Tensix cores or memory regions to improve locality and reduce long-distance data movement.</p></article>
+        <article><h3>Fast dispatch</h3><p>An asynchronous command queue mode where the device processes queued work, reducing host CPU involvement compared with slow dispatch.</p></article>
+        <article><h3>TT-NN</h3><p>A higher-level Python tensor and operation library built on TT-Metalium. Useful for model-level experiments without writing every kernel manually.</p></article>
       </div>
     </section>
 
@@ -220,46 +552,45 @@
 
       <div class="resource-grid">
         <article class="directory-group">
-          <h3>Tenstorrent</h3>
+          <h3>Tenstorrent technical docs</h3>
           <ul>
-            <li><span>Tenstorrent developer hub</span><a href="https://tenstorrent.com/en/developers">Open</a></li>
-            <li><span><code>tt-metal</code> GitHub repository</span><a href="https://github.com/tenstorrent/tt-metal">Open</a></li>
-            <li><span>TT-Metalium documentation</span><a href="https://docs.tenstorrent.com/tt-metal/latest/tt-metalium/index.html">Open</a></li>
+            <li><span>TT-Metalium documentation home</span><a href="https://docs.tenstorrent.com/tt-metal/latest/tt-metalium/index.html">Open</a></li>
             <li><span>TT-Metalium getting started</span><a href="https://docs.tenstorrent.com/tt-metal/latest/tt-metalium/get_started/get_started.html">Open</a></li>
-            <li><span><code>tt-buda</code> archive</span><a href="https://github.com/tenstorrent/tt-buda">Open</a></li>
-            <li><span>TT-Forge MLIR compiler stack</span><a href="https://tenstorrent.com/en/software/tt-forge">Open</a></li>
+            <li><span>TT architecture and Metalium guide</span><a href="https://github.com/tenstorrent/tt-metal/blob/main/METALIUM_GUIDE.md">Open</a></li>
+            <li><span><code>tt-metal</code> GitHub repository</span><a href="https://github.com/tenstorrent/tt-metal">Open</a></li>
           </ul>
         </article>
 
         <article class="directory-group">
-          <h3>NPU Platforms</h3>
+          <h3>TT-Metalium deep links</h3>
+          <ul>
+            <li><span>Single-core matrix multiplication lab</span><a href="https://docs.tenstorrent.com/tt-metal/latest/tt-metalium/tt_metal/labs/matmul/lab1/lab1.html">Open</a></li>
+            <li><span>Memory from a kernel developer's perspective</span><a href="https://docs.tenstorrent.com/tt-metal/latest/tt-metalium/tt_metal/advanced_topics/memory_for_kernel_developers.html">Open</a></li>
+            <li><span>Circular buffer APIs</span><a href="https://docs.tenstorrent.com/tt-metal/latest/tt-metalium/tt_metal/apis/kernel_apis/circular_buffers/circular_buffers.html">Open</a></li>
+            <li><span>TT-Metalium API index</span><a href="https://docs.tenstorrent.com/tt-metal/latest/tt-metalium/tt_metal/apis/index.html">Open</a></li>
+            <li><span>Optimized multi-core matmul</span><a href="https://docs.tenstorrent.com/tt-metal/latest/tt-metalium/tt_metal/examples/matmul_multi_core_optimized.html">Open</a></li>
+          </ul>
+        </article>
+
+        <article class="directory-group">
+          <h3>Compiler and model layers</h3>
+          <ul>
+            <li><span>TT-NN documentation</span><a href="https://docs.tenstorrent.com/tt-metal/latest/ttnn/">Open</a></li>
+            <li><span>TT-Forge MLIR compiler stack</span><a href="https://tenstorrent.com/en/software/tt-forge">Open</a></li>
+            <li><span><code>tt-buda</code> archive</span><a href="https://github.com/tenstorrent/tt-buda">Open</a></li>
+            <li><span>PyBuda / TT-Buda docs</span><a href="https://docs.tenstorrent.com/pybuda/latest/index.html">Open</a></li>
+            <li><span>LLVM MLIR</span><a href="https://mlir.llvm.org/">Open</a></li>
+          </ul>
+        </article>
+
+        <article class="directory-group">
+          <h3>Related NPU platforms and courses</h3>
           <ul>
             <li><span>BOS Semiconductor Eagle-N product notes</span><a href="https://www.bos-semi.com/product">Open</a></li>
             <li><span>Microsoft NPU development for Copilot+ PCs</span><a href="https://learn.microsoft.com/en-us/windows/ai/npu-devices/">Open</a></li>
             <li><span>Intel Linux NPU driver</span><a href="https://github.com/intel/linux-npu-driver">Open</a></li>
-            <li><span>AMD Ryzen AI Software</span><a href="https://www.amd.com/en/developer/resources/ryzen-ai-software.html">Open</a></li>
-            <li><span>ONNX Runtime Vitis AI Execution Provider</span><a href="https://onnxruntime.ai/docs/execution-providers/Vitis-AI-ExecutionProvider.html">Open</a></li>
-          </ul>
-        </article>
-
-        <article class="directory-group">
-          <h3>Compiler Stacks</h3>
-          <ul>
-            <li><span>LLVM MLIR</span><a href="https://mlir.llvm.org/">Open</a></li>
-            <li><span>MLIR documentation</span><a href="https://mlir.llvm.org/docs/">Open</a></li>
-            <li><span>Apache TVM</span><a href="https://tvm.apache.org/">Open</a></li>
-            <li><span>OpenXLA XLA compiler</span><a href="https://openxla.org/xla">Open</a></li>
-            <li><span>IREE compiler and runtime</span><a href="https://iree.dev/">Open</a></li>
-          </ul>
-        </article>
-
-        <article class="directory-group">
-          <h3>Courses</h3>
-          <ul>
             <li><span>MIT 6.5940 TinyML and Efficient Deep Learning</span><a href="https://hanlab.mit.edu/courses/2024-fall-65940">Open</a></li>
             <li><span>Stanford CS149 Parallel Computing</span><a href="https://cs149.stanford.edu/">Open</a></li>
-            <li><span>CMU 15-418 Parallel Computer Architecture</span><a href="https://www.cs.cmu.edu/~418/">Open</a></li>
-            <li><span>UC Berkeley CS 182 Deep Learning</span><a href="https://cs182sp21.github.io/">Open</a></li>
           </ul>
         </article>
       </div>
