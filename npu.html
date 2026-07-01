@@ -3,11 +3,11 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="Bui Cong Nguyen's NPU systems and compiler page: resume match, Tenstorrent tt-buda and tt-metal exploration, TT-Metalium terminology, diagrams, coursework, and technical resources.">
-  <title>NPU Systems, Tenstorrent, and Compiler Notes | Bui Cong Nguyen</title>
+  <meta name="description" content="A self-study guide to AI accelerators (NPU, VPU, LPU, GPU, TPU), how they are deployed, LLVM and MLIR for AI compilers, the Tenstorrent stack, and a searchable 50-question interview Q&A bank.">
+  <title>NPU, VPU &amp; LPU — AI Accelerator &amp; Compiler Study Guide | Bui Cong Nguyen</title>
   <link rel="stylesheet" href="styles.css">
 </head>
-<body>
+<body class="npu-page">
   <header class="site-header">
     <a class="brand" href="index.html#top" aria-label="Bui Cong Nguyen home">
       <img src="https://avatars.githubusercontent.com/u/72680210?v=4" alt="Bui Cong Nguyen avatar">
@@ -15,11 +15,11 @@
     </a>
     <nav aria-label="Primary navigation">
       <a href="index.html">Home</a>
-      <a href="#resume-match">Resume Match</a>
-      <a href="#deep-dive">Deep Dive</a>
-      <a href="#tech-reports">Tech Reports</a>
-      <a href="#terminology">Terminology</a>
-      <a href="#coursework">Coursework</a>
+      <a href="#processors">Processors</a>
+      <a href="#deploy">Deploy</a>
+      <a href="#llvm-mlir">LLVM &amp; MLIR</a>
+      <a href="#tenstorrent">Tenstorrent</a>
+      <a href="#qa">Q&amp;A</a>
       <a href="#resources">Resources</a>
       <a href="https://github.com/buicongnguyen">GitHub</a>
     </nav>
@@ -28,91 +28,250 @@
   <main id="top">
     <section class="hero npu-hero content-hero">
       <div class="hero-copy">
-        <p class="eyebrow">NPU compiler | Tenstorrent | edge AI</p>
-        <h1>NPU Systems, Compiler Work, and Tenstorrent Notes</h1>
+        <p class="eyebrow">AI accelerators | compilers | deployment | study guide</p>
+        <h1>NPU, VPU &amp; LPU: AI Accelerators, Compilers, and Deployment</h1>
         <p class="lede">
-          A focused page connecting my resume to Neural Processing Unit work: compiler optimization,
-          Tenstorrent <code>tt-buda</code> and <code>tt-metal</code> exploration, model deployment, computer vision workloads,
-          embedded inference, and hardware-aware software.
+          A self-study reference for AI-accelerator and ML-compiler engineering. It compares NPUs, VPUs, LPUs,
+          GPUs, and TPUs, shows how models are deployed to each, walks the LLVM and MLIR compiler path, uses
+          Tenstorrent as a concrete case study, and ends with a searchable bank of 50 interview questions and answers.
         </p>
         <div class="hero-actions">
-          <a class="button" href="#tenstorrent">Tenstorrent Work</a>
-          <a class="button secondary" href="#deep-dive">Technical Deep Dive</a>
-          <a class="button secondary" href="#resources">Technical Docs</a>
+          <a class="button" href="#processors">Compare accelerators</a>
+          <a class="button secondary" href="#qa">Interview Q&amp;A</a>
+          <a class="button secondary" href="#llvm-mlir">LLVM &amp; MLIR</a>
         </div>
       </div>
     </section>
 
-    <section id="resume-match" class="section">
+    <section id="processors" class="section">
       <div class="section-heading">
-        <p class="eyebrow">From resume</p>
-        <h2>Why NPU Fits My Background</h2>
+        <p class="eyebrow">Accelerators</p>
+        <h2>NPU, VPU &amp; LPU: What They Are and How They Differ</h2>
         <p class="section-note">
-          The resume explicitly lists work as a Researcher NPU Compiler Software Engineer at
-          BOS Semiconductor, focused on optimizing an NPU compiler for Neural Network Processing Unit systems.
+          "NPU", "VPU", and "LPU" name overlapping classes of AI accelerator. GPU and NPU are the established
+          terms; VPU and LPU are largely vendor labels. The one axis that explains most of the differences is how
+          much generality each design trades away for performance-per-watt or deterministic latency.
         </p>
       </div>
 
       <div class="evidence-grid">
         <article>
-          <span>Resume</span>
-          <h3>NPU compiler optimization</h3>
+          <span>NPU</span>
+          <h3>Neural Processing Unit</h3>
           <p>
-            The role connects directly to compiler passes, model lowering, profiling, and deployment
-            constraints for automotive and edge AI acceleration.
+            Dedicated neural-inference accelerator, usually an IP block inside a mobile or PC SoC. MAC / systolic
+            arrays plus small on-chip SRAM, integer-native (INT8/INT4). Optimizes inferences-per-watt at unit batch.
+            Examples: Apple Neural Engine, Qualcomm Hexagon, Intel/AMD PC NPUs.
           </p>
         </article>
         <article>
-          <span>Samsung</span>
-          <h3>Computer vision and mobile AI</h3>
+          <span>VPU</span>
+          <h3>Vision Processing Unit</h3>
           <p>
-            OCR, accessibility vision, object tracking, barcode detection, stereo and TOF calibration,
-            OpenCV, PyTorch, Android JNI, and power-sensitive production features.
+            Low-power (sub-1.5 W) CNN/vision accelerator for edge and embedded devices: SIMD/VLIW DSP cores,
+            fixed-function image signal processing, and direct camera interfaces. Intel Movidius Myriad X, Hailo-8,
+            Mobileye EyeQ. Increasingly folded into the term "NPU".
           </p>
         </article>
         <article>
-          <span>Cadence</span>
-          <h3>EDA routing and algorithms</h3>
+          <span>LPU</span>
+          <h3>Language Processing Unit</h3>
           <p>
-            Nano-routing work in Innovus used C++, TCL, Linux debugging, graph search, and runtime reduction,
-            which transfers well to compiler graph optimization and scheduling.
+            Groq's deterministic, compiler-scheduled Tensor Streaming Processor. SRAM-only (~230 MB at ~80 TB/s),
+            no HBM, no caches or reactive schedulers. Wins single-stream, jitter-free LLM decoding, but a real model
+            must be sharded across many chips.
           </p>
         </article>
         <article>
-          <span>Argosdyne</span>
-          <h3>Robotics and realtime systems</h3>
+          <span>GPU</span>
+          <h3>Graphics Processing Unit</h3>
           <p>
-            Drone control, ROS 2, MQTT telemetry, object detection, and multi-platform services are useful
-            context for edge devices that need local AI inference.
+            Fully programmable, massively-parallel SIMT engine backed by off-chip HBM (CUDA / ROCm). Dominates
+            training and high-throughput batched inference at hundreds of watts. The flexible, high-power end of the
+            spectrum. Examples: NVIDIA H100 / B200.
           </p>
         </article>
         <article>
-          <span>KAIST</span>
-          <h3>PhD/MS computer science foundation</h3>
+          <span>TPU</span>
+          <h3>Tensor Processing Unit</h3>
           <p>
-            Image processing, computer vision, information hiding, digital forensics, networks, software
-            engineering, and algorithms provide the academic base for NPU workload analysis.
+            Google's systolic-array ASIC (128&#215;128 weight-stationary MXU, bfloat16 &#215; FP32 accumulate).
+            Cloud TPU pods do training and serving; the Coral Edge TPU is the INT8, ~2 W sibling &mdash; same
+            compute principle, opposite end of the deployment spectrum.
           </p>
         </article>
         <article>
-          <span>Stack</span>
-          <h3>C++, Python, PyTorch, OpenCV</h3>
+          <span>Caveat</span>
+          <h3>Naming &amp; the TOPS trap</h3>
           <p>
-            The resume's strongest implementation stack is close to the practical NPU path:
-            C++ runtime code, Python model tooling, PyTorch models, and OpenCV-heavy vision pipelines.
+            VPU and NPU overlap: Intel rebranded its Movidius "VPU" block to "NPU" in Meteor Lake with no
+            technology change. When comparing accelerators, always check precision &mdash; INT8 TOPS is not
+            comparable to INT4 or FP16 TOPS, and peak TOPS rarely reflects real, memory-bound throughput.
           </p>
+        </article>
+      </div>
+
+      <div class="compare-wrap" style="margin-top:12px">
+        <table class="compare">
+          <thead>
+            <tr><th scope="col">Dimension</th><th scope="col">GPU</th><th scope="col">NPU</th><th scope="col">VPU</th><th scope="col">LPU</th></tr>
+          </thead>
+          <tbody>
+          <tr><th scope="row">Primary goal</th><td>General-purpose massively-parallel compute (training + inference)</td><td>Energy-efficient on-device neural inference</td><td>Low-power computer-vision / CNN inference</td><td>Deterministic ultra-low-latency LLM token generation</td></tr>
+          <tr><th scope="row">Typical workload</th><td>Training + high-throughput batched inference</td><td>Quantized DNN inference, photography, on-device LLMs</td><td>Object detection, classification, segmentation, stereo depth</td><td>Sequential autoregressive LLM decoding</td></tr>
+          <tr><th scope="row">Precision / datatypes</th><td>BF16/FP16/FP8; FP4/FP6 (Blackwell), INT8</td><td>INT8 workhorse; INT4/INT2, FP16/BF16/FP8</td><td>Low-precision fixed-point INT8/INT16</td><td>INT8 (INT32 accumulate)</td></tr>
+          <tr><th scope="row">Memory model</th><td>Off-chip HBM (3.3-7.7 TB/s), tens-hundreds GB</td><td>Small on-chip SRAM plus shared system LPDDR</td><td>On-chip scratchpad (CMX) plus in-package LPDDR4</td><td>SRAM-only (~230 MB, ~80 TB/s), no HBM</td></tr>
+          <tr><th scope="row">Programmability</th><td>Fully programmable (CUDA/ROCm), any workload</td><td>Constrained quantized DNN operators, compiler-scheduled</td><td>Programmable SIMD/VLIW DSP cores plus fixed-function</td><td>Statically compiler-scheduled pipeline, no runtime scheduling</td></tr>
+          <tr><th scope="row">Throughput vs latency</th><td>Maximizes aggregate throughput (large batches)</td><td>Inferences-per-watt at small/unit batch</td><td>Inferences-per-watt; throughput secondary</td><td>Single-stream latency, flat jitter-free per-token</td></tr>
+          <tr><th scope="row">Power envelope</th><td>Hundreds of watts to ~1 kW per package</td><td>~1-10 W integrated; hundreds W if discrete</td><td>~0.5-1.5 W</td><td>Hundreds of watts, rack-scale</td></tr>
+          <tr><th scope="row">Form factor</th><td>PCIe/SXM boards, DGX/HGX rack systems</td><td>SoC IP block; M.2/USB edge modules</td><td>Embedded SoC, USB stick, M.2/PCIe card</td><td>PCIe cards, GroqNode/GroqRack appliances</td></tr>
+          <tr><th scope="row">Where deployed</th><td>Cloud/datacenter</td><td>Mobile SoCs, AI PCs, edge, automotive</td><td>Edge: cameras, drones, robotics, ADAS</td><td>Cloud (GroqCloud) and on-prem/air-gapped</td></tr>
+          <tr><th scope="row">Representative products</th><td>NVIDIA H100/B200, Google Cloud TPU</td><td>Apple Neural Engine, Qualcomm Hexagon, Intel/AMD NPU</td><td>Intel Movidius Myriad X, Hailo-8, Mobileye EyeQ</td><td>Groq LPU/TSP, GroqCard, GroqRack</td></tr>
+          <tr><th scope="row">Software / toolchain</th><td>CUDA, TensorRT, ROCm</td><td>Core ML, ONNX Runtime EPs, QNN, OpenVINO</td><td>OpenVINO (Model Optimizer, INT8 quantization)</td><td>Groq compiler; OpenAI-compatible GroqCloud API</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="section-note" style="margin-top:10px">These accelerators trade generality for efficiency along a clear axis: GPUs are fully programmable HBM-backed engines that dominate training and batched inference at high power, while NPUs and VPUs sacrifice programmability for extreme performance-per-watt on quantized inference at the edge (VPU being the vision/CNN-specialized subclass increasingly folded into "NPU"). Groq's LPU sits at the opposite extreme from the GPU: a deterministic, compiler-scheduled, SRAM-only design that wins single-stream LLM latency but must shard models across many chips because each holds only ~230 MB. The core trade-offs are memory model (off-chip HBM vs on-chip SRAM/scratchpad), throughput vs latency bias, and programmability vs fixed-function efficiency, with "VPU" and "LPU" being largely vendor-specific labels versus the more established GPU/NPU terms.</p>
+    </section>
+
+    <section id="deploy" class="section">
+      <div class="section-heading">
+        <p class="eyebrow">Deployment</p>
+        <h2>How AI Accelerators Are Deployed</h2>
+        <p class="section-note">
+          The same trained model can target a phone, a laptop NPU, an edge camera, or a datacenter GPU. What
+          changes is the memory model, the power budget, and the runtime/execution-provider layer that dispatches
+          operators to the device with CPU fallback.
+        </p>
+      </div>
+
+      <div class="evidence-grid compact">
+        <article>
+          <span>Mobile SoC</span>
+          <h3>~1&ndash;5 W, unified LPDDR</h3>
+          <p>
+            An integrated NPU (Apple Neural Engine, Qualcomm Hexagon, MediaTek APU, Google Tensor) shares unified
+            memory with the CPU/GPU and runs INT8/INT4 for camera pipelines, speech, and small on-device LLMs.
+          </p>
+        </article>
+        <article>
+          <span>Edge / embedded</span>
+          <h3>Single-digit W, SRAM + sensors</h3>
+          <p>
+            VPUs and small NPUs (Movidius, Coral Edge TPU, Jetson, Mobileye EyeQ) use SRAM scratchpads and direct
+            sensor interfaces for vision, robotics, and ADAS, keeping inference off the cloud.
+          </p>
+        </article>
+        <article>
+          <span>AI PC</span>
+          <h3>40+ TOPS in laptop thermals</h3>
+          <p>
+            Copilot+ PCs mandate a 40+ TOPS integrated NPU (Intel Core Ultra, AMD Ryzen AI, Snapdragon X) to offload
+            on-device AI from the CPU/iGPU for battery efficiency.
+          </p>
+        </article>
+        <article>
+          <span>Datacenter</span>
+          <h3>Dedicated HBM, ~100 W&ndash;1 kW</h3>
+          <p>
+            Discrete GPUs, TPUs, and LPUs with multi-GB HBM and rack-scale interconnect (NVLink, ICI, RealScale)
+            handle large-scale training and high-throughput batched serving.
+          </p>
+        </article>
+      </div>
+
+      <div class="pipeline" style="margin-top:14px">
+        <div><strong>Train</strong><span>PyTorch, TensorFlow, JAX</span></div>
+        <div><strong>Export</strong><span>ONNX, StableHLO, Core ML</span></div>
+        <div><strong>Compile + quantize</strong><span>fuse, INT8/INT4, calibrate</span></div>
+        <div><strong>Runtime / EP</strong><span>ONNX RT, QNN, OpenVINO, CoreML</span></div>
+        <div><strong>Device</strong><span>NPU / VPU / GPU / LPU</span></div>
+      </div>
+      <p class="section-note" style="margin-top:10px">
+        The export-to-interchange step decouples the framework from the backend; the runtime / execution-provider
+        layer is the portability abstraction. In ONNX Runtime, each backend (CUDA, TensorRT, OpenVINO, QNN, CoreML,
+        NNAPI, DirectML) is a pluggable execution provider: the graph is partitioned, each subgraph is assigned to
+        the best available EP, and unsupported operators fall back to the CPU. On Windows, Windows ML sits above
+        ONNX Runtime and auto-selects the vendor EP.
+      </p>
+    </section>
+
+    <section id="llvm-mlir" class="section">
+      <div class="section-heading">
+        <p class="eyebrow">Compilers</p>
+        <h2>LLVM &amp; MLIR for AI Compilers</h2>
+        <p class="section-note">
+          Modern AI compilers do the tensor-level work (fusion, tiling, quantization, dataflow mapping) in a
+          high-level, domain-specific IR, then lower to LLVM for mature scalar/vector code generation. MLIR is the
+          multi-level IR that makes this progressive lowering practical &mdash; and it is an LLVM sub-project.
+        </p>
+      </div>
+
+      <div class="deep-grid">
+        <article>
+          <h3>LLVM IR and the three-stage pipeline</h3>
+          <p>
+            LLVM IR is a strongly-typed, three-address, SSA-form virtual instruction set. Its single-definition
+            property makes use-def chains trivial, so passes like constant propagation, GVN, and dead-code
+            elimination are simple. The pipeline is front-end (Clang, rustc) &rarr; middle-end (<code>opt</code>) &rarr;
+            back-end (<code>llc</code>: instruction selection, register allocation, codegen), all centered on IR.
+          </p>
+        </article>
+        <article>
+          <h3>Why ML stacks reuse LLVM as a terminal back-end</h3>
+          <p>
+            Graph- and tensor-level concerns are best solved in a higher-level IR where the semantics are still
+            visible. Once resolved, stacks lower to LLVM IR to inherit its mature scalar/vector optimization,
+            register allocation, and code emission (including NVPTX and AMDGPU for GPUs). XLA, Triton, IREE, and
+            TorchInductor all follow this "lower, then hand off to LLVM" pattern.
+          </p>
+        </article>
+        <article>
+          <h3>MLIR dialects and progressive lowering</h3>
+          <p>
+            MLIR has no fixed opcode set: dialects (<code>tosa</code>, <code>linalg</code>, <code>affine</code>,
+            <code>scf</code>, <code>vector</code>, <code>memref</code>, <code>gpu</code>, <code>llvm</code>) coexist in
+            one module and are lowered gradually. Domain semantics &mdash; tensors, convolutions, tiling structure
+            &mdash; survive as long as they are useful, then are lowered away. Tiling and fusion run on immutable
+            <code>linalg</code> tensors, where they are provably safe; bufferization runs later.
+          </p>
+        </article>
+        <article>
+          <h3>Where NPU vendors intercept</h3>
+          <p>
+            Because MLIR is multi-level, a vendor can intercept at the abstraction that matches their hardware
+            (commonly <code>linalg</code> or a custom dialect), inject micro-kernels and dataflow mappings, and reuse
+            upstream tiling, fusion, and bufferization instead of rebuilding a compiler. The <code>llvm</code> dialect
+            is the near-1:1 convergence point back to LLVM IR. <code>TableGen</code> then makes standing up a new NPU
+            or DSP back-end largely declarative.
+          </p>
+        </article>
+      </div>
+
+      <div class="diagram-grid" style="margin-top:12px">
+        <article class="diagram-card wide">
+          <h3>A typical MLIR lowering path to hardware</h3>
+          <div class="decision-graph" aria-label="MLIR lowering from framework to hardware">
+            <div><strong>PyTorch / TF</strong><span>torch, StableHLO</span></div>
+            <div><strong>TOSA</strong><span>portable op set</span></div>
+            <div><strong>linalg</strong><span>tile, fuse</span></div>
+            <div><strong>scf / affine + vector</strong><span>loops, SIMD</span></div>
+            <div><strong>memref</strong><span>bufferize</span></div>
+            <div><strong>llvm dialect</strong><span>terminal dialect</span></div>
+            <div><strong>LLVM IR / target</strong><span>CPU, GPU, NPU</span></div>
+          </div>
         </article>
       </div>
     </section>
 
     <section id="tenstorrent" class="section">
       <div class="section-heading">
-        <p class="eyebrow">Hands-on exploration</p>
-        <h2>Tenstorrent <code>tt-buda</code> and <code>tt-metal</code></h2>
+        <p class="eyebrow">Case study</p>
+        <h2>Tenstorrent <code>tt-metal</code> and <code>tt-forge</code></h2>
         <p class="section-note">
-          My NPU learning path includes hands-on attempts with Tenstorrent's open-source stack. The important
-          lesson is the full vertical path: model import, compiler lowering, graph scheduling, tile layout,
-          explicit data movement, and kernel execution on a grid of Tensix cores.
+          Tenstorrent's open-source stack is a useful real-world NPU case study because it exposes the full vertical
+          path: model import, compiler lowering, graph scheduling, tile layout, explicit data movement, and kernel
+          execution on a grid of Tensix cores.
         </p>
       </div>
 
@@ -121,35 +280,35 @@
           <span><code>tt-buda</code></span>
           <h3>Archived high-level compiler path</h3>
           <p>
-            Tried the BUDA/PyBuda path for compiling AI/ML models from frameworks such as PyTorch,
-            TensorFlow, ONNX, and TFLite to Tenstorrent hardware. The repository was archived in February
-            2026, so it is best treated as historical compiler-stack experience and a bridge to TT-Forge.
+            The BUDA / PyBuda path compiled AI/ML models from frameworks such as PyTorch, TensorFlow, ONNX, and
+            TFLite to Tenstorrent hardware. The repository was archived in February 2026, so it is best treated as
+            historical context and a bridge to TT-Forge.
           </p>
         </article>
         <article>
           <span><code>tt-metal</code></span>
           <h3>Low-level programming model</h3>
           <p>
-            Tried and studied the TT-Metalium route for C++ kernels, Tensix cores, explicit data movement, memory
-            layout, tiling, circular buffers, and host-to-device execution. This is the most relevant path
-            for understanding performance beyond a model-import API.
+            The TT-Metalium route exposes C++ kernels, Tensix cores, explicit data movement, memory layout, tiling,
+            circular buffers, and host-to-device execution. It is the most instructive path for understanding
+            performance beyond a model-import API.
           </p>
         </article>
         <article>
           <span>Bridge</span>
-          <h3>Compiler to runtime thinking</h3>
+          <h3>Compiler-to-runtime thinking</h3>
           <p>
-            The key learning point is how graph-level optimizations become hardware execution:
-            operator decomposition, tiling, sharding, buffer placement, NoC movement, runtime arguments,
-            synchronization, and profiling.
+            The key idea is how graph-level optimizations become hardware execution: operator decomposition, tiling,
+            sharding, buffer placement, NoC movement, runtime arguments, synchronization, and profiling.
           </p>
         </article>
         <article>
-          <span>Next</span>
-          <h3>Follow current Tenstorrent stack</h3>
+          <span>Current</span>
+          <h3>The MLIR-based stack</h3>
           <p>
-            Since <code>tt-buda</code> is archived, the practical continuation is <code>tt-metal</code>, TT-NN, and TT-Forge,
-            Tenstorrent's newer MLIR-based compiler stack.
+            Since <code>tt-buda</code> is archived, the current stack is <code>tt-metal</code>, TT-NN, and TT-Forge
+            &mdash; Tenstorrent's MLIR-based (<code>tt-mlir</code>) compiler path, a concrete example of the LLVM/MLIR
+            pattern above.
           </p>
         </article>
       </div>
@@ -158,11 +317,11 @@
     <section id="deep-dive" class="section">
       <div class="section-heading">
         <p class="eyebrow">From TT-Metalium docs</p>
-        <h2>Technical Deep Dive</h2>
+        <h2>Technical Deep Dive: A Grid-of-Cores NPU</h2>
         <p class="section-note">
-          TT-Metalium exposes more hardware detail than a typical framework runtime. That makes it valuable
-          for NPU compiler study because the programmer sees where compiler decisions land: core placement,
-          tile layout, SRAM buffering, NoC transfers, and kernel synchronization.
+          TT-Metalium exposes more hardware detail than a typical framework runtime, which makes it valuable for
+          study: the programmer sees where compiler decisions land &mdash; core placement, tile layout, SRAM
+          buffering, NoC transfers, and kernel synchronization.
         </p>
       </div>
 
@@ -183,7 +342,7 @@
         </article>
 
         <article>
-          <h3>2. The basic operation is reader -> compute -> writer</h3>
+          <h3>2. The basic operation is reader -&gt; compute -&gt; writer</h3>
           <p>
             A typical TT-Metalium program creates three kernel roles. The reader data-movement kernel moves
             tiles from DRAM or another core into L1 circular buffers. The compute kernel waits on those buffers,
@@ -261,7 +420,7 @@
         <h2>How the Stack and Kernels Fit Together</h2>
         <p class="section-note">
           These diagrams are simplified study graphs based on the TT-Metalium docs. They are not vendor block
-          diagrams, but they show the concepts I would track when studying or optimizing an NPU compiler path.
+          diagrams, but they show the concepts to track when studying or optimizing an NPU compiler path.
         </p>
       </div>
 
@@ -483,36 +642,294 @@
       </div>
     </section>
 
+    <section id="qa" class="section">
+      <div class="section-heading">
+        <p class="eyebrow">Interview prep</p>
+        <h2>Interview Q&amp;A: 50 Questions</h2>
+        <p class="section-note">
+          A searchable bank of 50 questions and model answers across accelerators, deployment, LLVM, MLIR,
+          and NPU-compiler optimization. Filter by topic, search by keyword, and click a question to reveal the
+          answer. Difficulty is tagged Basic, Intermediate, or Advanced.
+        </p>
+      </div>
+
+      <div class="qa-toolbar">
+        <input class="qa-search" type="search" placeholder="Search 50 questions and answers&hellip;" aria-label="Search questions">
+        <div class="qa-chips" role="group" aria-label="Filter by category">
+            <button class="qa-chip" data-cat="all" aria-pressed="true">All 50</button>
+            <button class="qa-chip" data-cat="accelerators" aria-pressed="false">Accelerators (10)</button>
+            <button class="qa-chip" data-cat="deployment" aria-pressed="false">Deployment (10)</button>
+            <button class="qa-chip" data-cat="llvm" aria-pressed="false">LLVM (10)</button>
+            <button class="qa-chip" data-cat="mlir" aria-pressed="false">MLIR (10)</button>
+            <button class="qa-chip" data-cat="compilers" aria-pressed="false">NPU compilers (10)</button>
+        </div>
+        <div class="qa-tools">
+          <button type="button" data-act="expand">Expand all</button>
+          <button type="button" data-act="collapse">Collapse all</button>
+        </div>
+        <p class="qa-count" id="qa-count"></p>
+      </div>
+
+      <div class="qa-groups">
+          <div class="qa-group" data-cat="accelerators">
+            <h3>Accelerators: VPU, LPU, NPU &amp; GPU <span class="qa-gcount">(10)</span></h3>
+            <div class="qa-list">
+            <details class="qa" data-cat="accelerators">
+              <summary><span class="qa-q">1. What is a Neural Processing Unit (NPU), and how does its design goal differ from that of a CPU and a GPU?</span><span class="qa-badge" data-diff="Basic">Basic</span></summary>
+              <p class="qa-a">An NPU is a domain-specific accelerator optimized for the dense linear algebra (matrix-multiply and convolution) at the heart of neural-network inference. Unlike a CPU, which is latency-optimized and general-purpose, and a GPU, which is a throughput-optimized SIMT engine built for both training and inference, an NPU trades generality for extreme energy efficiency (TOPS per watt) on quantized, low-precision math. Most consumer NPUs are IP blocks integrated into a mobile or PC SoC (Apple Neural Engine, Qualcomm Hexagon, Arm Ethos, Intel/AMD PC NPUs), sharing system DRAM and thermal budget with the CPU and GPU. The design point is inferences-per-watt at small batch sizes, not peak FLOPS or large-batch throughput.</p>
+            </details>
+            <details class="qa" data-cat="accelerators">
+              <summary><span class="qa-q">2. What does the TOPS metric measure, and why is a headline TOPS number an unreliable way to compare two accelerators?</span><span class="qa-badge" data-diff="Basic">Basic</span></summary>
+              <p class="qa-a">TOPS is Tera-Operations-Per-Second, and headline figures are almost always quoted for peak INT8 throughput, scaling roughly with (number of MACs x clock x 2), since a multiply-accumulate counts as two ops. It is unreliable first because it is precision-dependent: INT8 TOPS is not comparable to INT4 or FP16 TOPS, so numbers are only meaningful at equal precision. Second, peak TOPS is a theoretical ceiling that rarely reflects effective throughput (ops actually executed divided by latency), because real workloads are usually memory-bandwidth-bound rather than compute-bound. This gap is especially large for LLM decode, where the autoregressive, one-token-at-a-time pattern is dominated by weight-fetch bandwidth, not MAC utilization.</p>
+            </details>
+            <details class="qa" data-cat="accelerators">
+              <summary><span class="qa-q">3. What is a Vision Processing Unit (VPU), and why has the term become largely interchangeable with 'NPU'?</span><span class="qa-badge" data-diff="Basic">Basic</span></summary>
+              <p class="qa-a">A VPU is a class of AI accelerator purpose-built to run computer-vision and CNN inference at very low power (typically sub-1.5 W) for edge and embedded devices, exemplified by Intel's Movidius Myriad 2 and Myriad X. Architecturally it combines arrays of programmable SIMD/VLIW vector DSP cores (Movidius 'SHAVE' cores) with fixed-function ISP and vision hardware, large on-chip scratchpad, and direct camera interfaces, all tuned for inferences-per-watt rather than absolute throughput. The terms converged because Intel historically branded Movidius silicon a 'VPU,' but when it integrated a Movidius-derived inference block into Meteor Lake / Core Ultra CPUs it rebranded that block an 'NPU' with no fundamental technology change. So 'VPU' and 'NPU' are overlapping, largely marketing-driven names for the same broad low-power inference category, with 'VPU' foregrounding vision/CNN heritage and 'NPU' being the now-dominant general term.</p>
+            </details>
+            <details class="qa" data-cat="accelerators">
+              <summary><span class="qa-q">4. What is a systolic array, and why is it the canonical datapath for tensor accelerators like the Google TPU?</span><span class="qa-badge" data-diff="Intermediate">Intermediate</span></summary>
+              <p class="qa-a">A systolic array is a 2D grid of processing elements (multiply-accumulate units) through which operands and partial sums flow rhythmically between neighbors, so each data element is reused across many PEs as it propagates. This maximizes data reuse and minimizes traffic to the register file and SRAM, which is critical because memory movement, not the multiply itself, dominates energy in dense matrix multiply. Google's TPU Matrix Multiply Unit is the canonical example: a 128x128 (16,384 MAC) systolic array in current generations, with the Edge TPU using a smaller array on the same principle. The array is fed by a chosen stationarity (the TPU is weight-stationary, preloading and holding weights in the PEs while activations stream through) that the compiler matches to the operand-reuse pattern of the workload.</p>
+            </details>
+            <details class="qa" data-cat="accelerators">
+              <summary><span class="qa-q">5. Contrast the memory model of an integrated SoC NPU with that of a discrete datacenter accelerator such as a Cloud TPU or datacenter GPU. Why does this distinction matter for a compiler engineer?</span><span class="qa-badge" data-diff="Intermediate">Intermediate</span></summary>
+              <p class="qa-a">An integrated SoC NPU shares the system's LPDDR/DRAM with the CPU and GPU under a unified-memory model: there is no explicit host-to-device copy, but bandwidth is limited and contended, so the NPU leans heavily on small managed on-chip SRAM scratchpads to keep weights and tiles resident. A discrete accelerator has its own dedicated high-bandwidth memory (HBM or GDDR, tens of GB at TB/s), requires explicit host-device transfers over PCIe or NVLink, and draws hundreds of watts for orders of magnitude more compute. For a compiler this shapes tiling and memory planning: on an integrated NPU you tile aggressively to fit tiny SRAM and schedule around shared-bus contention, whereas on a discrete part you plan HBM staging, double-buffered DMA, and host-device transfer overlap. It also drives roofline reasoning, since the two tiers have very different memory-bandwidth ceilings.</p>
+            </details>
+            <details class="qa" data-cat="accelerators">
+              <summary><span class="qa-q">6. Why do many NPUs require quantization to run a model at all, and how do PTQ and QAT differ in achieving it?</span><span class="qa-badge" data-diff="Intermediate">Intermediate</span></summary>
+              <p class="qa-a">Many NPU MAC arrays are integer-native, so quantization is part of the compiler rather than an optional pass; Qualcomm's Hexagon backend in QNN, for example, accepts only quantized graphs (int8/int16, uint8/uint16) expressed as Quantize-Dequantize (QDQ) graphs, and FP32 must be converted before it can execute. Post-Training Quantization (PTQ) converts a trained FP model to INT8/INT4 directly, using a small calibration dataset to pick activation ranges via min-max, entropy/KL, or percentile methods; it is fast and needs no retraining but degrades at very low bit-widths. Quantization-Aware Training (QAT) inserts fake-quant nodes and fine-tunes so weights adapt to rounding, recovering accuracy at INT4/FP4 where PTQ falls off. Granularity also matters: per-tensor is cheapest, per-channel is standard for convolutions, and per-block schemes like NVFP4/MXFP are emerging for LLMs.</p>
+            </details>
+            <details class="qa" data-cat="accelerators">
+              <summary><span class="qa-q">7. The Microsoft Copilot+ PC program sets a 40+ TOPS NPU bar. Which vendor NPUs currently clear it, and how does software on Windows actually dispatch a model to the NPU?</span><span class="qa-badge" data-diff="Intermediate">Intermediate</span></summary>
+              <p class="qa-a">Qualcomm's Snapdragon X Elite/Plus shipped first with a ~45 TOPS Hexagon NPU, followed by Intel Lunar Lake (Core Ultra 200V, NPU 4.0 at ~48 TOPS) and AMD Ryzen AI 300 'Strix Point' (XDNA 2 at ~50 TOPS), with Snapdragon X2 Elite pushing to ~80 TOPS. On Windows, apps reach the NPU through Windows ML (the recommended layer, superseding raw DirectML), which sits over ONNX Runtime and auto-selects a hardware Execution Provider such as the QNN EP for Qualcomm Hexagon or the OpenVINO EP for the Intel NPU, with graceful fallback to GPU or CPU for unsupported operators. The model is quantized (typically INT8/INT4) and compiled ahead-of-time for the specific NPU. Vendors cache the compiled graph as a serialized context/engine binary to skip recompilation at load time.</p>
+            </details>
+            <details class="qa" data-cat="accelerators">
+              <summary><span class="qa-q">8. Groq's LPU is described as achieving 'radical determinism.' What specific hardware is removed to get there, and how does its memory design enable fast, jitter-free LLM decoding?</span><span class="qa-badge" data-diff="Advanced">Advanced</span></summary>
+              <p class="qa-a">The LPU (Groq's Tensor Streaming Processor) deliberately omits the reactive, dynamically-scheduled hardware that CPUs and GPUs rely on: branch predictors, caches, arbiters, reorder buffers, and out-of-order/hardware schedulers. All scheduling is pushed into a compiler that lays out every instruction and every byte of data movement cycle-by-cycle across a functionally-sliced 2D grid of matrix, vector, switch, and memory slices, with data flowing as SIMD 'streams' like a programmable assembly line. Removing reactive machinery makes timing exactly predictable and frees die area for compute and SRAM: the first-gen 14nm chip holds up to ~230 MB of on-chip SRAM at roughly 80 TB/s as primary weight storage, with no external HBM. Because autoregressive decoding is sequential and memory-bandwidth-bound, keeping weights in SRAM at far higher bandwidth than a GPU's HBM and eliminating memory-stall variance yields high single-stream tokens/sec and flat per-token latency; the tradeoff is that only hundreds of MB fit per chip, so real models must be sharded across many chips linked by the statically-scheduled RealScale fabric.</p>
+            </details>
+            <details class="qa" data-cat="accelerators">
+              <summary><span class="qa-q">9. Place GPU, TPU, NPU, VPU, and LPU on a spectrum of programmability versus specialization, and explain how memory model and throughput-versus-latency bias track that spectrum.</span><span class="qa-badge" data-diff="Advanced">Advanced</span></summary>
+              <p class="qa-a">Programmability decreases as specialization increases: GPUs are fully programmable SIMT engines (CUDA/ROCm) that run graphics, HPC, and any tensor workload; TPUs are compiler-driven systolic-array ASICs (XLA/JAX) that stay flexible across model types; NPUs and VPUs run a constrained set of quantized DNN operators through fixed-function engines; and Groq's LPU is a statically-scheduled, compiler-controlled pipeline with essentially no runtime scheduling. The memory model tracks this: GPUs and TPUs use off-chip HBM (H100 ~3.35 TB/s, TPU v5p ~2.77 TB/s), NPUs/VPUs use small on-chip SRAM plus shared system LPDDR, and the LPU is radically SRAM-only (~230 MB at ~80 TB/s, no external DRAM in the critical path). The throughput-versus-latency bias follows too: GPUs and TPUs maximize aggregate throughput with large batches and big pods, NPUs/VPUs optimize inferences-per-watt at unit batch on-device, and the LPU explicitly optimizes single-stream token latency via deterministic dataflow. Power spans roughly five orders of magnitude, from ~1-5 W mobile NPUs to hundreds of watts or ~1 kW per datacenter package.</p>
+            </details>
+            <details class="qa" data-cat="accelerators">
+              <summary><span class="qa-q">10. Google ships both the Cloud TPU and the Coral Edge TPU. Explain how they embody the same architectural principle yet occupy opposite ends of the deployment spectrum, and what changes between them.</span><span class="qa-badge" data-diff="Advanced">Advanced</span></summary>
+              <p class="qa-a">Both are built on the same core principle: a systolic-array Matrix Multiply Unit of MAC processing elements with weight-stationary dataflow, fed by on-chip SRAM under compiler-scheduled tiling. The Cloud TPU is a discrete datacenter accelerator with 128x128 systolic MXUs, bfloat16 multiply with FP32 accumulate, multi-GB HBM (v5p ~95 GB), and liquid cooling, deployed in pods interconnected by ICI (v5p up to 8,960 chips in a 3D torus) for both training and large-scale serving. The Coral Edge TPU is its low-power sibling: an INT8-only ~4 TOPS engine at ~2 W in a USB/M.2/SoM module, running only inference on TFLite/LiteRT models compiled by the Edge TPU compiler. So what changes across the spectrum is scale and role, not the fundamental compute pattern: precision (bfloat16+FP32 versus INT8-only), memory (HBM versus tiny on-chip SRAM plus host), power (hundreds of watts versus ~2 W), multi-chip scale-out versus a single edge module, and training-plus-serving versus inference-only.</p>
+            </details>
+            </div>
+          </div>
+          <div class="qa-group" data-cat="deployment">
+            <h3>Deployment &amp; Systems <span class="qa-gcount">(10)</span></h3>
+            <div class="qa-list">
+            <details class="qa" data-cat="deployment">
+              <summary><span class="qa-q">11. Walk me through the canonical export-and-deploy pipeline that takes a trained PyTorch/TensorFlow model to a target accelerator. What are the distinct stages?</span><span class="qa-badge" data-diff="Basic">Basic</span></summary>
+              <p class="qa-a">The common pipeline has five stages. (1) Train in a framework (PyTorch/TensorFlow/JAX); (2) export the model to an interchange graph IR such as ONNX, StableHLO, TorchScript, or Core ML; (3) compile and optimize for the specific target, which includes post-training INT8/INT4 quantization with calibration plus operator fusion and layout canonicalization; (4) load the compiled artifact into a runtime or execution-provider abstraction that partitions the graph and dispatches ops to the device; and (5) execute on hardware. The export-to-interchange step is what decouples the framework from the backend, and the runtime/EP layer is the portability abstraction that lets one exported model target many devices with CPU fallback for unsupported ops.</p>
+            </details>
+            <details class="qa" data-cat="deployment">
+              <summary><span class="qa-q">12. Contrast latency-optimized versus throughput-optimized inference deployment. Where does batching fit, and what is the fundamental tradeoff?</span><span class="qa-badge" data-diff="Basic">Basic</span></summary>
+              <p class="qa-a">Latency-optimized serving minimizes time-to-result for a single request (small or unit batch), which is what interactive/on-device workloads and autoregressive LLM decode need; throughput-optimized serving maximizes aggregate requests processed per second, which is how datacenter GPUs and TPUs are typically run. Batching is the primary lever for throughput: grouping requests amortizes weight loads and keeps the MAC/systolic array well-fed, raising arithmetic intensity and hardware utilization. The tradeoff is that larger batches increase per-request tail latency, because a request may wait to fill a batch and then shares compute with others. Edge NPUs deliberately optimize inferences-per-watt at unit batch, while Groq's LPU is an extreme latency point that flattens per-token latency with deterministic dataflow rather than chasing batch throughput.</p>
+            </details>
+            <details class="qa" data-cat="deployment">
+              <summary><span class="qa-q">13. A model runs fine on CPU but must ship on a Qualcomm Hexagon NPU. Why is quantization not optional here, and what graph form does the QNN backend expect?</span><span class="qa-badge" data-diff="Intermediate">Intermediate</span></summary>
+              <p class="qa-a">Qualcomm's Hexagon Tensor Processor (HTP) is integer-native, so the QNN (AI Engine Direct) backend targeting the HTP accepts quantized graphs (int8/uint8, int16/uint16); a plain FP32 graph cannot execute on the HTP. This makes the quantizer effectively part of the compiler rather than an optional pass. Models are commonly expressed as QDQ (Quantize-Dequantize) graphs, where explicit quantize/dequantize nodes carry the scales and zero-points the compiler folds into integer kernels. In practice you run PTQ with a calibration set (or QAT if accuracy degrades at low bit-width), producing per-channel weight scales, then compile and serialize to a QNN context binary. This is typically surfaced through the ONNX Runtime QNN execution provider.</p>
+            </details>
+            <details class="qa" data-cat="deployment">
+              <summary><span class="qa-q">14. Explain the ONNX Runtime execution-provider model. How does one ONNX model target CUDA, TensorRT, OpenVINO, QNN, or CoreML, and what happens when an EP lacks an operator?</span><span class="qa-badge" data-diff="Intermediate">Intermediate</span></summary>
+              <p class="qa-a">ONNX Runtime treats each backend as a pluggable execution provider (EP): CUDA, TensorRT, OpenVINO, QNN, NNAPI, CoreML, DirectML, CANN, and others. At session load, the runtime partitions the model graph and assigns each supported subgraph to the highest-priority EP that can run it, so the same ONNX file retargets to many devices without re-authoring. When an EP does not implement an operator, that op or subgraph falls back to the CPU EP, which preserves correctness but can hurt performance if fallbacks are frequent or force host-device round trips. Some EPs also build and cache an optimized artifact on first run — TensorRT caches an "engine" and QNN caches a "context binary" — so subsequent loads skip recompilation. On Windows, Windows ML sits above ONNX Runtime and auto-selects the vendor EP (QNN for Qualcomm, OpenVINO for Intel, TensorRT-RTX for NVIDIA) with graceful GPU/CPU fallback.</p>
+            </details>
+            <details class="qa" data-cat="deployment">
+              <summary><span class="qa-q">15. Compare deployment across the four tiers: mobile SoC, edge/embedded, AI PC, and datacenter/cloud. What distinguishes them in memory model, power, and accelerator type?</span><span class="qa-badge" data-diff="Intermediate">Intermediate</span></summary>
+              <p class="qa-a">Mobile SoC deployment uses an integrated NPU (Apple Neural Engine, Qualcomm Hexagon, MediaTek APU, Google Tensor) at roughly 1-5 W that shares unified LPDDR with the CPU/GPU and runs INT8/INT4 for camera pipelines, speech, and small on-device LLMs. Edge/embedded uses VPUs and small NPUs (Movidius, Coral Edge TPU, Jetson, Mobileye EyeQ) with SRAM scratchpads and direct sensor interfaces at single-digit watts for vision, robotics, and ADAS. AI PCs use integrated 40+ TOPS NPUs (Intel Core Ultra, AMD Ryzen AI, Snapdragon X) within laptop thermals for Copilot+ features, offloading from the CPU/iGPU for battery efficiency. Datacenter/cloud uses discrete GPUs, TPUs, and LPUs with dedicated multi-GB HBM, hundreds of watts to ~1 kW per package, and rack-scale interconnect (NVLink for GPUs, ICI for TPUs, RealScale for Groq); they alone do large-scale training plus high-throughput batched serving. The sharpest divide is memory: shared LPDDR or on-chip SRAM at the edge versus dedicated HBM requiring explicit host-device transfers in the datacenter.</p>
+            </details>
+            <details class="qa" data-cat="deployment">
+              <summary><span class="qa-q">16. What is the Copilot+ PC NPU requirement, and how do applications actually reach the NPU on Windows versus on Apple and Android platforms?</span><span class="qa-badge" data-diff="Intermediate">Intermediate</span></summary>
+              <p class="qa-a">Microsoft requires a 40+ TOPS integrated NPU (alongside 16 GB RAM and 256 GB storage) for Copilot+ PC certification, enabling on-device features like Recall, live captions/translation, Windows Studio Effects, and image generation; Qualcomm Snapdragon X Elite (~45 TOPS) shipped first, followed by Intel Lunar Lake / Core Ultra 200V (~48 TOPS) and AMD Ryzen AI 300 (~50 TOPS). On Windows, apps increasingly reach the NPU through Windows ML — the strategic successor to DirectML for on-device inference, layered over ONNX Runtime — which auto-loads the vendor execution provider (QNN for Qualcomm, OpenVINO for Intel, Vitis AI for AMD) with fallback to GPU/CPU; DirectML remains a supported bundled EP. On Apple platforms the Neural Engine has no direct public API and is accessed only implicitly through Core ML, which decides op placement. On Android the path was historically NNAPI, but NNAPI was deprecated in Android 15 in favor of LiteRT (TensorFlow Lite) plus vendor delegates/SDKs, with NPU coverage still fragmented.</p>
+            </details>
+            <details class="qa" data-cat="deployment">
+              <summary><span class="qa-q">17. TOPS ratings are a notorious source of confusion when comparing accelerators for a deployment decision. Why is headline TOPS often misleading, and what actually bounds real inference performance?</span><span class="qa-badge" data-diff="Advanced">Advanced</span></summary>
+              <p class="qa-a">Headline TOPS is a peak figure computed as roughly MACs × clock × 2 (a MAC counts as two ops), and it is precision-dependent, so INT8 TOPS is not comparable to INT4 or FP16 TOPS — comparing across precisions is meaningless. "Effective TOPS" (ops actually executed divided by latency) is frequently many times lower than peak because real workloads, especially LLM decode, are memory-bandwidth-bound rather than compute-bound. A roofline analysis makes this concrete: attainable throughput is capped by peak memory bandwidth until arithmetic intensity (FLOPs per byte) is high enough to hit the compute ceiling, so a kernel with low intensity never approaches peak TOPS regardless of array size. For integrated NPUs this is worsened by shared LPDDR bandwidth contended with the CPU/GPU. The practical implication: for deployment you evaluate achievable latency/throughput on the real model and shapes, and treat TOPS only as a same-precision, order-of-magnitude sanity check.</p>
+            </details>
+            <details class="qa" data-cat="deployment">
+              <summary><span class="qa-q">18. Groq's LPU and a discrete GPU represent opposite ends of the deployment design space. Explain the SRAM-only tradeoff and why it forces multi-chip sharding, and what deployment niche it wins.</span><span class="qa-badge" data-diff="Advanced">Advanced</span></summary>
+              <p class="qa-a">The Groq LPU stores weights in ~230 MB of on-chip SRAM at roughly 80 TB/s with no external HBM/DRAM in the critical path, versus a GPU's off-chip HBM at single-digit TB/s (e.g., an H100 at ~3.35 TB/s). That order-of-magnitude bandwidth edge, combined with fully compiler-scheduled deterministic execution (no caches, branch predictors, or reactive schedulers), gives very high tokens/sec and flat, jitter-free per-token latency with essentially no tail latency for memory-bandwidth-bound autoregressive decode. The catch is capacity: a few hundred MB per chip cannot hold a real LLM, so the model must be sharded across many LPUs, with inter-chip movement also statically scheduled over the RealScale fabric so hundreds of chips act as one deterministic machine. This raises system cost and complexity but wins the low-latency interactive/agentic LLM serving niche — deployed as the GroqCloud token API or on-prem GroqRack for regulated, air-gapped environments — rather than training or batched-throughput-only workloads.</p>
+            </details>
+            <details class="qa" data-cat="deployment">
+              <summary><span class="qa-q">19. For datacenter inference deployment, teams commonly compile a model into a cached, target-specific artifact rather than running the graph interpretively. Using TensorRT as the example, what does that build produce and why cache it?</span><span class="qa-badge" data-diff="Advanced">Advanced</span></summary>
+              <p class="qa-a">TensorRT performs an ahead-of-time build that produces a serialized "engine": an optimized plan with layer and tensor fusion, precision calibration (INT8 PTQ/QAT, and FP8/FP4 on newer parts), kernel auto-tuning selected for the specific GPU and input shapes, and optional 2:4 structured-sparsity support on Sparse Tensor Cores. Fusion is one of the highest-impact latency optimizations because it collapses chains like conv+bias+ReLU or the attention softmax chain into single kernels, avoiding round trips to DRAM. The engine is cached so you pay the expensive build once offline instead of recompiling on every process start, which matters for autoscaling where cold starts are frequent; the analogous pattern is a QNN context binary or an XLA executable. The caveat is that an engine is tied to the GPU architecture, TensorRT version, and often the profiled shape ranges, so it must be rebuilt when any of those change — a real operational concern for fleet management.</p>
+            </details>
+            <details class="qa" data-cat="deployment">
+              <summary><span class="qa-q">20. When integrating an NPU as an IP block into an SoC (versus a discrete accelerator), what system-level constraints most shape the compiler and deployment story?</span><span class="qa-badge" data-diff="Advanced">Advanced</span></summary>
+              <p class="qa-a">An integrated SoC NPU shares system LPDDR and a single power/thermal budget with the CPU and GPU, so unlike a discrete accelerator with its own HBM and hundreds of watts, it has no private high-bandwidth memory and no explicit host-device copy — but it contends for bandwidth and must fit a small (~1-10 W) envelope. That makes on-chip SRAM residency a central design goal: the compiler must tile/block tensors to fit the limited scratchpad, choose a dataflow stationarity (weight/output/row-stationary) matching operand reuse, and use double-buffered (ping-pong) DMA to overlap tile loads with compute and hide memory latency. Because these arrays are integer-native, quantization to INT8/INT4 is effectively mandatory and part of the compile step, and dataflow is statically scheduled ahead-of-time rather than dynamically, so vendor compilers (QNN, OpenVINO, Core ML, RKNN, Arm Vela) do memory planning and mapping offline. The deployment artifact is a serialized, device-specific context/engine binary shipped inside the app, typically dispatched via an ONNX Runtime EP or platform runtime with CPU fallback for unsupported ops.</p>
+            </details>
+            </div>
+          </div>
+          <div class="qa-group" data-cat="llvm">
+            <h3>LLVM <span class="qa-gcount">(10)</span></h3>
+            <div class="qa-list">
+            <details class="qa" data-cat="llvm">
+              <summary><span class="qa-q">21. What is LLVM IR, and which three of its properties make dataflow optimizations straightforward?</span><span class="qa-badge" data-diff="Basic">Basic</span></summary>
+              <p class="qa-a">LLVM IR is a strongly-typed, three-address, SSA-form virtual instruction set that decouples language front-ends from hardware back-ends. Its SSA property means every value has exactly one static definition, so use-def chains are trivial and passes like constant propagation, global value numbering, and dead-code elimination become simple. It is three-address (operations name their operands and result explicitly) and strongly typed, with memory modeled explicitly through load/store on typed pointers rather than implicit register aliasing. It also exists in three isomorphic forms — in-memory C++ objects, human-readable .ll text, and compact .bc bitcode — which lets tools inspect, serialize, and re-ingest the same IR losslessly.</p>
+            </details>
+            <details class="qa" data-cat="llvm">
+              <summary><span class="qa-q">22. Describe the canonical three-stage LLVM pipeline and name the tool that embodies each stage.</span><span class="qa-badge" data-diff="Basic">Basic</span></summary>
+              <p class="qa-a">The pipeline is front-end, middle-end, and back-end, all centered on LLVM IR. The front-end (e.g., Clang for C/C++/Objective-C, or rustc/swiftc/flang) lowers source to LLVM IR; for Clang this is source to AST to IR. The middle-end, driven by opt, runs target-independent analyses and transforms directly on IR. The back-end, driven by llc, lowers IR to target-specific machine code through instruction selection, scheduling, register allocation, and prologue/epilogue insertion before emitting assembly or object code via the MC layer. This clean separation is why one optimizer-and-codegen investment is amortized across dozens of front-end languages and hardware targets.</p>
+            </details>
+            <details class="qa" data-cat="llvm">
+              <summary><span class="qa-q">23. Why do ML and NPU compiler stacks overwhelmingly reuse LLVM as a terminal back-end rather than as a whole-program solution?</span><span class="qa-badge" data-diff="Intermediate">Intermediate</span></summary>
+              <p class="qa-a">Graph- and tensor-level concerns — operator fusion, tiling, layout and quantization, and dynamic shapes — are best handled in a higher-level, domain-specific IR where the semantics are still visible. Once those are resolved, stacks lower to LLVM IR specifically to inherit LLVM's mature scalar and vector optimization, register allocation, instruction scheduling, and battle-tested code emission for CPUs and GPUs. This avoids re-implementing low-level compiler engineering per accelerator and lets teams focus their effort on the parts unique to their hardware. XLA, Triton, IREE, Mojo/MAX, TorchInductor, and vendor NPU stacks all follow this 'lower-then-hand-off-to-LLVM' pattern.</p>
+            </details>
+            <details class="qa" data-cat="llvm">
+              <summary><span class="qa-q">24. Name several representative target-independent middle-end passes and explain what mem2reg/SROA accomplishes and why it matters.</span><span class="qa-badge" data-diff="Intermediate">Intermediate</span></summary>
+              <p class="qa-a">Representative target-independent passes include mem2reg/SROA, function inlining, instcombine (peephole simplification), GVN (redundancy elimination), the loop passes LICM and unrolling, loop and SLP vectorization, and various interprocedural passes. mem2reg (and its more general sibling SROA, scalar replacement of aggregates) promotes stack allocas into SSA virtual registers, replacing memory traffic with pure SSA values reconciled by phi nodes at control-flow merges. This matters because most front-ends, including Clang, initially emit locals as alloca/load/store; putting them into SSA form is what unlocks the rest of the SSA-based optimizers. The new PassManager organizes all of these by scope into Module, CGSCC, Function, and Loop pass managers.</p>
+            </details>
+            <details class="qa" data-cat="llvm">
+              <summary><span class="qa-q">25. Contrast SelectionDAG and GlobalISel as instruction-selection frameworks in an LLVM back-end.</span><span class="qa-badge" data-diff="Advanced">Advanced</span></summary>
+              <p class="qa-a">SelectionDAG is the legacy framework: it builds a dataflow DAG per basic block, legalizes types and operations, runs DAG-combines, and then greedily tree-pattern-matches nodes to target instructions — so selection is fundamentally block-local. GlobalISel is the newer replacement that operates on Generic Machine IR (gMIR) across whole functions through a pipeline of IRTranslator, Legalizer, RegBankSelect, and InstructionSelect. Working at whole-function scope enables faster and more global selection and avoids rebuilding a DAG per block. Importantly, both frameworks can share TableGen-described selection patterns, so a target's pattern investment is not wasted when migrating.</p>
+            </details>
+            <details class="qa" data-cat="llvm">
+              <summary><span class="qa-q">26. What does register allocation do in LLVM, which allocators ship in-tree, and which is the production default?</span><span class="qa-badge" data-diff="Advanced">Advanced</span></summary>
+              <p class="qa-a">Register allocation maps an unbounded number of virtual registers onto the finite set of physical registers, inserting spill code to memory when register pressure exceeds what is available. LLVM ships four allocators selectable via -regalloc=: Fast (used at -O0, prioritizing compile speed), Basic, Greedy (the default at -O1 and above), and PBQP (Partitioned Boolean Quadratic Programming). Greedy is the production workhorse and performs global live-range splitting to reduce spills. After allocation, prologue/epilogue insertion finalizes the stack frame and resolves references to abstract stack slots.</p>
+            </details>
+            <details class="qa" data-cat="llvm">
+              <summary><span class="qa-q">27. What is TableGen, and why is it central to standing up a new NPU or DSP back-end cheaply?</span><span class="qa-badge" data-diff="Intermediate">Intermediate</span></summary>
+              <p class="qa-a">TableGen is LLVM's declarative DSL in which target .td files describe registers, register classes, instruction encodings and operands, calling conventions, scheduling models, and instruction-selection patterns. TableGen back-ends consume these files and auto-generate large swaths of C++ — instruction info, register info, matcher tables, and GlobalISel selectors — so a new target is defined largely by data rather than hand-written code. For an accelerator vendor this dramatically lowers bring-up cost: custom RISC-V, DSP, or NPU instructions are added declaratively and can be upstreamed into LLVM before silicon tapes out. It is the mechanism that makes retargeting economical instead of a from-scratch C++ effort.</p>
+            </details>
+            <details class="qa" data-cat="llvm">
+              <summary><span class="qa-q">28. How does MLIR relate to LLVM, and what is the role of the llvm dialect in an ML compilation flow?</span><span class="qa-badge" data-diff="Intermediate">Intermediate</span></summary>
+              <p class="qa-a">MLIR is an LLVM sub-project providing a multi-level, dialect-extensible IR for progressive (partial) lowering of abstractions that plain LLVM IR cannot represent well, such as tensors, structured loops, and dynamic shapes. A flow composes dialect conversions — for example tosa to linalg to scf/affine plus vector to memref — until everything is expressed in the llvm dialect, which maps almost 1:1 onto LLVM IR and serves as the terminal dialect. A translation step then emits real LLVM IR for final code generation through LLVM's back-ends. So MLIR handles high-level structure and multi-level optimization, and LLVM handles the low-level scalar/vector codegen it is best at; the llvm (or spirv) dialect is the stable convergence point between the two.</p>
+            </details>
+            <details class="qa" data-cat="llvm">
+              <summary><span class="qa-q">29. How do GPU-targeting ML compilers use LLVM to emit device code, using Triton as a concrete example?</span><span class="qa-badge" data-diff="Advanced">Advanced</span></summary>
+              <p class="qa-a">For GPUs, LLVM's in-tree back-ends perform the final device-code generation: the NVPTX back-end emits NVIDIA PTX (subsequently assembled by ptxas or the driver), and the AMDGPU back-end emits AMDGCN/GCN ISA (assembled into HSACO). OpenAI's Triton is built on MLIR and lowers tile-level kernels through Triton-IR (TTIR) to Triton-GPU IR (TTGIR) to LLVM IR, and finally to PTX or AMDGCN via these back-ends. NVIDIA's own NVVM is a vendor-specific instance of the same idea — an LLVM IR-based library/back-end that generates PTX for CUDA. PyTorch 2's TorchInductor emits Triton kernels for GPUs, so it inherits this exact LLVM-to-PTX/AMDGCN path.</p>
+            </details>
+            <details class="qa" data-cat="llvm">
+              <summary><span class="qa-q">30. Compare LLVM's legacy MCJIT with modern ORC/ORCv2, and explain how lazy compilation is useful for ML runtimes.</span><span class="qa-badge" data-diff="Advanced">Advanced</span></summary>
+              <p class="qa-a">MCJIT is the legacy JIT: it compiles an entire module eagerly through the MC layer. ORC (ORCv2) is the modern replacement — layered and concurrent, with symbol definitions living in JITDylibs and layers such as IRCompileLayer and CompileOnDemandLayer determining how they compile; by default symbols compile on first lookup, and LLLazyJIT adds true per-function lazy compilation via lazy-reexports. LLJIT is the recommended MCJIT replacement built on this infrastructure. For ML runtimes, this on-demand/lazy behavior lets a compiler specialize kernels to runtime shapes and dtypes and defer per-function codegen until first call, avoiding ahead-of-time enumeration of every possible dynamic-shape variant.</p>
+            </details>
+            </div>
+          </div>
+          <div class="qa-group" data-cat="mlir">
+            <h3>MLIR <span class="qa-gcount">(10)</span></h3>
+            <div class="qa-list">
+            <details class="qa" data-cat="mlir">
+              <summary><span class="qa-q">31. What is a dialect in MLIR, and why are dialects central to the framework's design? Give a few examples of dialects and their abstraction levels.</span><span class="qa-badge" data-diff="Basic">Basic</span></summary>
+              <p class="qa-a">A dialect is a namespaced collection of operations, types, and attributes that together define a coherent unit of IR at some abstraction level; it is MLIR's primary extensibility mechanism, since MLIR has no fixed, built-in opcode set. The key property is that multiple dialects can coexist within the same module, so a program can hold high-level and low-level ops side by side and be lowered gradually between them. Examples span the abstraction spectrum: tosa and stablehlo represent high-level ML operators, linalg captures structured linear algebra, affine and scf express loop nests and structured control flow, vector models SIMD, memref represents buffers, and the llvm dialect mirrors LLVM IR nearly 1:1 as a terminal dialect. This open, layered design is exactly what lets hardware vendors add their own dialects without forking the whole infrastructure.</p>
+            </details>
+            <details class="qa" data-cat="mlir">
+              <summary><span class="qa-q">32. Describe MLIR's structural nesting model. What are Operations, Regions, Blocks, and Values, and how do they relate?</span><span class="qa-badge" data-diff="Basic">Basic</span></summary>
+              <p class="qa-a">MLIR IR is a nested structure where Operations are the nodes and Values are the SSA edges connecting them. The containment hierarchy is recursive: an Operation can contain zero or more Regions, a Region contains a list of Blocks, and each Block contains a list of Operations, which can themselves contain Regions. Every Value is either an operation result or a block argument, has exactly one definition and a Type, and thus satisfies static single assignment. Blocks end in a terminator and take block arguments in place of PHI nodes, so control-flow merges pass values as successor-block arguments. This uniform, self-similar structure is what lets one framework represent everything from a whole tensor-graph op with nested regions down to a single llvm.add.</p>
+            </details>
+            <details class="qa" data-cat="mlir">
+              <summary><span class="qa-q">33. What does "progressive (partial) lowering" mean in MLIR, and why is it especially valuable for NPU/AI-compiler backends?</span><span class="qa-badge" data-diff="Intermediate">Intermediate</span></summary>
+              <p class="qa-a">Progressive lowering means a compiler translates a program through a sequence of dialects step by step (e.g. tosa to linalg to scf/affine plus vector to memref to llvm) rather than in one monolithic frontend-to-backend jump, and partial lowering means only some ops are converted at each stage so mixed-abstraction IR is legal in between. This matters because domain semantics like convolutions, tiling structure, and tensor value semantics are preserved as long as they are useful for analysis and optimization, then discarded only when lowered away. For NPU backends specifically, it lets a vendor intercept at whatever abstraction best matches their hardware, commonly linalg or a custom vendor dialect, and inject custom micro-kernels or dataflow mappings there. Crucially, they reuse upstream tiling, fusion, and bufferization instead of rebuilding a full compiler stack, which is the core economic argument for multi-level IR.</p>
+            </details>
+            <details class="qa" data-cat="mlir">
+              <summary><span class="qa-q">34. Why are tiling and fusion in MLIR typically performed on tensor-valued ops (like linalg) rather than after bufferization? What role does the linalg dialect play?</span><span class="qa-badge" data-diff="Intermediate">Intermediate</span></summary>
+              <p class="qa-a">Tiling and fusion are performed while values are still immutable, value-semantic tensors because that immutability makes the transforms provably safe and freely composable: there is no aliasing or mutable-buffer hazard to reason about, so producers and consumers can be split and merged without worrying about clobbering shared memory. The linalg dialect is the workhorse here because its named and generic structured ops carry explicit indexing maps and iterator types, which expose the loop and reuse structure needed to tile and fuse mechanically. Once tiled, loops are materialized via scf or affine and inner data movement via the vector dialect. Doing this before bufferization is deliberate; bufferization runs late, after the tiling and fusion decisions are locked in, so the resulting buffers reflect an already-optimized loop nest.</p>
+            </details>
+            <details class="qa" data-cat="mlir">
+              <summary><span class="qa-q">35. Explain MLIR's dialect-conversion framework. What are the roles of ConversionTarget, ConversionPatterns, and TypeConverter, and how does partial vs full conversion differ?</span><span class="qa-badge" data-diff="Intermediate">Intermediate</span></summary>
+              <p class="qa-a">The dialect-conversion framework drives lowering from one set of dialects to another. A ConversionTarget declares legality: each operation is marked Legal, Illegal, or Dynamically Legal (legal only if a predicate holds, e.g. on operand types). ConversionPatterns are rewrite rules that transform illegal ops into legal ones, and the framework can transitively compose an A-to-C lowering from separate A-to-B and B-to-C patterns. A TypeConverter maps types across the boundary, supporting 1-to-1 and 1-to-N conversions, and the framework inserts unrealized_conversion_cast ops to bridge temporary type mismatches that later patterns reconcile. Full conversion requires every op to end up legal or it fails, whereas partial conversion tolerates remaining illegal ops, which is what enables the incremental, mixed-abstraction lowering MLIR is built around.</p>
+            </details>
+            <details class="qa" data-cat="mlir">
+              <summary><span class="qa-q">36. How are transformations expressed and scheduled in MLIR? Contrast rewrite patterns with the PassManager, and mention declarative rewrite mechanisms.</span><span class="qa-badge" data-diff="Intermediate">Intermediate</span></summary>
+              <p class="qa-a">Transformations are expressed as pattern-based rewrites: a RewritePattern matches an op subgraph and replaces it, and these are commonly applied by the greedy pattern rewriter, which repeatedly applies patterns until it reaches a fixpoint. Patterns can be written in C++ or declaratively via DRR (table-driven declarative rewrite rules in TableGen) or PDL (the pattern-description-language dialect), which reduces boilerplate for structural matches. Passes bundle related transformations and are scheduled by the PassManager, which nests pass pipelines over the op hierarchy, for example running a pass per func.func nested inside a module pipeline. So patterns are the fine-grained rewriting mechanism, while the PassManager handles orchestration, ordering, and nesting; tools like mlir-opt compose these pipelines for development and debugging.</p>
+            </details>
+            <details class="qa" data-cat="mlir">
+              <summary><span class="qa-q">37. What is bufferization in MLIR, and how does One-Shot Bufferize decide on in-place reuse versus inserting copies? Why does it run late in the pipeline?</span><span class="qa-badge" data-diff="Advanced">Advanced</span></summary>
+              <p class="qa-a">Bufferization converts value-semantic tensor SSA values into mutable memref buffers with explicit memory. One-Shot Bufferize performs a whole-function analysis over the tensor use-def and alias chains and prefers to reuse buffers in place, anchored by destination-passing-style out operands exposed through the DestinationStyleOpInterface, with per-op bufferization behavior driven by the BufferizableOpInterface, so a result can write into the buffer of an operand it consumes. It inserts a copy only when it detects a read-after-write conflict, i.e. a buffer would be overwritten while a still-needed value aliases it, which keeps the peak memory footprint low. It runs late, after tiling and fusion, because those transforms are far easier and safer on immutable tensors; once mutable buffers and aliasing exist, aggressive restructuring becomes much harder, so you lock in the loop structure first and materialize memory last.</p>
+            </details>
+            <details class="qa" data-cat="mlir">
+              <summary><span class="qa-q">38. Walk through how a high-level op like tosa.matmul is lowered toward hardware in an MLIR pipeline, naming the dialects it passes through and what each stage contributes.</span><span class="qa-badge" data-diff="Advanced">Advanced</span></summary>
+              <p class="qa-a">TOSA is a stable, numerically specified, quantization-friendly operator set used as a portable interchange dialect, so tosa.matmul starts as a single high-level op. It first lowers to the tensor and linalg dialects, typically a tensor.empty for the result init plus a linalg.matmul (or linalg.batch_matmul) structured op carrying indexing maps. At the linalg level the compiler applies tiling and fusion to fit operands into on-chip memory and to combine adjacent ops, then materializes loops via scf or affine and vectorizes inner work through the vector dialect. Next, One-Shot Bufferize converts the remaining tensors to memref buffers, choosing in-place reuse where possible. Finally the dialect-conversion framework lowers to a target dialect such as gpu, nvvm/rocdl, spirv, or the llvm dialect, from which real LLVM IR or device code is emitted; each stage preserves semantics only as long as they remain useful, which is the multi-level payoff.</p>
+            </details>
+            <details class="qa" data-cat="mlir">
+              <summary><span class="qa-q">39. Compare how IREE, Torch-MLIR, and Triton build on MLIR. What does each contribute, and how does IREE's flow/stream/hal pipeline map work onto diverse hardware including NPUs?</span><span class="qa-badge" data-diff="Advanced">Advanced</span></summary>
+              <p class="qa-a">Torch-MLIR is a frontend: it introduces torch and related conversion dialects to import PyTorch (via TorchScript, FX/Dynamo, or torch.export) and lower it into backend-ready dialects like linalg, TOSA, or StableHLO, so it feeds other MLIR backends rather than generating code itself. Triton is a tile-level GPU kernel DSL built on MLIR with its own dialects (Triton/TTIR, TritonGPU/TTGIR, plus target GPU dialects), reusing arith/math/scf and lowering TTIR to TTGIR to LLVM IR for device codegen. IREE is an end-to-end compiler and runtime that ingests StableHLO/TOSA/Torch/linalg and lowers through three stages: flow forms dispatchable functions with fusion and workload partitioning, stream schedules asynchronous, potentially multi-device execution, and hal is a hardware abstraction layer managing buffers and command submission at runtime. That hal boundary is what lets one compiled artifact target CPUs, GPUs, and NPUs; NPU vendors reuse the upstream mid-level lowering and plug custom dialects/micro-kernels in below, as seen in iree-amd-aie for AMD AIE NPUs.</p>
+            </details>
+            <details class="qa" data-cat="mlir">
+              <summary><span class="qa-q">40. Fundamentally, why does a multi-level IR like MLIR help NPU backends more than a single low-level IR such as LLVM IR alone? Frame the answer around abstraction, reuse, and where vendors intercept.</span><span class="qa-badge" data-diff="Advanced">Advanced</span></summary>
+              <p class="qa-a">A single low-level IR like LLVM IR is scalar/vector SSA and cannot cleanly represent tensors, whole loop nests, dynamic shapes, or dataflow-mapping structure, so lowering to it too early destroys exactly the domain information an NPU compiler needs to reason about tiling, fusion, quantization, and mapping stationarity onto MAC/systolic arrays. MLIR keeps those high-level semantics alive across coexisting dialects and lowers progressively, so each analysis runs at the abstraction where it is natural: tensor-level fusion on linalg, loop transforms on affine/scf, SIMD on vector, and memory planning after bufferization on memref. Just as important is reuse: vendors intercept at a mid-level dialect such as linalg or a custom dialect, inject their own micro-kernels and hardware ops, and inherit upstream tiling, fusion, bufferization, and the dialect-conversion machinery instead of rebuilding a compiler from scratch. LLVM still serves as a terminal backend via the llvm dialect for final scalar/vector codegen, so MLIR complements rather than replaces it, which is why stacks like IREE, TPU-MLIR, and MLIR-AIE converge on this pattern.</p>
+            </details>
+            </div>
+          </div>
+          <div class="qa-group" data-cat="compilers">
+            <h3>NPU Compilers &amp; Optimization <span class="qa-gcount">(10)</span></h3>
+            <div class="qa-list">
+            <details class="qa" data-cat="compilers">
+              <summary><span class="qa-q">41. What is operator fusion in an NPU compiler, and why is it typically the single most impactful latency optimization?</span><span class="qa-badge" data-diff="Basic">Basic</span></summary>
+              <p class="qa-a">Operator fusion merges a chain of adjacent operators (for example conv + bias + ReLU, or the softmax chain inside attention) into a single kernel so intermediate activations stay in on-chip registers/SRAM instead of being written out to and re-read from DRAM/HBM. The dominant cost in edge and inference workloads is off-chip memory traffic, not arithmetic, so eliminating those round-trips directly cuts both latency and energy. Fusion also raises a kernel's arithmetic intensity (FLOPs per byte moved), pushing it away from the memory-bound region of the roofline. It runs early as a mostly target-independent graph-level pass alongside constant folding, CSE, and dead-code elimination. Because it removes materialization of intermediate tensors, it is usually the highest-leverage single transform a stack applies.</p>
+            </details>
+            <details class="qa" data-cat="compilers">
+              <summary><span class="qa-q">42. Explain the difference between post-training quantization (PTQ) and quantization-aware training (QAT), and when you would reach for each.</span><span class="qa-badge" data-diff="Basic">Basic</span></summary>
+              <p class="qa-a">PTQ takes an already-trained FP model and converts it to INT8/INT4/FP8 directly, using a small calibration set to pick activation ranges via min-max, entropy/KL, or percentile clipping; it needs no retraining and is fast, making it the default first attempt. QAT instead inserts fake-quant (simulated rounding) nodes into the graph and fine-tunes, so the weights learn to compensate for quantization error, which recovers accuracy at aggressive bit-widths like INT4/FP4 where PTQ degrades noticeably. You reach for PTQ when you need a quick deployment and INT8 accuracy loss is acceptable, and for QAT when the target precision is low or the model is accuracy-sensitive. The tradeoff is cost: QAT requires a fine-tuning pipeline, representative data, and GPU time, whereas PTQ needs only a calibration pass.</p>
+            </details>
+            <details class="qa" data-cat="compilers">
+              <summary><span class="qa-q">43. What does roofline analysis tell you, and how does an NPU compiler use it to guide optimization decisions?</span><span class="qa-badge" data-diff="Basic">Basic</span></summary>
+              <p class="qa-a">A roofline plot graphs attainable throughput (FLOP/s) against arithmetic intensity (FLOPs per byte of memory traffic), bounded by two ceilings: a horizontal peak-compute line and a diagonal peak-memory-bandwidth line. Where a kernel lands classifies it as compute-bound (under the flat ceiling) or memory-bound (under the sloped ceiling). Compilers use this to justify fusion and tiling: both raise arithmetic intensity by reusing data on-chip, moving a memory-bound kernel rightward until it escapes the bandwidth-limited region. Hardware designers 'steepen the roofline' by adding HBM or larger on-chip SRAM. The model is coarse because it ignores on-chip locality across fused ops, so finer tools like Timeloop or Stream model tiling more precisely.</p>
+            </details>
+            <details class="qa" data-cat="compilers">
+              <summary><span class="qa-q">44. Why is tiling/blocking necessary on NPUs, and what makes tile-shape selection a hard problem?</span><span class="qa-badge" data-diff="Intermediate">Intermediate</span></summary>
+              <p class="qa-a">NPUs have small, explicitly-managed on-chip SRAM/scratchpads rather than large caches, so large weight and activation tensors cannot fit resident; tiling splits them into blocks sized to fit on-chip, letting operands be staged once and reused heavily across the MAC array to maximize arithmetic intensity instead of being restreamed from DRAM/HBM. The difficulty is that the optimal tile shape depends jointly on SRAM capacity and banking, the array's dataflow/stationarity, DMA bandwidth, and the operator's reuse pattern, and these interact non-linearly. It is effectively a large search space over tile sizes, loop order, vectorization, and PE binding. That is why stacks like TVM (Ansor/MetaSchedule) auto-tune tiling by benchmarking many candidate schedules on the real device. A poor tile choice either overflows SRAM or leaves the array starved and underutilized.</p>
+            </details>
+            <details class="qa" data-cat="compilers">
+              <summary><span class="qa-q">45. Describe dataflow mapping and the common stationarity choices (weight-, output-, input-, row-stationary). How does a compiler pick one?</span><span class="qa-badge" data-diff="Intermediate">Intermediate</span></summary>
+              <p class="qa-a">Dataflow mapping assigns the loop nest of a tensor op onto the physical MAC/systolic array, choosing which operand stays resident in the processing elements to maximize on-chip reuse. Weight-stationary preloads and holds weights in the PEs and streams activations, best when weights are reused across many activations (Google's TPU MXU is weight-stationary); output-stationary keeps partial sums accumulating locally in each PE while both operands stream, minimizing psum writeback; input-stationary holds activations; row-stationary (Eyeriss) balances reuse of weights, activations, and partial sums simultaneously. The compiler picks the mapping whose stationary operand matches the layer's dominant reuse pattern — e.g., weight-stationary for weight-heavy convolutions, output-stationary when accumulation traffic dominates. The goal is to minimize the most expensive data movement given the layer's operand-reuse profile and the array's structure.</p>
+            </details>
+            <details class="qa" data-cat="compilers">
+              <summary><span class="qa-q">46. What is bufferization in an MLIR-based NPU flow, and how does double-buffering (ping-pong) hide memory latency?</span><span class="qa-badge" data-diff="Intermediate">Intermediate</span></summary>
+              <p class="qa-a">Bufferization converts value-semantic tensor SSA values into explicit mutable memref buffers, computing liveness and doing buffer allocation and reuse to minimize peak on-chip SRAM footprint. MLIR's One-Shot Bufferize analyzes tensor use-def chains whole-function, prefers in-place reuse anchored by destination-passing-style 'outs' operands, and inserts copies only on read-after-write conflicts. It typically runs late, after tiling and fusion, so those transforms operate on immutable tensors where they are provably safe. Double-buffering (ping-pong) allocates two buffers per pipeline stage so the DMA of the next tile writes into one buffer while the compute engine consumes the other, overlapping data movement with computation. This software-pipelining hides DMA latency and keeps the MAC array fed rather than stalling on loads.</p>
+            </details>
+            <details class="qa" data-cat="compilers">
+              <summary><span class="qa-q">47. Why do integer-native NPUs like Qualcomm's Hexagon HTP make the quantizer part of the compiler rather than an optional pass, and what is a QDQ graph?</span><span class="qa-badge" data-diff="Intermediate">Intermediate</span></summary>
+              <p class="qa-a">On integer-native accelerators the MAC array only executes low-precision integer math, so an FP32 graph literally cannot run until it is quantized; Qualcomm's QNN backend for the Hexagon Tensor Processor accepts quantized graphs (uint8/uint16, int8/int16), meaning quantization is a mandatory lowering step rather than an optional accuracy-vs-speed tradeoff. Models are expressed as QDQ (Quantize-Dequantize) graphs, where explicit Quantize and Dequantize nodes are inserted around operators to encode the scale and zero-point at each tensor boundary. The compiler then folds these QDQ pairs into the integer kernels, propagating scales so real arithmetic happens in INT and requantization occurs between ops. Because deployment is impossible without it, the quantizer is embedded in the compiler pipeline. This also lets tools like ONNX Runtime's QNN EP consume standard QDQ ONNX models and map them to the HTP.</p>
+            </details>
+            <details class="qa" data-cat="compilers">
+              <summary><span class="qa-q">48. Contrast per-tensor, per-channel, and per-block/group quantization granularity, and explain why activation quantization is harder than weight quantization.</span><span class="qa-badge" data-diff="Advanced">Advanced</span></summary>
+              <p class="qa-a">Per-tensor quantization uses a single scale/zero-point for an entire tensor — cheapest in metadata and compute but least accurate when value ranges vary widely across channels. Per-channel assigns a separate scale per output channel (standard for CNN/conv weights), capturing channel-wise range differences at negligible cost. Per-block/group quantization (e.g., NVFP4 with 16-element blocks, MXFP4 with 32-element blocks) uses a scale per small block of elements and is standard for LLMs where even per-channel is too coarse at 4-bit. Activations are harder than weights because they are data-dependent and contain large per-channel outliers that inflate the range and crush the resolution of normal values, whereas weights are static and better-behaved. This outlier problem motivates schemes like SmoothQuant (migrating outlier scale from activations into weights), GPTQ (Hessian-guided per-channel weight quantization with calibration), and AWQ (activation-aware channel scaling).</p>
+            </details>
+            <details class="qa" data-cat="compilers">
+              <summary><span class="qa-q">49. How does structured 2:4 sparsity accelerate inference at the hardware level, and what must the compiler and format provide to realize the speedup?</span><span class="qa-badge" data-diff="Advanced">Advanced</span></summary>
+              <p class="qa-a">Structured 2:4 (N:M) sparsity forces exactly two of every four contiguous weights to zero, producing a regular pattern that NVIDIA Ampere+ Sparse Tensor Cores exploit for up to 2x throughput by physically skipping the zeroed multiply-accumulates. The compressed operand is stored as the non-zero values plus 2-bit-per-element metadata indicating which two positions in each group were retained, so the hardware can select the matching activations at issue time. Realizing the speedup requires the toolchain to prune to the exact 2:4 pattern, encode weights in the compressed values-plus-metadata format, and emit the sparse MMA path — exposed via cuSPARSELt and the mma.sp PTX instruction, with TensorRT supporting sparse-INT8 engines. Unlike unstructured pruning, which compresses more but yields no real speedup without hardware/format support, 2:4 is directly accelerated because its regularity matches the sparse datapath. The tradeoff is a fixed 50% density ceiling and potential accuracy loss that may require fine-tuning to recover.</p>
+            </details>
+            <details class="qa" data-cat="compilers">
+              <summary><span class="qa-q">50. Explain why MLIR's multi-level, progressive-lowering design is well-suited to NPU compilers, and how it interacts with LLVM as the terminal back-end.</span><span class="qa-badge" data-diff="Advanced">Advanced</span></summary>
+              <p class="qa-a">MLIR hosts many coexisting dialects at different abstraction levels in one SSA IR, so a compiler can preserve domain semantics — tensors, convolutions, tiling structure — through reusable mid-level dialects (linalg, affine, scf, vector, memref, gpu) and lower them progressively rather than in one monolithic step. This matters for NPUs because vendors can intercept at exactly the right altitude, inject custom dialects or micro-kernels for their spatial/systolic array, and reuse upstream tiling, fusion, and bufferization instead of rebuilding a whole compiler; examples include MLIR-AIE/iree-amd-aie for AMD XDNA and TPU-MLIR. Tiling and fusion are performed while values are still immutable tensors (especially in linalg) because value semantics make those transforms provably safe, and bufferization runs later to materialize memrefs. Once the program reaches the llvm dialect — a near-1:1 mirror of LLVM IR — a translation step emits real LLVM IR, handing off scalar/vector optimization, register allocation, and CPU/GPU codegen (via NVPTX/AMDGPU) to LLVM's mature back-ends. Thus MLIR handles high-level structure LLVM IR cannot represent, and LLVM serves as the terminal code-generation target.</p>
+            </details>
+            </div>
+          </div>
+        <p class="qa-empty" hidden>No questions match your search.</p>
+      </div>
+    </section>
+
     <section id="coursework" class="section">
       <div class="section-heading">
-        <p class="eyebrow">Coursework map</p>
-        <h2>Related Study Areas for NPU Work</h2>
+        <p class="eyebrow">Study map</p>
+        <h2>Related Study Areas</h2>
         <p class="section-note">
-          NPU work sits between compiler engineering, parallel architecture, deep learning, quantization,
-          runtime systems, and application-level computer vision.
+          NPU and AI-compiler work sits between computer architecture, compiler engineering, deep learning,
+          quantization, and runtime systems. These are the foundations and the core topics worth going deep on.
         </p>
       </div>
 
       <div class="learning-map">
         <article>
-          <h3>Already represented in the resume</h3>
+          <h3>Foundations</h3>
           <ul>
-            <li>Algorithms, graph search, BFS, DFS, dynamic programming, hashing, and linked lists.</li>
-            <li>Image processing, computer vision, OCR, object tracking, stereo calibration, and TOF workflows.</li>
-            <li>Machine learning and deep learning through Samsung internal coursework and PyTorch projects.</li>
-            <li>Software engineering across Windows, Linux, Android, realtime systems, and production debugging.</li>
-            <li>Networks, wireless communication, telemetry, and embedded device communication context.</li>
+            <li>Computer architecture: memory hierarchy, SRAM/DRAM/HBM, SIMD, DMA, and data movement.</li>
+            <li>Linear algebra and deep learning: GEMM, convolution, attention, and numerical precision.</li>
+            <li>Algorithms and graphs: search, scheduling, and dynamic programming for compiler passes.</li>
+            <li>Systems programming: C++, pointers/memory, concurrency, and Linux debugging.</li>
+            <li>Parallel programming: kernels, tiling, synchronization, and profiling (CUDA/OpenMP concepts).</li>
           </ul>
         </article>
 
         <article>
-          <h3>Best continuation coursework</h3>
+          <h3>Core NPU-compiler topics</h3>
           <ul>
-            <li>Computer architecture: memory hierarchy, SIMD, caches, DMA, accelerators, and data movement.</li>
-            <li>Compiler design: IR, SSA, lowering, legalization, scheduling, allocation, and backend codegen.</li>
-            <li>Parallel programming: OpenMP, CUDA concepts, kernels, tiling, synchronization, and profiling.</li>
-            <li>Efficient AI: pruning, quantization, sparsity, distillation, operator fusion, and graph partitioning.</li>
-            <li>Runtime systems: drivers, execution providers, buffer management, profiling, and deployment tooling.</li>
+            <li>Compiler design: IR, SSA, lowering, legalization, scheduling, allocation, and codegen.</li>
+            <li>MLIR/LLVM: dialects, progressive lowering, rewrite patterns, bufferization, and TableGen.</li>
+            <li>Efficient AI: quantization (PTQ/QAT), pruning/sparsity, operator fusion, and graph partitioning.</li>
+            <li>Accelerator dataflow: systolic arrays, stationarity, tiling, and roofline analysis.</li>
+            <li>Runtime and deployment: execution providers, memory planning, profiling, and driver interfaces.</li>
           </ul>
         </article>
       </div>
@@ -546,7 +963,7 @@
         <p class="eyebrow">Useful websites</p>
         <h2>NPU and AI Compiler Resources</h2>
         <p class="section-note">
-          These links emphasize official documentation and durable learning material for practical NPU compiler work.
+          Official documentation and durable learning material for AI accelerators and NPU-compiler work.
         </p>
       </div>
 
@@ -558,101 +975,176 @@
             <li><span>TT-Metalium getting started</span><a href="https://docs.tenstorrent.com/tt-metal/latest/tt-metalium/get_started/get_started.html">Open</a></li>
             <li><span>TT architecture and Metalium guide</span><a href="https://github.com/tenstorrent/tt-metal/blob/main/METALIUM_GUIDE.md">Open</a></li>
             <li><span><code>tt-metal</code> GitHub repository</span><a href="https://github.com/tenstorrent/tt-metal">Open</a></li>
+            <li><span><code>tt-forge</code> MLIR compiler</span><a href="https://github.com/tenstorrent/tt-forge">Open</a></li>
           </ul>
         </article>
 
         <article class="directory-group">
-          <h3>TT-Metalium deep links</h3>
+          <h3>LLVM &amp; MLIR</h3>
           <ul>
-            <li><span>Single-core matrix multiplication lab</span><a href="https://docs.tenstorrent.com/tt-metal/latest/tt-metalium/tt_metal/labs/matmul/lab1/lab1.html">Open</a></li>
-            <li><span>Memory from a kernel developer's perspective</span><a href="https://docs.tenstorrent.com/tt-metal/latest/tt-metalium/tt_metal/advanced_topics/memory_for_kernel_developers.html">Open</a></li>
-            <li><span>Circular buffer APIs</span><a href="https://docs.tenstorrent.com/tt-metal/latest/tt-metalium/tt_metal/apis/kernel_apis/circular_buffers/circular_buffers.html">Open</a></li>
-            <li><span>TT-Metalium API index</span><a href="https://docs.tenstorrent.com/tt-metal/latest/tt-metalium/tt_metal/apis/index.html">Open</a></li>
-            <li><span>Optimized multi-core matmul</span><a href="https://docs.tenstorrent.com/tt-metal/latest/tt-metalium/tt_metal/examples/matmul_multi_core_optimized.html">Open</a></li>
+            <li><span>LLVM documentation home</span><a href="https://llvm.org/docs/">Open</a></li>
+            <li><span>MLIR home and dialects</span><a href="https://mlir.llvm.org/">Open</a></li>
+            <li><span>MLIR Language Reference</span><a href="https://mlir.llvm.org/docs/LangRef/">Open</a></li>
+            <li><span>MLIR Bufferization</span><a href="https://mlir.llvm.org/docs/Bufferization/">Open</a></li>
+            <li><span>MLIR Toy tutorial</span><a href="https://mlir.llvm.org/docs/Tutorials/Toy/">Open</a></li>
           </ul>
         </article>
 
         <article class="directory-group">
-          <h3>Compiler and model layers</h3>
+          <h3>Deployment &amp; runtimes</h3>
           <ul>
-            <li><span>TT-NN documentation</span><a href="https://docs.tenstorrent.com/tt-metal/latest/ttnn/">Open</a></li>
-            <li><span>TT-Forge MLIR compiler stack</span><a href="https://tenstorrent.com/en/software/tt-forge">Open</a></li>
-            <li><span><code>tt-buda</code> archive</span><a href="https://github.com/tenstorrent/tt-buda">Open</a></li>
-            <li><span>PyBuda / TT-Buda docs</span><a href="https://docs.tenstorrent.com/pybuda/latest/index.html">Open</a></li>
-            <li><span>LLVM MLIR</span><a href="https://mlir.llvm.org/">Open</a></li>
+            <li><span>ONNX Runtime execution providers</span><a href="https://onnxruntime.ai/docs/execution-providers/">Open</a></li>
+            <li><span>Copilot+ PC NPU dev guide</span><a href="https://learn.microsoft.com/en-us/windows/ai/npu-devices/">Open</a></li>
+            <li><span>Intel OpenVINO toolkit</span><a href="https://docs.openvino.ai/">Open</a></li>
+            <li><span>Apache TVM</span><a href="https://tvm.apache.org/docs/">Open</a></li>
+            <li><span>OpenXLA / IREE</span><a href="https://openxla.org/">Open</a></li>
           </ul>
         </article>
 
         <article class="directory-group">
-          <h3>Related NPU platforms and courses</h3>
+          <h3>Hardware &amp; courses</h3>
           <ul>
-            <li><span>BOS Semiconductor Eagle-N product notes</span><a href="https://www.bos-semi.com/product">Open</a></li>
-            <li><span>Microsoft NPU development for Copilot+ PCs</span><a href="https://learn.microsoft.com/en-us/windows/ai/npu-devices/">Open</a></li>
+            <li><span>Groq LPU architecture</span><a href="https://groq.com/lpu-architecture">Open</a></li>
+            <li><span>Google Cloud TPU architecture</span><a href="https://docs.cloud.google.com/tpu/docs/system-architecture-tpu-vm">Open</a></li>
             <li><span>Intel Linux NPU driver</span><a href="https://github.com/intel/linux-npu-driver">Open</a></li>
-            <li><span>MIT 6.5940 TinyML and Efficient Deep Learning</span><a href="https://hanlab.mit.edu/courses/2024-fall-65940">Open</a></li>
+            <li><span>MIT 6.5940 TinyML &amp; Efficient DL</span><a href="https://hanlab.mit.edu/courses/2024-fall-65940">Open</a></li>
             <li><span>Stanford CS149 Parallel Computing</span><a href="https://cs149.stanford.edu/">Open</a></li>
           </ul>
         </article>
       </div>
     </section>
 
-    <section class="section">
+    <section id="sources" class="section">
       <div class="section-heading">
-        <p class="eyebrow">Portfolio direction</p>
-        <h2>Project Ideas That Match This Page</h2>
+        <p class="eyebrow">References</p>
+        <h2>Sources</h2>
+        <p class="section-note">
+          Primary references behind the comparison table, deployment notes, and Q&amp;A on this page &mdash;
+          vendor documentation, official compiler docs, standards, and peer-reviewed papers.
+        </p>
       </div>
 
-      <div class="project-grid">
-        <article class="project-card">
-          <div>
-            <p class="tag">Compiler lab</p>
-            <h3>Tenstorrent operator study notes</h3>
-            <p>
-              Document small experiments from <code>tt-metal</code>: simple kernels, tiling, memory movement,
-              circular buffers, matrix multiplication, and host/device profiling observations.
-            </p>
-          </div>
+      <div class="resource-grid">
+        <article class="directory-group">
+          <h3>AI accelerators: VPU, LPU, NPU, GPU, TPU</h3>
+          <ul>
+            <li><span>Vision processing unit — Wikipedia</span><a href="https://en.wikipedia.org/wiki/Vision_processing_unit">Open</a></li>
+            <li><span>Intel Discloses New Details on Meteor Lake (VPU/NPU) — AnandTech</span><a href="https://www.anandtech.com/show/18878/intel-discloses-new-details-on-meteor-lake-vpu-block-lays-out-vision-for-client-ai">Open</a></li>
+            <li><span>Intel Meteor Lake's NPU — Chips and Cheese</span><a href="https://chipsandcheese.com/p/intel-meteor-lakes-npu">Open</a></li>
+            <li><span>Hailo-8 AI Accelerator for Edge Devices — Hailo</span><a href="https://hailo.ai/products/ai-accelerators/hailo-8-ai-accelerator/">Open</a></li>
+            <li><span>Groq — LPU Architecture (official architecture page)</span><a href="https://groq.com/lpu-architecture">Open</a></li>
+            <li><span>Groq Blog — 'What is a Language Processing Unit? (The Groq LPU Explained)'</span><a href="https://groq.com/blog/the-groq-lpu-explained">Open</a></li>
+            <li><span>Abts et al., 'Think Fast: A Tensor Streaming Processor (TSP) for Accelerating Deep Learning Workloads,' ISCA 2020 (Groq copy)</span><a href="https://groq.com/groq-isca-paper-2020/">Open</a></li>
+            <li><span>Wikipedia — Groq (TSP/LPU history, specs, GroqCloud, funding)</span><a href="https://en.wikipedia.org/wiki/Groq">Open</a></li>
+            <li><span>Tensor Processing Unit — Wikipedia</span><a href="https://en.wikipedia.org/wiki/Tensor_Processing_Unit">Open</a></li>
+            <li><span>TPU architecture: systolic MXU (128x128 / 256x256), bfloat16 x FP32 accumulate — Google Cloud Documentation</span><a href="https://docs.cloud.google.com/tpu/docs/system-architecture-tpu-vm">Open</a></li>
+            <li><span>Google Coral Edge TPU explained in depth (~64x64 MXU, INT8-only, ~4 TOPS @ ~2 W) — Q-engineering</span><a href="https://qengineering.eu/google-corals-tpu-explained.html">Open</a></li>
+            <li><span>Qualcomm Hexagon NPU (scalar/vector/tensor, micro-tile inferencing) — Qualcomm</span><a href="https://www.qualcomm.com/processors/hexagon">Open</a></li>
+            <li><span>Apple unveils M4 chip with 16-core Neural Engine capable of 38 TOPS — The Register</span><a href="https://www.theregister.com/2024/05/07/apple_m4_ipad/">Open</a></li>
+            <li><span>AI Accelerators for Large Language Model Inference: Architecture Analysis and Scaling Strategies (arXiv 2506.00008)</span><a href="https://arxiv.org/pdf/2506.00008">Open</a></li>
+          </ul>
         </article>
-        <article class="project-card">
-          <div>
-            <p class="tag">Vision demo</p>
-            <h3>ONNX vision model deployment path</h3>
-            <p>
-              Revisit resume OCR and computer vision experience with a model export path:
-              PyTorch to ONNX, graph inspection, quantization, and accelerator runtime notes.
-            </p>
-          </div>
+        <article class="directory-group">
+          <h3>LLVM</h3>
+          <ul>
+            <li><span>LLVM: A Compilation Framework for Lifelong Program Analysis &amp; Transformation (Lattner &amp; Adve, CGO 2004)</span><a href="https://llvm.org/pubs/2004-01-30-CGO-LLVM.html">Open</a></li>
+            <li><span>The LLVM Target-Independent Code Generator — LLVM Documentation</span><a href="https://llvm.org/docs/CodeGenerator.html">Open</a></li>
+            <li><span>Global Instruction Selection (GlobalISel) — LLVM Documentation</span><a href="https://llvm.org/docs/GlobalISel/index.html">Open</a></li>
+            <li><span>ORC Design and Implementation (ORCv2) — LLVM Documentation</span><a href="https://llvm.org/docs/ORCv2.html">Open</a></li>
+            <li><span>LLVM's Analysis and Transform Passes — LLVM Documentation</span><a href="https://llvm.org/docs/Passes.html">Open</a></li>
+          </ul>
         </article>
-        <article class="project-card">
-          <div>
-            <p class="tag">Learning hub</p>
-            <h3>NPU compiler study tracker</h3>
-            <p>
-              Extend the existing computer science study app with flashcards for MLIR, TVM,
-              scheduling, quantization, bufferization, and execution providers.
-            </p>
-          </div>
+        <article class="directory-group">
+          <h3>MLIR</h3>
+          <ul>
+            <li><span>MLIR: Multi-Level IR Compiler Framework — mlir.llvm.org</span><a href="https://mlir.llvm.org/">Open</a></li>
+            <li><span>MLIR Language Reference (operations, regions, blocks, SSA, dialects)</span><a href="https://mlir.llvm.org/docs/LangRef/">Open</a></li>
+            <li><span>MLIR: A Compiler Infrastructure for the End of Moore's Law (CGO 2021 / arXiv:2002.11054)</span><a href="https://arxiv.org/abs/2002.11054">Open</a></li>
+            <li><span>MLIR Dialects (list and descriptions of core dialects)</span><a href="https://mlir.llvm.org/docs/Dialects/">Open</a></li>
+            <li><span>MLIR Bufferization and One-Shot Bufferize</span><a href="https://mlir.llvm.org/docs/Bufferization/">Open</a></li>
+            <li><span>MLIR Dialect Conversion (partial/full conversion, ConversionTarget, TypeConverter)</span><a href="https://mlir.llvm.org/docs/DialectConversion/">Open</a></li>
+            <li><span>Triton Kernel Compilation Stages — PyTorch Blog</span><a href="https://pytorch.org/blog/triton-kernel-compilation-stages/">Open</a></li>
+          </ul>
         </article>
-        <article class="project-card">
-          <div>
-            <p class="tag">Robotics AI</p>
-            <h3>ROS 2 perception deployment notes</h3>
-            <p>
-              Connect drone/robotics experience to local AI inference by documenting how perception
-              nodes move from PyTorch to ONNX and onto accelerator-backed runtime paths.
-            </p>
-          </div>
+        <article class="directory-group">
+          <h3>Deployment, quantization &amp; NPU compilers</h3>
+          <ul>
+            <li><span>Execution Providers — ONNX Runtime documentation</span><a href="https://onnxruntime.ai/docs/execution-providers/">Open</a></li>
+            <li><span>Copilot+ PCs developer guide (40+ TOPS requirement, Windows ML/ONNX/QNN/OpenVINO, quantization) — Microsoft Learn</span><a href="https://learn.microsoft.com/en-us/windows/ai/npu-devices/">Open</a></li>
+            <li><span>Windows ML execution providers — Microsoft Learn</span><a href="https://learn.microsoft.com/en-us/windows/ai/new-windows-ml/supported-execution-providers">Open</a></li>
+            <li><span>QNN Execution Provider - ONNX Runtime documentation</span><a href="https://onnxruntime.ai/docs/execution-providers/QNN-ExecutionProvider.html">Open</a></li>
+            <li><span>Achieving FP32 Accuracy for INT8 Inference Using Quantization Aware Training with NVIDIA TensorRT (NVIDIA Technical Blog)</span><a href="https://developer.nvidia.com/blog/achieving-fp32-accuracy-for-int8-inference-using-quantization-aware-training-with-tensorrt/">Open</a></li>
+            <li><span>Exploiting NVIDIA Ampere Structured Sparsity with cuSPARSELt (NVIDIA Technical Blog)</span><a href="https://developer.nvidia.com/blog/exploiting-ampere-structured-sparsity-with-cusparselt/">Open</a></li>
+            <li><span>XLA architecture (OpenXLA Project)</span><a href="https://openxla.org/xla/architecture">Open</a></li>
+            <li><span>MetaSchedule: Search-Based Auto-Tuning (Apache TVM documentation)</span><a href="https://tvm.apache.org/docs/deep_dive/tensor_ir/tutorials/meta_schedule.html">Open</a></li>
+            <li><span>IREE Stream / HAL dialect reference (flow -&gt; stream -&gt; hal pipeline)</span><a href="https://iree.dev/reference/mlir-dialects/Stream/">Open</a></li>
+            <li><span>tt-forge: Tenstorrent's MLIR-based compiler (GitHub / Tenstorrent)</span><a href="https://github.com/tenstorrent/tt-forge">Open</a></li>
+            <li><span>From Loop Nests to Silicon: Mapping AI Workloads onto AMD NPUs with MLIR-AIR (arXiv)</span><a href="https://arxiv.org/abs/2510.14871">Open</a></li>
+          </ul>
         </article>
       </div>
     </section>
   </main>
 
   <footer>
-    <p>Built from resume evidence, NPU compiler work, Tenstorrent exploration, and official NPU ecosystem references.</p>
+    <p>A self-study reference on NPUs, AI accelerators, and ML compilers (LLVM/MLIR), with a searchable interview Q&amp;A bank.</p>
     <div class="footer-links">
       <a href="index.html">Home</a>
       <a href="https://github.com/buicongnguyen/buicongnguyen.github.io">Source</a>
     </div>
   </footer>
+
+  <script>
+  (function () {
+    var root = document.getElementById('qa');
+    if (!root) return;
+    var search = root.querySelector('.qa-search');
+    var chips = Array.prototype.slice.call(root.querySelectorAll('.qa-chip'));
+    var items = Array.prototype.slice.call(root.querySelectorAll('details.qa'));
+    var groups = Array.prototype.slice.call(root.querySelectorAll('.qa-group'));
+    var countEl = root.querySelector('#qa-count');
+    var emptyEl = root.querySelector('.qa-empty');
+    var cat = 'all';
+
+    function norm(s) { return (s || '').toLowerCase(); }
+
+    function apply() {
+      var q = norm(search.value).trim();
+      var terms = q ? q.split(/\s+/) : [];
+      var shown = 0;
+      items.forEach(function (it) {
+        var okCat = cat === 'all' || it.getAttribute('data-cat') === cat;
+        var text = norm(it.textContent);
+        var okText = terms.every(function (t) { return text.indexOf(t) >= 0; });
+        var vis = okCat && okText;
+        it.hidden = !vis;
+        if (vis) shown++;
+      });
+      groups.forEach(function (g) {
+        var vis = Array.prototype.some.call(g.querySelectorAll('details.qa'), function (it) { return !it.hidden; });
+        g.hidden = !vis;
+      });
+      if (emptyEl) emptyEl.hidden = shown !== 0;
+      if (countEl) countEl.textContent = 'Showing ' + shown + ' of ' + items.length + ' questions';
+    }
+
+    search.addEventListener('input', apply);
+    chips.forEach(function (c) {
+      c.addEventListener('click', function () {
+        cat = c.getAttribute('data-cat');
+        chips.forEach(function (x) { x.setAttribute('aria-pressed', x === c ? 'true' : 'false'); });
+        apply();
+      });
+    });
+    root.querySelectorAll('.qa-tools button').forEach(function (b) {
+      b.addEventListener('click', function () {
+        var open = b.getAttribute('data-act') === 'expand';
+        items.forEach(function (it) { if (!it.hidden) it.open = open; });
+      });
+    });
+
+    apply();
+  })();
+  </script>
 </body>
 </html>
