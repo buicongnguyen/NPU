@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Operating systems interview practice with categorized study plan and multiple-choice questions.">
+<title>Operating Systems Interview Practice</title>
+<link rel="stylesheet" href="practice-common.css">
+</head>
+<body>
+<header>
+  <p class="eyebrow">Detailed plan 2</p>
+  <h1>Operating Systems Interview Practice</h1>
+  <p>Study plan, knowledge map, and 50 multiple-choice questions for Linux processes, scheduling, synchronization, virtual memory, filesystems, I/O, and debugging.</p>
+  <nav>
+    <a href="#plan">Plan</a>
+    <a href="#knowledge">Knowledge</a>
+    <a href="#questions">Questions</a>
+    <a href="#resources">Sources</a>
+    <a href="interview-practice.html">Practice Hub</a>
+    <a href="index.html">Home</a>
+  </nav>
+</header>
+<main>
+  <section id="plan" class="section"><h2>Execution Plan</h2><div id="plan-root" class="grid"></div></section>
+  <section id="knowledge" class="section"><h2>Knowledge Map</h2><div id="knowledge-root" class="grid"></div></section>
+  <section class="toolbar">
+    <input id="search" type="search" placeholder="Search OS questions..." aria-label="Search OS questions">
+    <div id="stats" class="stats"></div>
+  </section>
+  <section id="questions" class="section"><h2>Question Bank</h2><div id="questions-root"></div></section>
+  <section id="resources" class="section"><h2>Sources</h2><div id="resources-root" class="grid"></div></section>
+</main>
+<script>
+window.practicePageData = {
+  plans: [
+    { phase: "Phase 1", title: "Process model", text: "Master process creation, fork, exec, wait, exit status, signals, process IDs, zombies, and file descriptor inheritance." },
+    { phase: "Phase 2", title: "Scheduling and concurrency", text: "Review runnable, blocked, preemption, context switch cost, mutexes, condition variables, semaphores, atomics, and deadlock." },
+    { phase: "Phase 3", title: "Virtual memory", text: "Study address spaces, page tables, TLBs, page faults, mmap, copy-on-write, demand paging, and memory protection." },
+    { phase: "Phase 4", title: "Files and I/O", text: "Practice file descriptors, open file descriptions, page cache, blocking I/O, epoll, fsync, pipes, sockets, and zero-copy ideas." },
+    { phase: "Phase 5", title: "Debug and real time", text: "Use strace, perf, gdb, logs, stack traces, scheduling metrics, and real-time latency analysis to diagnose real systems." }
+  ],
+  knowledge: [
+    { title: "Process vs thread", text: "Processes have separate virtual address spaces. Threads share the process address space but have independent execution contexts and stacks." },
+    { title: "fork and copy-on-write", text: "Linux avoids copying all pages at fork by sharing pages until a process writes, then copying the changed page." },
+    { title: "Synchronization contract", text: "Locks protect invariants. Condition variables wait for state changes and should be used with a predicate loop." },
+    { title: "Virtual memory", text: "Virtual memory hides physical placement, enforces protection, enables demand paging, and supports shared mappings." },
+    { title: "Page cache", text: "Buffered file I/O usually goes through the page cache, which can improve performance but complicates durability and memory accounting." },
+    { title: "File descriptor inheritance", text: "Descriptors can survive fork and exec unless close-on-exec is set, which matters for servers and subprocess management." },
+    { title: "Real-time concern", text: "Real-time systems optimize worst-case latency and predictability, not just average throughput." },
+    { title: "Debugging rule", text: "When stuck, classify the wait: CPU-bound, blocked on I/O, blocked on a lock/futex, sleeping on a timer, or stopped by a signal." }
+  ],
+  groups: [
+    { id: "processes", title: "Processes, Threads, and Signals", tag: "proc", questions: [
+      { q: "What does fork() create?", choices: ["A child process that initially resembles the parent.", "A new kernel filesystem.", "A GPU kernel.", "A new TCP packet only."], answer: 0, why: "fork duplicates the calling process and returns differently in parent and child." },
+      { q: "What does execve() do?", choices: ["Replaces the current process image with a new program.", "Creates a second process without changing code.", "Only waits for a child.", "Only changes file permissions."], answer: 0, why: "exec does not create a new process by itself; it changes what the current process runs." },
+      { q: "Why does a shell commonly fork before exec?", choices: ["So the shell can keep running while the child becomes the command.", "Because exec always creates two shells.", "To avoid using PATH.", "To disable signals."], answer: 0, why: "The child can exec the requested command while the parent shell waits or continues." },
+      { q: "What is a zombie process?", choices: ["A terminated child whose status has not been reaped.", "A process using too much RAM.", "A process without a PID.", "A thread with no stack."], answer: 0, why: "The kernel keeps minimal status until the parent calls wait-like APIs." },
+      { q: "What is an orphan process?", choices: ["A process whose parent exited.", "A process with no memory.", "A process that cannot open files by definition.", "A CPU interrupt."], answer: 0, why: "The OS reparents orphans, commonly to an init-like process." },
+      { q: "What do threads in the same process share?", choices: ["Address space and many process resources.", "Separate address spaces by default.", "Nothing at all.", "Only their instruction pointer."], answer: 0, why: "Threads share memory, which makes communication easy and races possible." },
+      { q: "What is the danger of fork() in a multithreaded program?", choices: ["Only the calling thread exists in the child, but locks may be inherited in locked states.", "The child has no address space.", "All files are always closed.", "Signals become impossible."], answer: 0, why: "After fork in a multithreaded process, async-signal-safe rules matter until exec." },
+      { q: "What is a signal?", choices: ["An asynchronous notification delivered to a process or thread.", "A file descriptor offset.", "A page table entry.", "A compiler optimization flag."], answer: 0, why: "Signals can interrupt normal control flow and require careful handlers." },
+      { q: "What is SIGCHLD used for?", choices: ["Notifying a parent that a child changed state.", "Allocating virtual memory.", "Locking a mutex.", "Flushing disk caches."], answer: 0, why: "Parents often use SIGCHLD plus wait to reap children." },
+      { q: "What does close-on-exec prevent?", choices: ["Accidental descriptor inheritance across exec.", "Process creation.", "Page faults.", "Thread creation."], answer: 0, why: "FD_CLOEXEC helps avoid leaking descriptors into child programs." }
+    ]},
+    { id: "scheduling", title: "Scheduling and Synchronization", tag: "sync", questions: [
+      { q: "What is a context switch?", choices: ["Saving one task state and restoring another.", "A type of file path.", "A neural network layer.", "A linker section."], answer: 0, why: "Context switches enable multitasking but have overhead." },
+      { q: "What does preemption mean?", choices: ["The OS can interrupt a running task to run another.", "A process must finish before scheduling.", "Only one program can ever run.", "The disk cache is disabled."], answer: 0, why: "Preemption is central to responsive multitasking." },
+      { q: "What is a runnable task?", choices: ["A task ready to execute if a CPU is available.", "A task waiting for disk I/O only.", "A terminated process.", "A file descriptor."], answer: 0, why: "Schedulers choose among runnable tasks." },
+      { q: "What is a race condition?", choices: ["A correctness bug depending on timing between concurrent operations.", "A faster scheduler.", "A type of executable file.", "An intentional page fault."], answer: 0, why: "Races happen when shared state is accessed without correct synchronization." },
+      { q: "What does a mutex protect?", choices: ["A critical section or shared invariant.", "Only process IDs.", "Only executable files.", "Only GPU memory."], answer: 0, why: "A mutex provides mutual exclusion around shared state." },
+      { q: "Why use a condition variable with a mutex?", choices: ["To wait for a predicate while protecting shared state.", "To replace all memory allocation.", "To make fork impossible.", "To force CPU affinity."], answer: 0, why: "The mutex protects the predicate checked before and after waiting." },
+      { q: "Why should condition waits use a while loop?", choices: ["Spurious wakeups or consumed conditions can occur.", "The compiler requires it for syntax.", "It always improves cache size.", "It prevents process creation."], answer: 0, why: "Always recheck the predicate after waking." },
+      { q: "What is priority inversion?", choices: ["A high-priority task waits on a low-priority task while medium-priority tasks run.", "A high-priority task always runs forever.", "A file's permissions invert.", "A page table becomes invalid."], answer: 0, why: "Priority inheritance can reduce this problem." },
+      { q: "What four conditions are associated with deadlock?", choices: ["Mutual exclusion, hold-and-wait, no preemption, circular wait.", "Fork, exec, wait, exit.", "Open, read, write, close.", "Text, data, bss, heap."], answer: 0, why: "Breaking one of these conditions can prevent deadlock." },
+      { q: "When is a spinlock appropriate?", choices: ["For very short waits where sleeping is not allowed or too expensive.", "For blocking disk I/O.", "For long network requests.", "For user prompts."], answer: 0, why: "Spinlocks burn CPU while waiting and must be used carefully." }
+    ]},
+    { id: "memory", title: "Virtual Memory", tag: "mem", questions: [
+      { q: "What is virtual memory?", choices: ["An address-space abstraction mapped to physical memory by the OS and MMU.", "A type of monitor cable.", "Only a compiler warning.", "A replacement for files."], answer: 0, why: "Virtual memory provides isolation, sharing, and demand paging." },
+      { q: "What is a page table?", choices: ["A structure mapping virtual pages to physical frames and permissions.", "A filesystem directory.", "A scheduler queue only.", "An optimizer state."], answer: 0, why: "The MMU consults page-table data during address translation." },
+      { q: "What does the TLB cache?", choices: ["Recent virtual-to-physical translations.", "Open file names.", "TCP connections only.", "Shell history."], answer: 0, why: "TLB hits avoid expensive page-table walks." },
+      { q: "What is a page fault?", choices: ["An exception when a virtual access cannot be satisfied by current mappings.", "A failed shell command only.", "A disk sector size.", "A thread priority."], answer: 0, why: "The OS may allocate, load, fix permissions, or kill the process depending on the fault." },
+      { q: "What is demand paging?", choices: ["Loading pages into memory only when needed.", "Loading all files at boot.", "Disabling virtual memory.", "Pinning every page."], answer: 0, why: "Demand paging improves memory efficiency and startup behavior." },
+      { q: "What is copy-on-write?", choices: ["Shared pages are copied only when a writer modifies them.", "All pages are copied at fork immediately.", "Writes are never allowed.", "The disk becomes read-only."], answer: 0, why: "COW makes fork cheaper for common fork-then-exec workflows." },
+      { q: "What does mmap do?", choices: ["Maps files or anonymous memory into a process address space.", "Creates a new process.", "Computes CPU priority.", "Only sends network packets."], answer: 0, why: "mmap supports file-backed memory, shared memory, and lazy loading." },
+      { q: "Why can memory overcommit be risky?", choices: ["Allocation may appear to succeed but fail later when pages are actually touched.", "It prevents all paging.", "It makes files smaller.", "It removes page tables."], answer: 0, why: "Overcommit separates virtual reservation from physical backing." },
+      { q: "What is swapping?", choices: ["Moving memory pages to/from storage under pressure.", "Changing process names.", "Rotating CPU cores.", "Compiling code."], answer: 0, why: "Swapping can keep systems alive but severely hurt latency." },
+      { q: "Why use mlock in real-time code?", choices: ["To avoid page faults in locked memory during critical execution.", "To create a child process.", "To flush a socket.", "To sort page tables."], answer: 0, why: "Real-time code often avoids unpredictable page-fault latency." }
+    ]},
+    { id: "io", title: "Filesystems and I/O", tag: "io", questions: [
+      { q: "What is a file descriptor?", choices: ["A per-process integer handle to an open file-like object.", "A disk block checksum.", "A thread ID only.", "A memory page size."], answer: 0, why: "Descriptors refer to open files, sockets, pipes, devices, and more." },
+      { q: "What is an open file description?", choices: ["Kernel state shared by duplicated descriptors, including offset and status flags.", "A comment in source code.", "A file name string only.", "A page fault record."], answer: 0, why: "forked or duped descriptors can share the same open file description." },
+      { q: "What does pipe() create?", choices: ["A unidirectional communication channel with read and write ends.", "A new address space.", "A disk partition.", "A mutex."], answer: 0, why: "Pipes are common for parent-child and shell pipeline communication." },
+      { q: "What is blocking I/O?", choices: ["The caller waits until the operation can make progress or complete.", "I/O that never waits.", "I/O using only CPU registers.", "A type of lock file."], answer: 0, why: "Blocking calls can simplify code but may stall threads." },
+      { q: "What is nonblocking I/O?", choices: ["Operations return immediately if they would block.", "Operations ignore errors.", "The kernel copies all files twice.", "The scheduler stops."], answer: 0, why: "Nonblocking I/O is often paired with event loops." },
+      { q: "What is epoll used for?", choices: ["Waiting efficiently for readiness events on many descriptors.", "Replacing virtual memory.", "Compiling executables.", "Changing image resolution."], answer: 0, why: "epoll is important for scalable Linux network servers." },
+      { q: "What does the page cache do?", choices: ["Caches file data in memory for buffered I/O.", "Stores only process IDs.", "Caches DNS names only.", "Disables writes."], answer: 0, why: "The page cache can improve read/write performance and merge I/O." },
+      { q: "Why call fsync?", choices: ["To request durable persistence of file data and metadata needed for the file.", "To make fork faster.", "To clear gradients.", "To increase CPU clock."], answer: 0, why: "Without fsync-like durability points, data may still be in volatile caches." },
+      { q: "What is zero-copy I/O trying to reduce?", choices: ["Unnecessary data copies between buffers or kernel/user space.", "The number of source files.", "The number of process IDs.", "The size of the scheduler."], answer: 0, why: "Avoiding copies can improve throughput and reduce CPU use." },
+      { q: "Why can direct I/O be difficult?", choices: ["It often requires alignment and explicit buffering decisions.", "It always makes code shorter.", "It removes hardware constraints.", "It cannot fail."], answer: 0, why: "Bypassing the page cache shifts more responsibility to the application." }
+    ]},
+    { id: "debug", title: "Debugging and Real-Time", tag: "debug", questions: [
+      { q: "When is strace useful?", choices: ["To observe system calls, errors, signals, and blocking behavior.", "To train a model.", "To edit a linker script.", "To generate images."], answer: 0, why: "strace is often the fastest way to see what a Linux process asks the kernel to do." },
+      { q: "When is perf useful?", choices: ["To sample CPU hotspots and performance counters.", "To change file permissions only.", "To create a process.", "To send ROS messages."], answer: 0, why: "perf helps identify where CPU time and hardware events are spent." },
+      { q: "How do you debug a deadlock?", choices: ["Inspect thread stacks and lock ownership/waiting relationships.", "Increase image resolution.", "Delete logs.", "Disable all tests."], answer: 0, why: "Deadlocks reveal themselves in wait chains and stuck lock acquisitions." },
+      { q: "What does a futex wait often indicate?", choices: ["A thread is blocked on a user-space synchronization primitive backed by the kernel.", "A filesystem is formatted.", "A GPU kernel is compiling.", "A signal is impossible."], answer: 0, why: "pthread mutexes and condition variables often use futexes under contention." },
+      { q: "What should you collect for a hung process?", choices: ["Thread stack traces, system-call state, CPU usage, logs, and lock/wait information.", "Only screenshots.", "Only final exit code.", "Only CSS files."], answer: 0, why: "A hang needs evidence about where execution is waiting." },
+      { q: "What is tail latency?", choices: ["High-percentile latency such as p99 or p999.", "Average file size.", "The number of open descriptors.", "The first byte of a page."], answer: 0, why: "Tail latency matters for user-visible reliability and real-time systems." },
+      { q: "What is a real-time system optimizing for?", choices: ["Predictable bounded timing behavior.", "Only maximum throughput.", "Only disk capacity.", "Only code size."], answer: 0, why: "Missing deadlines can be more important than average speed." },
+      { q: "Why can paging hurt real-time behavior?", choices: ["Page faults can introduce unpredictable latency.", "Paging always improves deadlines.", "Paging disables scheduling.", "Paging removes all memory pressure."], answer: 0, why: "Real-time code often locks memory or pre-faults pages." },
+      { q: "What is CPU isolation useful for?", choices: ["Reducing interference on selected CPUs for latency-sensitive work.", "Replacing memory protection.", "Deleting interrupts.", "Changing file ownership."], answer: 0, why: "Isolation can reduce scheduler noise but must be configured with interrupts and kernel threads in mind." },
+      { q: "Why measure before tuning kernel parameters?", choices: ["Because tuning can shift bottlenecks or hurt other workloads.", "Because measurement is never useful.", "Because all defaults are wrong.", "Because logs are automatically perfect."], answer: 0, why: "Performance tuning should be driven by evidence and workload-specific goals." }
+    ]}
+  ],
+  resources: [
+    { title: "Linux man-pages", text: "System-call and library behavior for fork, exec, wait, mmap, pipes, signals, and descriptors.", links: [{ label: "fork(2)", href: "https://man7.org/linux/man-pages/man2/fork.2.html" }, { label: "man7 index", href: "https://man7.org/linux/man-pages/" }] },
+    { title: "Linux kernel docs", text: "Kernel memory-management and administration documentation.", links: [{ label: "Memory management", href: "https://docs.kernel.org/admin-guide/mm/index.html" }, { label: "MM concepts", href: "https://docs.kernel.org/admin-guide/mm/concepts.html" }] },
+    { title: "OSTEP", text: "Durable OS textbook organized around virtualization, concurrency, and persistence.", links: [{ label: "Operating Systems: Three Easy Pieces", href: "https://pages.cs.wisc.edu/~remzi/OSTEP/" }] },
+    { title: "POSIX synchronization", text: "Background for pthread mutexes, condition variables, and concurrency patterns.", links: [{ label: "pthreads overview", href: "https://man7.org/linux/man-pages/man7/pthreads.7.html" }] }
+  ]
+};
+</script>
+<script src="practice-common.js"></script>
+</body>
+</html>

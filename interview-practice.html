@@ -1,0 +1,287 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Deep learning, operating systems, and embedded systems interview practice questions.">
+<title>Deep Learning, OS, and Embedded Interview Practice</title>
+<style>
+  :root { color-scheme: dark; --bg:#101418; --panel:#171d25; --panel2:#1f2732; --ink:#e8edf2; --muted:#a9b6c7; --line:#2b3644; --accent:#55b4ff; --green:#7ee787; --amber:#f2cc60; --code:#0b0f14; }
+  * { box-sizing: border-box; }
+  body { margin:0; font-family: Inter, Segoe UI, system-ui, sans-serif; background:var(--bg); color:var(--ink); line-height:1.6; }
+  header { padding:36px clamp(18px,5vw,64px); border-bottom:1px solid var(--line); background:linear-gradient(135deg,#12233d,#18202a); }
+  h1 { margin:0 0 10px; font-size:clamp(2rem,5vw,4rem); line-height:1.05; }
+  h2 { margin:0 0 14px; font-size:1.7rem; }
+  h3 { margin:24px 0 12px; color:#cfe7ff; }
+  p { margin:0 0 14px; }
+  a { color:var(--accent); }
+  main { max-width:1180px; margin:0 auto; padding:28px clamp(18px,4vw,40px) 64px; }
+  nav { display:flex; flex-wrap:wrap; gap:10px; margin-top:20px; }
+  nav a, .chip { display:inline-flex; align-items:center; gap:6px; padding:8px 11px; border:1px solid var(--line); border-radius:999px; background:#0f1926; color:var(--ink); text-decoration:none; font-size:.92rem; }
+  .panel { background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:18px; margin:18px 0; }
+  .toolbar { position:sticky; top:0; z-index:5; background:rgba(16,20,24,.94); backdrop-filter:blur(10px); padding:12px 0; border-bottom:1px solid var(--line); }
+  input { width:100%; padding:13px 15px; border:1px solid var(--line); border-radius:8px; background:#0b1118; color:var(--ink); font-size:1rem; }
+  .stats { display:flex; flex-wrap:wrap; gap:10px; margin:12px 0 0; color:var(--muted); font-size:.95rem; }
+  .section-head { margin-top:30px; padding-top:20px; border-top:1px solid var(--line); }
+  .group { margin:18px 0 26px; }
+  details { background:var(--panel); border:1px solid var(--line); border-radius:8px; margin:10px 0; overflow:hidden; }
+  summary { cursor:pointer; padding:13px 15px; font-weight:700; color:#dbeafe; }
+  summary:hover { background:var(--panel2); }
+  .answer { padding:0 15px 15px; color:#d7e0ea; }
+  .meta { display:inline-flex; margin-left:8px; color:var(--amber); font-weight:600; font-size:.82rem; }
+  .resources { display:grid; grid-template-columns:repeat(auto-fit,minmax(260px,1fr)); gap:12px; }
+  .resource { background:#111923; border:1px solid var(--line); border-radius:8px; padding:13px; }
+  code { background:var(--code); padding:2px 5px; border-radius:4px; color:#d7e9ff; }
+  .hidden { display:none; }
+</style>
+</head>
+<body>
+<header>
+  <p class="chip">Interview practice</p>
+  <h1>Deep Learning, OS, and Embedded Q&amp;A</h1>
+  <p>This page is original study material generated from official documentation and durable course references. It is grouped for learning: fundamentals first, then debugging, deployment, and system-level tradeoffs.</p>
+  <nav>
+    <a href="deep-learning-practice.html">Deep Learning Detail</a>
+    <a href="os-practice.html">OS Detail</a>
+    <a href="embedded-practice.html">Embedded Detail</a>
+    <a href="#deep-learning">Deep Learning</a>
+    <a href="#os">Operating Systems</a>
+    <a href="#embedded">Embedded Systems</a>
+    <a href="#resources">Sources</a>
+    <a href="npu-practice.html">NPU Practice</a>
+    <a href="index.html">Home</a>
+  </nav>
+</header>
+
+<main>
+  <section class="panel">
+    <h2>How to use this page</h2>
+    <p>Open one category at a time. First answer from memory, then expand the card. Search for keywords such as <code>attention</code>, <code>deadlock</code>, <code>DMA</code>, <code>linker</code>, or <code>volatile</code>.</p>
+  </section>
+
+  <div class="toolbar">
+    <input id="search" type="search" placeholder="Search questions and answers..." aria-label="Search questions and answers">
+    <div class="stats" id="stats"></div>
+  </div>
+
+  <div id="qa-root"></div>
+
+  <section id="resources" class="section-head">
+    <h2>Source Map</h2>
+    <div class="resources">
+      <div class="resource"><b>Deep learning:</b> <a href="https://docs.pytorch.org/tutorials/beginner/blitz/neural_networks_tutorial.html">PyTorch neural networks</a>, <a href="https://d2l.ai/">Dive into Deep Learning</a>, <a href="https://cs231n.github.io/">CS231n notes</a>, <a href="https://huggingface.co/docs/transformers/en/index">Hugging Face Transformers</a>.</div>
+      <div class="resource"><b>Operating systems:</b> <a href="https://man7.org/linux/man-pages/man2/fork.2.html">Linux man-pages fork(2)</a>, <a href="https://docs.kernel.org/admin-guide/mm/index.html">Linux memory management</a>, <a href="https://docs.kernel.org/admin-guide/mm/concepts.html">Linux MM concepts</a>, <a href="https://pages.cs.wisc.edu/~remzi/OSTEP/">OSTEP</a>.</div>
+      <div class="resource"><b>Embedded systems:</b> <a href="https://freertos.org/Documentation/02-Kernel/02-Kernel-features/02-Queues-mutexes-and-semaphores/01-Queues">FreeRTOS queues</a>, <a href="https://freertos.org/Documentation/02-Kernel/02-Kernel-features/02-Queues-mutexes-and-semaphores/04-Mutexes">FreeRTOS mutexes</a>, <a href="https://developer.arm.com/documentation/107976/22-1-0/Map-code-and-data-to-your-target-device/Linker-scripts">Arm linker scripts</a>, <a href="https://developer.arm.com/documentation/dui0056/d/writing-code-for-rom/using-scatter-loading-with-memory-mapped-i-o/using-pointers-to-access-i-o">Arm volatile MMIO note</a>.</div>
+    </div>
+  </section>
+</main>
+
+<script>
+const data = [
+  {
+    id: "deep-learning",
+    title: "Deep Learning",
+    intro: "Questions for neural network fundamentals, CNNs, transformers, training, and deployment.",
+    groups: [
+      { name: "Foundations", tag: "DL", items: [
+        ["What is the difference between a parameter and a hyperparameter?", "A parameter is learned from data, such as a weight or bias. A hyperparameter is chosen outside training, such as learning rate, batch size, optimizer, model depth, dropout probability, or weight decay."],
+        ["Why do neural networks need nonlinear activation functions?", "Without nonlinear activations, stacked linear layers collapse into one linear transformation. Nonlinearities such as ReLU let the model represent complex decision boundaries and hierarchical features."],
+        ["What does backpropagation compute?", "Backpropagation applies the chain rule from the loss back through the computation graph to compute gradients for trainable parameters. Optimizers then use those gradients to update parameters."],
+        ["What is the role of a loss function?", "The loss converts prediction quality into a scalar training objective. For example, cross entropy is common for classification and mean squared error is common for regression."],
+        ["Why do we separate training, validation, and test sets?", "Training data fits parameters, validation data guides model selection and hyperparameters, and test data estimates final generalization. Mixing them causes optimistic results and possible data leakage."]
+      ]},
+      { name: "Optimization and Regularization", tag: "DL", items: [
+        ["Why can a learning rate be too high or too low?", "Too high can make optimization diverge or bounce around minima. Too low can make training painfully slow or get stuck before reaching a useful solution."],
+        ["What is the difference between SGD, momentum, and Adam?", "SGD follows the current gradient. Momentum smooths updates using velocity. Adam adapts step sizes using running estimates of first and second moments, often making early training easier."],
+        ["What does weight decay do?", "Weight decay penalizes large weights, usually by adding an L2-style term or decoupled decay in the optimizer. It can reduce overfitting and improve generalization."],
+        ["Why use dropout?", "Dropout randomly disables activations during training so the network cannot depend too heavily on exact co-adapted paths. It is a regularizer, and it is disabled or converted to deterministic scaling during evaluation."],
+        ["What is gradient clipping useful for?", "Gradient clipping limits very large gradients, which is especially useful in recurrent models, transformers, and unstable training runs where exploding gradients can destroy updates."]
+      ]},
+      { name: "CNN and Computer Vision", tag: "CV", items: [
+        ["Why are convolutions useful for images?", "Convolutions exploit local spatial structure and weight sharing. The same filter is applied across positions, reducing parameters and learning translation-friendly features."],
+        ["What do stride and padding control in convolution?", "Stride controls how far the filter moves between positions. Padding controls border handling and output size. Together they affect spatial resolution, compute, and receptive field placement."],
+        ["Why does a 1x1 convolution matter?", "A 1x1 convolution mixes channels at each spatial position. It can reduce or expand channel count, implement projections, and make bottleneck residual blocks efficient."],
+        ["What is batch normalization doing at a high level?", "Batch normalization normalizes intermediate activations using batch statistics during training and running statistics during inference, often stabilizing and accelerating deep network training."],
+        ["Why are residual connections important?", "Residual connections give gradients and information shorter paths through deep networks. They make very deep models easier to optimize by learning corrections around an identity-like path."]
+      ]},
+      { name: "Transformers and LLMs", tag: "LLM", items: [
+        ["What problem does self-attention solve?", "Self-attention lets each token combine information from other tokens in the sequence using learned query, key, and value projections. It handles long-range dependencies more directly than purely local operations."],
+        ["What are Q, K, and V in attention?", "Queries ask what a token is looking for, keys describe what each token offers, and values are the information mixed into the output. Scores come from query-key similarity and weight the values."],
+        ["Why is attention scaled by sqrt(d)?", "Scaling keeps dot-product logits from growing too large as the key/query dimension increases. That helps softmax avoid saturation and improves gradient behavior."],
+        ["What is the KV cache in autoregressive decoding?", "The KV cache stores past key and value tensors so each new token does not recompute attention projections for all previous tokens. It saves compute but consumes memory proportional to sequence length and layers."],
+        ["Why are tokenizers important in LLM systems?", "Tokenizers map text to model IDs and back. They affect vocabulary coverage, sequence length, latency, multilingual behavior, and how prompts or special tokens are represented."]
+      ]},
+      { name: "Training Debugging", tag: "Debug", items: [
+        ["What is a good first check when training loss does not decrease?", "Overfit a tiny batch. If the model cannot drive loss very low on a few examples, suspect bugs in labels, loss, optimizer, gradients, data preprocessing, or model wiring."],
+        ["How do you detect data leakage?", "Look for features derived from labels, train/test duplicates, future information in time series, preprocessing fitted on all data, or validation performance that is unrealistically high."],
+        ["Why can validation loss rise while training loss falls?", "The model is overfitting: it keeps improving on training examples while generalization worsens. Regularization, more data, augmentation, early stopping, or a smaller model may help."],
+        ["What is mixed precision training?", "Mixed precision uses lower precision such as FP16/BF16 for many tensor operations while preserving stability with techniques such as master weights, loss scaling, or higher-precision accumulations."],
+        ["Why should evaluation use model.eval() in PyTorch?", "Evaluation mode changes layers such as dropout and batch normalization to inference behavior. Without it, validation metrics can be noisy or wrong."]
+      ]},
+      { name: "Deployment and Performance", tag: "Deploy", items: [
+        ["What is quantization?", "Quantization represents weights or activations with lower precision, commonly INT8, to reduce memory and accelerate inference. It needs calibration, quantization-aware training, or careful error analysis."],
+        ["What is operator fusion?", "Fusion combines adjacent operations, such as convolution plus bias plus activation, to reduce memory traffic and kernel launch overhead. It often matters as much as raw arithmetic throughput."],
+        ["What is the difference between latency and throughput?", "Latency is time for one request. Throughput is requests or tokens per second over a workload. Batching often improves throughput but can increase per-request latency."],
+        ["Why export a model to ONNX?", "ONNX gives a portable graph representation that many runtimes and compilers can consume. Export requires checking operator support, dynamic shapes, numerical parity, and postprocessing assumptions."],
+        ["What is a good deployment validation loop?", "Compare framework output, exported model output, and runtime/compiler output on representative inputs. Track accuracy, latency, memory, unsupported ops, dtype changes, and preprocessing parity."]
+      ]}
+    ]
+  },
+  {
+    id: "os",
+    title: "Operating Systems",
+    intro: "Questions for Linux-style process, memory, synchronization, filesystem, and debugging interviews.",
+    groups: [
+      { name: "Processes and Threads", tag: "OS", items: [
+        ["What does fork() create?", "fork() creates a child process by duplicating the calling process. Parent and child run in separate address spaces, and Linux commonly uses copy-on-write pages to avoid copying all memory immediately."],
+        ["What is the difference between fork() and exec()?", "fork() creates a new process. exec() replaces the current process image with a new program. Shells commonly fork, then the child execs the requested command."],
+        ["How are processes and threads different?", "Processes have separate address spaces. Threads in the same process share address space and resources such as file descriptors, but each thread has its own stack and execution context."],
+        ["What is a context switch?", "A context switch saves the state of one running task and restores another. It enables multitasking but has overhead from scheduler work, register state, cache/TLB effects, and possible kernel transitions."],
+        ["What is a zombie process?", "A zombie is a terminated child whose exit status has not yet been collected by its parent with wait-like calls. It no longer runs but still has a process table entry."]
+      ]},
+      { name: "Scheduling and CPU", tag: "OS", items: [
+        ["What does the scheduler decide?", "The scheduler decides which runnable task gets CPU time, balancing responsiveness, fairness, priorities, affinity, deadlines, and system policy."],
+        ["What is preemption?", "Preemption means the OS can interrupt a running task and switch to another runnable task, usually due to timer interrupts, priority changes, or wakeups."],
+        ["What is starvation?", "Starvation happens when a runnable task waits indefinitely or too long because other tasks keep receiving resources. Aging, fair scheduling, and priority rules can reduce it."],
+        ["What is priority inversion?", "Priority inversion occurs when a high-priority task waits on a lock held by a low-priority task while medium-priority work prevents the low-priority task from running. Priority inheritance is a common fix."],
+        ["Why does CPU affinity matter?", "Affinity can improve cache locality and reduce migration overhead. But overly strict affinity can hurt load balancing if some CPUs are overloaded."]
+      ]},
+      { name: "Synchronization", tag: "OS", items: [
+        ["What is a race condition?", "A race condition happens when correctness depends on timing between concurrent operations. Shared mutable data needs synchronization or ownership discipline."],
+        ["When would you use a mutex?", "Use a mutex to protect a critical section so only one thread at a time accesses shared state. Keep the protected region small and avoid blocking calls while holding it when possible."],
+        ["How is a semaphore different from a mutex?", "A mutex protects ownership of a resource and is released by its owner. A semaphore is a counter used to signal resource availability or events; it does not necessarily imply ownership."],
+        ["Why do condition variables need a predicate loop?", "Threads can wake spuriously or after another thread consumes the condition. The standard pattern is lock, while predicate is false wait, then proceed."],
+        ["What are common deadlock conditions?", "Deadlock usually requires mutual exclusion, hold-and-wait, no preemption, and circular wait. Avoid it with lock ordering, timeouts, try-locks, or reducing shared locks."]
+      ]},
+      { name: "Virtual Memory", tag: "Memory", items: [
+        ["What is virtual memory?", "Virtual memory gives each process an address space abstraction. The OS and MMU map virtual pages to physical frames and enforce protection and sharing."],
+        ["What is a page fault?", "A page fault occurs when a virtual address cannot be translated with current permissions or mappings. It may load a page, allocate memory, grow a stack, or terminate the process if invalid."],
+        ["What is copy-on-write?", "Copy-on-write lets parent and child initially share physical pages after fork. A real copy is made only when one process writes to a shared page."],
+        ["What does the TLB cache?", "The translation lookaside buffer caches virtual-to-physical page translations. TLB misses require page-table walks and can be expensive."],
+        ["Why can mmap be useful?", "mmap maps files or anonymous memory into a process address space. It can support file-backed I/O, shared memory, lazy loading, and zero-copy-style workflows."]
+      ]},
+      { name: "Filesystems and I/O", tag: "I/O", items: [
+        ["What is the difference between a file descriptor and an open file description?", "A file descriptor is a per-process handle. Multiple descriptors can refer to the same open file description, sharing offset and status flags."],
+        ["Why can buffered I/O and direct I/O behave differently?", "Buffered I/O goes through the page cache and can merge or defer writes. Direct I/O tries to bypass page cache, often requiring alignment and careful application buffering."],
+        ["What is epoll used for?", "epoll lets a program wait efficiently for readiness events on many file descriptors, useful for high-concurrency network servers."],
+        ["What is fsync for?", "fsync asks the OS to flush file data and metadata needed for persistence to stable storage. It is important for durability but can be expensive."],
+        ["What does zero-copy mean in I/O discussions?", "Zero-copy means avoiding unnecessary copies between kernel and user buffers or between intermediate buffers. The exact mechanism depends on APIs such as mmap, sendfile, splice, or DMA paths."]
+      ]},
+      { name: "Debugging and Real-Time", tag: "Debug", items: [
+        ["When would you use strace?", "Use strace to observe system calls, arguments, errors, signals, and blocking behavior. It is very useful for diagnosing file, process, and permission problems."],
+        ["When would you use perf?", "Use perf to sample CPU hotspots, call stacks, cache misses, context switches, and other performance counters. It helps distinguish compute, kernel, and scheduling costs."],
+        ["What is a real-time scheduling concern?", "Real-time systems care about bounded latency and predictability, not just average throughput. Paging, unbounded locks, interrupt storms, and priority inversion are common hazards."],
+        ["Why might mlock be used in real-time programs?", "mlock can keep memory resident to avoid page faults during time-critical execution. It must be used carefully because locked memory reduces flexibility for the rest of the system."],
+        ["How do you debug a hung multithreaded process?", "Collect stack traces for all threads, inspect locks and futex waits, check CPU usage, use strace or gdb, and look for deadlocks, missed condition signals, or blocking I/O."]
+      ]}
+    ]
+  },
+  {
+    id: "embedded",
+    title: "Embedded Systems",
+    intro: "Questions for C/C++, interrupts, RTOS, hardware interfaces, linker scripts, and firmware debugging.",
+    groups: [
+      { name: "C/C++ and Memory", tag: "C", items: [
+        ["What does volatile mean in embedded C?", "volatile tells the compiler that a value can change outside normal program flow, such as a memory-mapped register or ISR-updated flag. It prevents certain optimizations but is not a lock or memory barrier by itself."],
+        ["Why is alignment important?", "Many MCUs and buses require or strongly prefer aligned accesses. Misalignment can cause faults, extra cycles, or multiple bus transactions."],
+        ["What is the difference between stack and heap in firmware?", "The stack is automatic storage for calls and locals, usually fixed and fast. The heap supports dynamic allocation but can fragment and is often avoided or tightly controlled in embedded systems."],
+        ["Why avoid malloc in hard real-time code?", "Dynamic allocation can have unpredictable latency, fragmentation, failure modes, and ownership complexity. Static allocation or pools are often preferred."],
+        ["What is a memory-mapped register?", "A peripheral register exposed at a specific memory address. Firmware reads and writes that address to control hardware such as GPIO, UART, timers, or DMA."]
+      ]},
+      { name: "Interrupts and Peripherals", tag: "ISR", items: [
+        ["What should an ISR generally do?", "An ISR should handle the urgent hardware event, clear or acknowledge the interrupt, capture minimal data, and defer heavier work to a task, queue, or bottom-half mechanism."],
+        ["Why keep ISRs short?", "Long ISRs increase interrupt latency, block lower-priority work, and can make real-time behavior unpredictable. They can also complicate locking and shared-state handling."],
+        ["What is interrupt priority?", "Interrupt priority determines which exception can preempt another. On Cortex-M systems, priority configuration and grouping affect nesting and latency."],
+        ["What is debouncing?", "Debouncing filters mechanical switch bounce so one physical press is not interpreted as many transitions. It can be done with hardware, timers, or state machines."],
+        ["What is DMA useful for?", "DMA moves data between peripherals and memory without CPU copying each byte. It reduces CPU load but requires cache coherency, buffer ownership, and completion/error handling."]
+      ]},
+      { name: "RTOS Concepts", tag: "RTOS", items: [
+        ["What is a task in an RTOS?", "A task is an independently scheduled thread of execution with its own stack and priority. Tasks communicate through queues, semaphores, notifications, or shared protected data."],
+        ["What is a FreeRTOS queue good for?", "A queue transfers fixed-size items between tasks or from ISR-safe APIs to tasks. It provides synchronization and data movement with optional blocking timeouts."],
+        ["When use a mutex instead of a binary semaphore?", "Use a mutex for mutual exclusion around a shared resource, especially when priority inheritance is needed. Use a binary semaphore more often for signaling events."],
+        ["What is priority inversion in RTOS code?", "A high-priority task waits for a resource held by a low-priority task while medium-priority tasks run. Mutex priority inheritance can reduce the inversion."],
+        ["What is a tickless idle mode?", "Tickless idle suppresses periodic scheduler ticks during idle periods to save power, programming a timer to wake the system at the next deadline or interrupt."]
+      ]},
+      { name: "Boot and Linker", tag: "Boot", items: [
+        ["What happens during embedded startup code?", "Startup code sets the stack pointer, initializes data from flash to RAM, zeros BSS, configures low-level runtime state, then calls main or the RTOS entry path."],
+        ["What does a linker script define?", "A linker script maps code and data sections into target memory regions such as flash, SRAM, tightly coupled memory, bootloader areas, or special peripheral regions."],
+        ["What are .text, .data, and .bss?", ".text holds code and constants, .data holds initialized writable data copied to RAM at startup, and .bss holds zero-initialized writable data cleared at startup."],
+        ["Why inspect a map file?", "A linker map shows where symbols and sections landed, how much memory they use, and whether unexpected objects or libraries are inflating firmware size."],
+        ["What is a vector table?", "A vector table contains initial stack pointer and exception/interrupt handler addresses. On Cortex-M it is central to reset and interrupt dispatch."]
+      ]},
+      { name: "Interfaces and Timing", tag: "HW", items: [
+        ["How do UART, SPI, and I2C differ?", "UART is asynchronous point-to-point serial. SPI is synchronous and fast with separate clock and chip-select lines. I2C is synchronous two-wire shared bus with addressing and pull-ups."],
+        ["What is a watchdog timer?", "A watchdog resets or interrupts the system if firmware fails to service it in time. It helps recover from hangs but should be paired with root-cause logging if possible."],
+        ["What is jitter?", "Jitter is variation in timing, such as task wakeup or control-loop period variation. In control systems, too much jitter can reduce stability and accuracy."],
+        ["Why use fixed-point arithmetic?", "Fixed-point can be faster, smaller, or more deterministic on hardware without floating-point support. It requires careful scale, overflow, rounding, and saturation design."],
+        ["What is cache coherency in DMA?", "If CPU caches and DMA buffers are not coherent, the CPU may read stale data or DMA may see old data. Firmware may need cache clean/invalidate operations or uncached buffers."]
+      ]},
+      { name: "Debug and Safety", tag: "Debug", items: [
+        ["What is JTAG or SWD used for?", "JTAG/SWD provides low-level debug access: halt, step, inspect registers/memory, program flash, and sometimes trace execution."],
+        ["How do you debug a hard fault?", "Capture fault status registers, stacked PC/LR/xPSR, stack pointer, and memory access status. Then map the PC to symbols and inspect the failing instruction and call path."],
+        ["What is brownout detection?", "Brownout detection resets or protects the MCU when supply voltage drops below a safe threshold, preventing undefined behavior from low voltage."],
+        ["Why design firmware state machines?", "State machines make event-driven behavior explicit, testable, and less dependent on fragile delays. They are useful for protocols, peripherals, UI, and control flows."],
+        ["What makes firmware update design hard?", "Updates must handle power loss, corrupted images, version compatibility, rollback, authentication, storage limits, and safe bootloader handoff."]
+      ]}
+    ]
+  }
+];
+
+function make(tag, className, text) {
+  const el = document.createElement(tag);
+  if (className) el.className = className;
+  if (text) el.textContent = text;
+  return el;
+}
+
+function render() {
+  const root = document.getElementById("qa-root");
+  let total = 0;
+  for (const section of data) {
+    const sec = make("section", "section-head");
+    sec.id = section.id;
+    sec.appendChild(make("h2", "", section.title));
+    sec.appendChild(make("p", "", section.intro));
+    let local = 0;
+    for (const group of section.groups) {
+      const wrap = make("div", "group");
+      wrap.dataset.section = section.title.toLowerCase();
+      wrap.dataset.group = group.name.toLowerCase();
+      wrap.appendChild(make("h3", "", group.name));
+      for (const item of group.items) {
+        total += 1;
+        local += 1;
+        const details = make("details", "qa-card");
+        details.dataset.search = `${section.title} ${group.name} ${item[0]} ${item[1]}`.toLowerCase();
+        const summary = make("summary", "", `${section.title} ${local}. ${item[0]}`);
+        const meta = make("span", "meta", group.tag);
+        summary.appendChild(meta);
+        const answer = make("div", "answer");
+        answer.appendChild(make("p", "", item[1]));
+        details.appendChild(summary);
+        details.appendChild(answer);
+        wrap.appendChild(details);
+      }
+      sec.appendChild(wrap);
+    }
+    root.appendChild(sec);
+  }
+  document.getElementById("stats").textContent = `${total} questions across ${data.length} interview domains`;
+}
+
+function filterCards() {
+  const q = document.getElementById("search").value.trim().toLowerCase();
+  let shown = 0;
+  for (const card of document.querySelectorAll(".qa-card")) {
+    const match = !q || card.dataset.search.includes(q);
+    card.classList.toggle("hidden", !match);
+    if (match) shown += 1;
+  }
+  document.getElementById("stats").textContent = q ? `${shown} matching questions` : "90 questions across 3 interview domains";
+}
+
+render();
+document.getElementById("search").addEventListener("input", filterCards);
+</script>
+</body>
+</html>

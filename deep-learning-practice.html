@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Deep learning interview practice with categorized study plan and multiple-choice questions.">
+<title>Deep Learning Interview Practice</title>
+<link rel="stylesheet" href="practice-common.css">
+</head>
+<body>
+<header>
+  <p class="eyebrow">Detailed plan 1</p>
+  <h1>Deep Learning Interview Practice</h1>
+  <p>Study plan, knowledge map, and 50 source-backed multiple-choice questions for neural networks, CNNs, transformers, training, debugging, and deployment.</p>
+  <nav>
+    <a href="#plan">Plan</a>
+    <a href="#knowledge">Knowledge</a>
+    <a href="#questions">Questions</a>
+    <a href="#resources">Sources</a>
+    <a href="interview-practice.html">Practice Hub</a>
+    <a href="index.html">Home</a>
+  </nav>
+</header>
+<main>
+  <section id="plan" class="section">
+    <h2>Execution Plan</h2>
+    <div id="plan-root" class="grid"></div>
+  </section>
+  <section id="knowledge" class="section">
+    <h2>Knowledge Map</h2>
+    <div id="knowledge-root" class="grid"></div>
+  </section>
+  <section class="toolbar">
+    <input id="search" type="search" placeholder="Search deep learning questions..." aria-label="Search deep learning questions">
+    <div id="stats" class="stats"></div>
+  </section>
+  <section id="questions" class="section">
+    <h2>Question Bank</h2>
+    <div id="questions-root"></div>
+  </section>
+  <section id="resources" class="section">
+    <h2>Sources</h2>
+    <div id="resources-root" class="grid"></div>
+  </section>
+</main>
+<script>
+window.practicePageData = {
+  plans: [
+    { phase: "Phase 1", title: "Neural-network basics", text: "Review tensors, modules, parameters, forward pass, loss, gradients, and optimizer update flow. Be able to explain a training step from input batch to parameter update." },
+    { phase: "Phase 2", title: "Training behavior", text: "Practice questions on initialization, learning rates, regularization, validation, overfitting, gradient clipping, mixed precision, and train/eval mode." },
+    { phase: "Phase 3", title: "CNN and vision", text: "Study convolution shape math, padding, stride, pooling, normalization, residual blocks, augmentation, object detection, segmentation, and feature maps." },
+    { phase: "Phase 4", title: "Transformer systems", text: "Cover tokenization, embeddings, attention, masking, positional encoding, KV cache, prefill/decode, batching, and long-context memory costs." },
+    { phase: "Phase 5", title: "Deployment and debugging", text: "Connect training knowledge to ONNX export, quantization, operator fusion, runtime parity checks, profiling, and numerical debugging." }
+  ],
+  knowledge: [
+    { title: "Training loop", text: "A standard loop runs forward inference, computes loss, calls backward to populate gradients, steps the optimizer, and clears gradients before the next batch." },
+    { title: "Autograd", text: "Modern frameworks record tensor operations into a computation graph and apply the chain rule automatically for differentiable operations." },
+    { title: "Generalization", text: "Validation performance estimates whether the model learned patterns that transfer beyond training examples. Data leakage breaks this estimate." },
+    { title: "Convolution", text: "Convolution uses local receptive fields and shared weights, making it efficient for image-like signals and spatial feature extraction." },
+    { title: "Attention", text: "Self-attention builds token-to-token interactions using query, key, and value projections, then mixes values according to normalized similarity scores." },
+    { title: "Numerical precision", text: "FP32 is useful for reference accuracy, while BF16/FP16/INT8 can reduce memory and improve throughput when supported and validated." },
+    { title: "Deployment parity", text: "Always compare framework, exported graph, and runtime outputs on representative inputs before trusting performance numbers." },
+    { title: "Performance bottleneck", text: "Deep learning inference can be compute-bound, memory-bandwidth-bound, launch-overhead-bound, or shape/operator-support-bound." }
+  ],
+  groups: [
+    { id: "fundamentals", title: "Foundations", tag: "core", questions: [
+      { q: "What is a trainable parameter?", choices: ["A value learned by optimization, such as a weight or bias.", "A value chosen only by the operating system.", "A random metric printed after training.", "A file format for images."], answer: 0, why: "Trainable parameters are updated by the optimizer using gradients from the loss." },
+      { q: "What is a hyperparameter?", choices: ["A learned weight inside a layer.", "A setting chosen outside training, such as learning rate or batch size.", "The final prediction vector.", "The gradient of the loss."], answer: 1, why: "Hyperparameters control the training or model design but are not directly learned from one backward pass." },
+      { q: "Why are nonlinear activations needed?", choices: ["They make every model smaller.", "Without them, stacked linear layers collapse into one linear map.", "They remove the need for data.", "They guarantee zero loss."], answer: 1, why: "Compositions of linear transformations are still linear, so nonlinearities expand representational power." },
+      { q: "What does a loss function measure?", choices: ["The number of CPU cores.", "How far predictions are from the desired target according to a training objective.", "Only model file size.", "Only GPU temperature."], answer: 1, why: "The loss is the scalar objective differentiated during training." },
+      { q: "What does backpropagation compute?", choices: ["Dataset download speed.", "Gradients of the loss with respect to parameters.", "The number of classes in the dataset.", "HTML page layout."], answer: 1, why: "Backpropagation applies the chain rule through the computation graph." },
+      { q: "What is the purpose of an optimizer?", choices: ["To update parameters using gradients and an update rule.", "To label raw data automatically.", "To convert Python to HTML.", "To remove all nonlinearities."], answer: 0, why: "SGD, Adam, and similar optimizers turn gradients into parameter updates." },
+      { q: "Why split train, validation, and test data?", choices: ["To make training slower only.", "To separate parameter fitting, model selection, and final generalization estimate.", "To avoid using labels.", "To force all classes into one file."], answer: 1, why: "Each split has a different purpose; using test data for tuning leaks information." },
+      { q: "What is overfitting?", choices: ["The model performs well on training data but poorly on unseen data.", "The model never learns training data.", "The loss is exactly zero on all future data.", "The model uses too few parameters by definition."], answer: 0, why: "Overfitting means training performance no longer predicts generalization." },
+      { q: "What does batch size affect?", choices: ["Only the spelling of layer names.", "Gradient noise, memory use, throughput, and sometimes generalization.", "The number of labels in the world.", "Whether the model has parameters."], answer: 1, why: "Batch size changes both systems behavior and optimization behavior." },
+      { q: "What is an epoch?", choices: ["One full pass over the training dataset.", "One hidden unit.", "One GPU register.", "One activation function only."], answer: 0, why: "Epochs count dataset passes, while iterations or steps count mini-batch updates." }
+    ]},
+    { id: "training", title: "Training, Optimization, and Regularization", tag: "train", questions: [
+      { q: "What happens if the learning rate is too high?", choices: ["Training may diverge or oscillate.", "The model becomes perfectly calibrated.", "The batch size becomes zero.", "The validation set disappears."], answer: 0, why: "Large updates can overshoot useful minima and destabilize training." },
+      { q: "What happens if the learning rate is too low?", choices: ["Training may be very slow or stall.", "Gradients become labels.", "All models become linear.", "The optimizer skips the loss."], answer: 0, why: "Tiny updates may not make meaningful progress within the training budget." },
+      { q: "Why use momentum?", choices: ["To smooth update directions and reduce zig-zag behavior.", "To delete gradients.", "To avoid all matrix multiplies.", "To replace the dataset."], answer: 0, why: "Momentum accumulates a velocity-like state from past gradients." },
+      { q: "What is Adam known for?", choices: ["Adaptive moment estimates for parameter updates.", "Only integer arithmetic.", "Converting labels to images.", "Disabling backpropagation."], answer: 0, why: "Adam tracks running estimates of gradient mean and variance-like magnitude." },
+      { q: "What does weight decay encourage?", choices: ["Smaller parameter magnitudes.", "Larger image dimensions.", "More file descriptors.", "No validation data."], answer: 0, why: "Weight decay penalizes large weights and can improve generalization." },
+      { q: "What does dropout do during training?", choices: ["Randomly disables some activations to regularize the model.", "Deletes training labels permanently.", "Forces every tensor to INT4.", "Turns the model into a filesystem."], answer: 0, why: "Dropout discourages fragile co-adaptation and is disabled or made deterministic during evaluation." },
+      { q: "Why use gradient clipping?", choices: ["To limit very large gradients and prevent unstable updates.", "To improve CSS styles.", "To remove loss functions.", "To make labels random."], answer: 0, why: "Clipping is common when gradients can explode, such as sequence models or difficult RL settings." },
+      { q: "What does model.eval() change in PyTorch-style workflows?", choices: ["Inference behavior for layers such as dropout and batch normalization.", "The number of classes.", "The operating system scheduler.", "The optimizer source code."], answer: 0, why: "Evaluation mode is required for meaningful validation and deployment checks." },
+      { q: "Why call optimizer.zero_grad() or clear gradients?", choices: ["Gradients accumulate by default in many frameworks.", "It deletes the model.", "It changes images to text.", "It disables all parameters."], answer: 0, why: "If gradients are not cleared, updates may include stale accumulation." },
+      { q: "What is mixed precision training?", choices: ["Using lower precision for many operations while preserving stability where needed.", "Mixing labels from train and test sets.", "Using only strings as tensors.", "Training without gradients."], answer: 0, why: "Mixed precision can improve throughput and memory use but must manage numerical stability." }
+    ]},
+    { id: "cnn", title: "CNN and Vision", tag: "vision", questions: [
+      { q: "Why are convolutions parameter-efficient for images?", choices: ["Weights are shared across spatial positions.", "Every pixel gets a separate full network.", "They require no data.", "They only run on CPUs."], answer: 0, why: "Shared filters reduce parameters and exploit spatial locality." },
+      { q: "What does stride control in convolution?", choices: ["The step size of the filter over the input.", "The number of classes.", "The loss formula only.", "The optimizer state."], answer: 0, why: "Higher stride usually reduces output spatial resolution." },
+      { q: "What does padding control?", choices: ["How borders are handled and output size is affected.", "Only model checkpoint names.", "Whether labels exist.", "The number of GPUs."], answer: 0, why: "Padding can preserve spatial size or control border behavior." },
+      { q: "Why is a 1x1 convolution useful?", choices: ["It mixes channels at each spatial location.", "It only changes image file format.", "It removes all nonlinearities.", "It cannot be learned."], answer: 0, why: "1x1 convolutions are channel projections and are common in bottleneck blocks." },
+      { q: "What does pooling often provide?", choices: ["Spatial downsampling or local aggregation.", "Random labels.", "Database indexing.", "A replacement for all training."], answer: 0, why: "Pooling can reduce resolution and improve local invariance." },
+      { q: "What is batch normalization's practical role?", choices: ["Stabilize and often speed training by normalizing intermediate activations.", "Make all tensors images.", "Remove the need for optimization.", "Force CPU execution."], answer: 0, why: "Batch normalization uses training batch statistics and inference running statistics." },
+      { q: "Why do residual connections help deep networks?", choices: ["They give gradients shorter paths through the model.", "They prevent all overfitting.", "They remove all parameters.", "They make convolution illegal."], answer: 0, why: "Residual paths make optimization of very deep networks easier." },
+      { q: "What is data augmentation?", choices: ["Applying label-preserving transformations to increase training diversity.", "Deleting difficult examples.", "Using test data as training labels.", "Turning off validation."], answer: 0, why: "Common augmentations include crops, flips, color jitter, noise, and geometric transforms." },
+      { q: "What does non-maximum suppression do in object detection?", choices: ["Removes overlapping duplicate boxes after scoring.", "Trains the backbone.", "Computes batch norm statistics.", "Creates image pixels."], answer: 0, why: "NMS is a post-processing step for many detectors." },
+      { q: "How does semantic segmentation differ from classification?", choices: ["Segmentation predicts labels per pixel or region, not one label for the whole image.", "Segmentation has no inputs.", "Classification always uses lidar.", "Segmentation cannot use CNNs."], answer: 0, why: "Segmentation preserves spatial output structure." }
+    ]},
+    { id: "transformers", title: "Transformers and LLMs", tag: "llm", questions: [
+      { q: "What is self-attention?", choices: ["A mechanism where tokens attend to other tokens in the same sequence.", "A file compression algorithm.", "A CPU scheduler.", "A camera calibration method."], answer: 0, why: "Self-attention computes token interactions using learned projections." },
+      { q: "What are Q, K, and V?", choices: ["Query, key, and value projections used to score and mix token information.", "Three image file extensions.", "Three optimizer names only.", "Three Linux signals."], answer: 0, why: "QK similarity determines attention weights applied to V." },
+      { q: "Why scale attention logits by sqrt(d)?", choices: ["To avoid overly large dot products that saturate softmax.", "To change text into images.", "To skip embeddings.", "To remove all masking."], answer: 0, why: "Scaling helps keep gradients healthy as feature dimension grows." },
+      { q: "What is an attention mask?", choices: ["A rule that blocks attention to padding, future tokens, or invalid positions.", "A GPU fan setting.", "A filesystem permission.", "A loss function replacement."], answer: 0, why: "Masks encode sequence validity and causal constraints." },
+      { q: "What does a tokenizer do?", choices: ["Maps text to token IDs and back.", "Computes gradients directly.", "Allocates CUDA memory only.", "Runs the operating system scheduler."], answer: 0, why: "Tokenization shapes sequence length, vocabulary coverage, and special-token handling." },
+      { q: "What is a positional encoding or embedding for?", choices: ["Providing order information to a model whose attention is otherwise permutation-like.", "Deleting repeated tokens.", "Replacing all activations.", "Skipping the loss."], answer: 0, why: "Transformers need positional information to reason about order." },
+      { q: "What is the KV cache?", choices: ["Stored key/value tensors from prior tokens reused during autoregressive decoding.", "A database of labels.", "A CPU-only optimizer.", "A way to remove attention."], answer: 0, why: "KV cache reduces repeated computation but increases memory use." },
+      { q: "How do prefill and decode differ?", choices: ["Prefill processes the prompt in parallel; decode generates one or a few new tokens using cache.", "Prefill is training and decode is labeling.", "Decode never uses attention.", "Prefill only runs on CPUs."], answer: 0, why: "LLM serving often has separate throughput bottlenecks for prefill and decode." },
+      { q: "Why is batching tricky for LLM inference?", choices: ["Requests have variable sequence lengths and decode progress.", "All requests have exactly equal cost.", "Batching disables KV cache.", "Batching removes tokenization."], answer: 0, why: "Schedulers must balance latency, padding waste, cache memory, and throughput." },
+      { q: "What is temperature in text generation?", choices: ["A sampling control that changes distribution sharpness.", "GPU temperature only.", "A model weight type.", "A tokenizer vocabulary rule."], answer: 0, why: "Higher temperature makes sampling more random; lower temperature makes it more deterministic." }
+    ]},
+    { id: "deployment", title: "Deployment and Debugging", tag: "deploy", questions: [
+      { q: "What is quantization?", choices: ["Representing weights or activations with lower precision.", "Increasing every tensor to FP64.", "Deleting the validation set.", "Replacing neural networks with SQL."], answer: 0, why: "Quantization can reduce memory and improve inference speed when accuracy survives." },
+      { q: "What is operator fusion?", choices: ["Combining adjacent operations to reduce memory traffic and launch overhead.", "Combining datasets without labels.", "Changing all shapes to dynamic.", "Turning attention into HTML."], answer: 0, why: "Fusion is a major runtime and compiler optimization." },
+      { q: "Why export to ONNX?", choices: ["To exchange a model graph with runtimes and compilers.", "To improve labels automatically.", "To remove all unsupported operations.", "To make training mandatory."], answer: 0, why: "ONNX export still requires operator support and numerical parity checks." },
+      { q: "What should you compare after export?", choices: ["Framework output, exported graph output, and target runtime output.", "Only file names.", "Only CSS colors.", "Only class labels from one example."], answer: 0, why: "Parity checks catch conversion, dtype, preprocessing, and runtime differences." },
+      { q: "What is latency?", choices: ["Time for one request or operation to complete.", "Number of model parameters only.", "The size of the dataset.", "The learning rate."], answer: 0, why: "Latency is user-visible response time." },
+      { q: "What is throughput?", choices: ["Work completed per unit time, such as images/sec or tokens/sec.", "Time for one sample only.", "A type of activation.", "A loss metric only."], answer: 0, why: "Batching often improves throughput even when it changes latency." },
+      { q: "What is a memory-bandwidth bottleneck?", choices: ["Performance is limited by moving data rather than arithmetic.", "The model has no weights.", "The CPU has no scheduler.", "The dataset has no labels."], answer: 0, why: "Many inference workloads are limited by reads/writes of activations and weights." },
+      { q: "What is a good first debug step when training fails?", choices: ["Overfit a tiny batch.", "Immediately deploy to production.", "Delete the loss.", "Only change the theme."], answer: 0, why: "A tiny-batch overfit test catches many wiring, label, and optimizer bugs." },
+      { q: "What does data leakage do?", choices: ["Makes validation or test metrics unrealistically good.", "Reduces all memory use.", "Improves true generalization by definition.", "Makes gradients unnecessary."], answer: 0, why: "Leakage lets the model use information that will not be available in real deployment." },
+      { q: "Why profile before optimizing?", choices: ["To identify the real bottleneck before changing code.", "To avoid measuring anything.", "To make every model larger.", "To replace validation."], answer: 0, why: "Profiling prevents wasting effort on non-bottlenecks." }
+    ]}
+  ],
+  resources: [
+    { title: "PyTorch tutorials", text: "Core neural network, autograd, optimizer, and deployment concepts.", links: [{ label: "Neural Networks", href: "https://docs.pytorch.org/tutorials/beginner/blitz/neural_networks_tutorial.html" }, { label: "Autograd basics", href: "https://docs.pytorch.org/tutorials/beginner/basics/autogradqs_tutorial.html" }] },
+    { title: "Dive into Deep Learning", text: "Open textbook for neural networks, optimization, convolution, attention, and modern architectures.", links: [{ label: "D2L", href: "https://d2l.ai/" }] },
+    { title: "CS231n", text: "Computer vision and deep learning notes for CNNs, backpropagation, optimization, and practical training.", links: [{ label: "Course notes", href: "https://cs231n.github.io/" }] },
+    { title: "Hugging Face Transformers", text: "Transformer model, tokenizer, pipeline, attention, and deployment vocabulary.", links: [{ label: "Transformers docs", href: "https://huggingface.co/docs/transformers/en/index" }] }
+  ]
+};
+</script>
+<script src="practice-common.js"></script>
+</body>
+</html>

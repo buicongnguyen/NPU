@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Embedded systems interview practice with categorized study plan and multiple-choice questions.">
+<title>Embedded Systems Interview Practice</title>
+<link rel="stylesheet" href="practice-common.css">
+</head>
+<body>
+<header>
+  <p class="eyebrow">Detailed plan 3</p>
+  <h1>Embedded Systems Interview Practice</h1>
+  <p>Study plan, knowledge map, and 50 multiple-choice questions for embedded C/C++, MMIO, interrupts, RTOS, boot flow, linker scripts, hardware interfaces, timing, and firmware debugging.</p>
+  <nav>
+    <a href="#plan">Plan</a>
+    <a href="#knowledge">Knowledge</a>
+    <a href="#questions">Questions</a>
+    <a href="#resources">Sources</a>
+    <a href="interview-practice.html">Practice Hub</a>
+    <a href="index.html">Home</a>
+  </nav>
+</header>
+<main>
+  <section id="plan" class="section"><h2>Execution Plan</h2><div id="plan-root" class="grid"></div></section>
+  <section id="knowledge" class="section"><h2>Knowledge Map</h2><div id="knowledge-root" class="grid"></div></section>
+  <section class="toolbar">
+    <input id="search" type="search" placeholder="Search embedded systems questions..." aria-label="Search embedded systems questions">
+    <div id="stats" class="stats"></div>
+  </section>
+  <section id="questions" class="section"><h2>Question Bank</h2><div id="questions-root"></div></section>
+  <section id="resources" class="section"><h2>Sources</h2><div id="resources-root" class="grid"></div></section>
+</main>
+<script>
+window.practicePageData = {
+  plans: [
+    { phase: "Phase 1", title: "C/C++ and memory", text: "Review volatile, const, static, alignment, stack, heap, memory-mapped registers, bit masks, undefined behavior, and ownership." },
+    { phase: "Phase 2", title: "Interrupts and peripherals", text: "Study ISR rules, interrupt priority, NVIC concepts, timers, DMA, GPIO, UART, SPI, I2C, CAN, and cache coherency." },
+    { phase: "Phase 3", title: "RTOS patterns", text: "Practice tasks, queues, semaphores, mutexes, priority inversion, timeouts, tick rate, task notifications, and ISR-to-task handoff." },
+    { phase: "Phase 4", title: "Boot and linker", text: "Understand reset vectors, startup code, .text/.data/.bss, linker scripts, map files, bootloaders, firmware images, and update safety." },
+    { phase: "Phase 5", title: "Debug and reliability", text: "Prepare for hard-fault analysis, watchdogs, brownout, logging, tracing, JTAG/SWD, timing jitter, and safe state-machine design." }
+  ],
+  knowledge: [
+    { title: "volatile", text: "volatile prevents the compiler from assuming a value is unchanged, which is useful for MMIO registers and ISR-updated flags. It is not a mutex." },
+    { title: "MMIO", text: "Memory-mapped I/O exposes hardware registers at addresses that firmware reads and writes like memory." },
+    { title: "ISR discipline", text: "Interrupt handlers should do the minimum urgent work, acknowledge the hardware event, and defer heavier processing." },
+    { title: "DMA ownership", text: "DMA reduces CPU copying but requires clear buffer ownership, alignment, cache maintenance, and completion/error handling." },
+    { title: "RTOS task", text: "An RTOS task is an independently scheduled execution context with a stack, priority, and communication primitives." },
+    { title: "Linker script", text: "A linker script maps input sections into target memory regions such as flash, SRAM, bootloader, or tightly coupled memory." },
+    { title: "Startup code", text: "Startup code initializes runtime memory, sets the stack pointer, clears BSS, copies data to RAM, and calls main or the RTOS entry." },
+    { title: "Watchdog", text: "A watchdog recovers from hangs by resetting or interrupting the system if firmware fails to service it in time." }
+  ],
+  groups: [
+    { id: "c-memory", title: "C/C++ and Memory", tag: "c", questions: [
+      { q: "What does volatile tell the compiler?", choices: ["The value may change outside normal program flow.", "The variable is atomic.", "The value is always constant.", "The variable is stored only on disk."], answer: 0, why: "volatile is common for MMIO and ISR-shared flags, but it does not provide mutual exclusion." },
+      { q: "Why is volatile not enough for thread safety?", choices: ["It does not make compound operations atomic or ordered across cores.", "It disables all interrupts.", "It creates a mutex automatically.", "It prevents all compiler output."], answer: 0, why: "Use atomics, locks, critical sections, or RTOS primitives for synchronization." },
+      { q: "What is memory-mapped I/O?", choices: ["Peripheral registers accessed through specific memory addresses.", "A filesystem mount option only.", "A neural-network format.", "A UART baud rate."], answer: 0, why: "Firmware controls hardware by reading and writing register addresses." },
+      { q: "Why can bit masks be safer than magic numbers?", choices: ["They name individual register fields and reduce accidental bit changes.", "They make code run without hardware.", "They replace linker scripts.", "They disable caches."], answer: 0, why: "Readable masks help preserve unrelated register bits." },
+      { q: "What is alignment?", choices: ["Placing data at addresses suitable for its type or hardware access.", "Sorting functions alphabetically.", "Choosing task names.", "Changing PWM duty cycle."], answer: 0, why: "Misaligned access may fault or require extra bus cycles." },
+      { q: "Why avoid unbounded dynamic allocation in firmware?", choices: ["Latency, fragmentation, failure, and ownership can be unpredictable.", "malloc always uses no memory.", "Static allocation is impossible.", "The compiler forbids heap use."], answer: 0, why: "Hard real-time systems often use static buffers or fixed pools." },
+      { q: "What is stack overflow in embedded code?", choices: ["A task or ISR uses more stack than allocated.", "A network packet is too large.", "A flash sector is erased.", "A UART byte is dropped only."], answer: 0, why: "Small stacks make overflow a common firmware failure mode." },
+      { q: "What is const useful for?", choices: ["Expressing read-only intent and enabling placement in read-only memory when possible.", "Making variables volatile.", "Disabling optimization.", "Starting the scheduler."], answer: 0, why: "const improves API clarity and can help memory placement." },
+      { q: "What is undefined behavior?", choices: ["A program construct where the C/C++ standard imposes no required behavior.", "A recoverable UART timeout.", "A normal RTOS delay.", "A documented register reset value."], answer: 0, why: "Undefined behavior can break differently under optimization or compiler changes." },
+      { q: "Why inspect generated assembly sometimes?", choices: ["To confirm timing, volatile accesses, barriers, or critical low-level code.", "To replace all tests.", "To remove comments.", "To change schematics."], answer: 0, why: "Embedded debugging often crosses the C/assembly/hardware boundary." }
+    ]},
+    { id: "interrupts", title: "Interrupts, DMA, and Peripherals", tag: "isr", questions: [
+      { q: "What should an ISR generally do?", choices: ["Handle urgent work, acknowledge the event, and defer heavy processing.", "Run a full neural-network training loop.", "Block forever on a queue.", "Format flash every time."], answer: 0, why: "Short ISRs reduce latency and avoid blocking other time-critical work." },
+      { q: "Why keep ISRs short?", choices: ["Long ISRs increase interrupt latency and jitter.", "Short ISRs always use more memory.", "ISRs cannot access registers.", "Long ISRs improve every deadline."], answer: 0, why: "Interrupt latency matters for control, communication, and real-time systems." },
+      { q: "What is interrupt priority?", choices: ["A rule deciding which interrupt can preempt another.", "A linker section name.", "A UART frame bit.", "A heap allocator type."], answer: 0, why: "Priority and grouping affect nesting and latency." },
+      { q: "What is an interrupt vector table?", choices: ["A table of exception and interrupt handler addresses.", "A table of labels only.", "A queue of task messages.", "A boot logo."], answer: 0, why: "On Cortex-M, reset and interrupt dispatch start through the vector table." },
+      { q: "What is DMA used for?", choices: ["Moving data between peripherals and memory without CPU copying each item.", "Generating source code.", "Replacing all interrupts.", "Changing clock frequency only."], answer: 0, why: "DMA can reduce CPU load but adds ownership and cache concerns." },
+      { q: "What is cache coherency in DMA?", choices: ["Ensuring CPU cache contents and DMA-visible memory agree.", "Sorting cache files.", "Converting SRAM to flash.", "Increasing UART speed."], answer: 0, why: "Clean/invalidate operations or uncached buffers may be required." },
+      { q: "What is debouncing?", choices: ["Filtering switch bounce so one press is not read as many transitions.", "Reducing stack size.", "Changing CPU priority.", "Erasing flash blocks."], answer: 0, why: "Mechanical contacts can oscillate during transitions." },
+      { q: "What is UART?", choices: ["Asynchronous serial communication with configured baud rate and framing.", "A two-wire addressed bus only.", "A flash memory format.", "A clock tree."], answer: 0, why: "UART is common for logs, bootloaders, and simple device links." },
+      { q: "How does SPI differ from I2C?", choices: ["SPI is clocked with chip-select lines and is often faster; I2C is two-wire addressed shared bus.", "SPI has no clock.", "I2C cannot share a bus.", "They are the same protocol."], answer: 0, why: "They have different wiring, arbitration, speed, and device-selection models." },
+      { q: "Why use hardware timers?", choices: ["To generate precise periodic events, capture timings, PWM, or timeouts.", "To allocate heap memory.", "To compile code.", "To parse HTML."], answer: 0, why: "Timers are fundamental for scheduling and peripheral control." }
+    ]},
+    { id: "rtos", title: "RTOS and Concurrency", tag: "rtos", questions: [
+      { q: "What is an RTOS task?", choices: ["A schedulable thread of execution with its own stack and priority.", "A flash erase block.", "A hardware register only.", "A linker expression."], answer: 0, why: "Tasks are the main unit of RTOS scheduling." },
+      { q: "What is a FreeRTOS queue used for?", choices: ["Passing fixed-size items between tasks or from ISR-safe APIs to tasks.", "Changing CPU voltage.", "Mapping flash sections.", "Compiling the program."], answer: 0, why: "Queues combine synchronization and data transfer." },
+      { q: "When should a mutex be used?", choices: ["To protect a shared resource with ownership semantics.", "To signal a one-time interrupt only.", "To write linker scripts.", "To configure UART parity."], answer: 0, why: "Mutexes are for mutual exclusion and may support priority inheritance." },
+      { q: "When is a binary semaphore useful?", choices: ["For event signaling between ISR/task or task/task.", "For owning a shared object with priority inheritance by definition.", "For placing code in flash.", "For clearing BSS."], answer: 0, why: "Binary semaphores are commonly used for signaling, not ownership." },
+      { q: "What is priority inversion?", choices: ["A high-priority task waits for a low-priority task holding a resource.", "The scheduler runs no tasks.", "The UART changes endian order.", "The heap grows downward."], answer: 0, why: "Priority inheritance can temporarily boost the lock holder." },
+      { q: "Why avoid blocking in an ISR?", choices: ["ISRs should not wait for scheduler-managed resources like normal tasks.", "Blocking always improves latency.", "ISRs cannot read registers.", "It changes flash layout."], answer: 0, why: "Use ISR-safe APIs that wake tasks instead." },
+      { q: "What is a tick rate?", choices: ["The periodic RTOS timer frequency used for time slicing and delays.", "The SPI bit order.", "The number of linker sections.", "A CAN identifier."], answer: 0, why: "Tick rate affects timing granularity, overhead, and power." },
+      { q: "What is tickless idle?", choices: ["Suppressing periodic ticks during idle periods to save power.", "Running the tick interrupt faster.", "Disabling all timers forever.", "Removing the scheduler."], answer: 0, why: "Tickless modes use a timer wakeup for the next needed event." },
+      { q: "Why use task notifications?", choices: ["They can be a lightweight direct signal to a task.", "They replace all queues with files.", "They configure flash wait states.", "They define interrupt vectors."], answer: 0, why: "In FreeRTOS, notifications can be faster and smaller than queues/semaphores for simple signals." },
+      { q: "What should be considered when choosing task priorities?", choices: ["Deadline, blocking behavior, resource sharing, and priority inversion risk.", "Alphabetical task names only.", "Source file order only.", "LED color only."], answer: 0, why: "Priority design is a system-level timing decision." }
+    ]},
+    { id: "boot-linker", title: "Boot Flow and Linker Scripts", tag: "boot", questions: [
+      { q: "What does startup code usually initialize?", choices: ["Stack pointer, .data copy, .bss zeroing, and runtime entry.", "Only UART baud rate.", "Only CSS files.", "Only network sockets."], answer: 0, why: "Startup bridges reset hardware state to a C/C++ runtime environment." },
+      { q: "What is .text?", choices: ["Code and often read-only constants.", "Zero-initialized data.", "Heap metadata only.", "A queue item."], answer: 0, why: ".text is typically placed in executable flash or memory." },
+      { q: "What is .data?", choices: ["Initialized writable data copied from flash to RAM at startup.", "Uninitialized zero data only.", "Interrupt vector only.", "A debug log file."], answer: 0, why: "Initial values live in nonvolatile memory but execute as writable RAM variables." },
+      { q: "What is .bss?", choices: ["Zero-initialized writable data cleared at startup.", "Executable code.", "A bootloader image signature only.", "An SPI command."], answer: 0, why: ".bss does not need stored initial values beyond zeroing." },
+      { q: "What does a linker script control?", choices: ["How sections are placed into memory regions.", "How interrupts are prioritized at runtime only.", "How UART bytes are framed.", "How labels are collected."], answer: 0, why: "Linker scripts map object-file sections to flash, RAM, boot regions, and special memory." },
+      { q: "Why inspect a map file?", choices: ["To see symbol placement and memory usage.", "To decode UART frames.", "To change task priority at runtime.", "To measure voltage."], answer: 0, why: "Map files explain firmware size and section placement." },
+      { q: "What is a bootloader?", choices: ["Small code that validates, loads, or jumps to an application image.", "A mutex type.", "An ADC sample.", "A C preprocessor macro only."], answer: 0, why: "Bootloaders enable startup control, recovery, and firmware updates." },
+      { q: "What makes firmware update design hard?", choices: ["Power loss, corrupted images, rollback, versioning, and authenticity.", "Updates never fail.", "Flash is infinite.", "Boot code cannot check signatures."], answer: 0, why: "Robust update systems plan for interruption and invalid images." },
+      { q: "Why reserve memory regions?", choices: ["For bootloader, vectors, calibration data, stacks, DMA buffers, or shared memory.", "To make code random.", "To force heap overflow.", "To disable debug."], answer: 0, why: "Embedded layouts often contain fixed hardware and product constraints." },
+      { q: "What is a reset handler?", choices: ["The entry function executed after reset before main.", "A UART receive callback only.", "A task notification.", "A linker warning."], answer: 0, why: "The reset handler initializes low-level runtime state." }
+    ]},
+    { id: "debug-reliability", title: "Interfaces, Timing, Debug, and Safety", tag: "debug", questions: [
+      { q: "What is a watchdog timer?", choices: ["A timer that detects hangs if firmware fails to service it.", "A PWM output only.", "A compiler flag.", "A file descriptor."], answer: 0, why: "Watchdogs help recover from unrecoverable software stalls." },
+      { q: "What is brownout detection?", choices: ["Detecting unsafe low supply voltage and resetting or protecting the system.", "A UART parity mode.", "A memory allocator.", "A queue overflow."], answer: 0, why: "Low voltage can cause undefined hardware behavior." },
+      { q: "What is jitter?", choices: ["Variation in timing from one cycle or event to another.", "A flash page size.", "A register field width.", "A pointer type."], answer: 0, why: "Control loops and communication timing can be sensitive to jitter." },
+      { q: "Why use a state machine?", choices: ["To make event-driven behavior explicit and testable.", "To hide all states in delays.", "To remove transitions.", "To replace hardware."], answer: 0, why: "State machines are useful for protocols, UI, boot flow, and control logic." },
+      { q: "What is JTAG or SWD used for?", choices: ["Low-level debug, flash programming, stepping, and memory/register inspection.", "Audio playback.", "Only web deployment.", "Changing I2C addresses automatically."], answer: 0, why: "Debug probes are essential for bring-up and fault analysis." },
+      { q: "How do you debug a hard fault?", choices: ["Capture stacked PC/LR, fault registers, stack pointer, and map addresses to symbols.", "Ignore the fault and reboot silently.", "Increase CSS padding.", "Only change baud rate."], answer: 0, why: "Fault context identifies the failing instruction and reason." },
+      { q: "Why is logging difficult in embedded systems?", choices: ["Bandwidth, timing impact, storage limits, and ISR/task safety matter.", "Logs are always free.", "UART has infinite speed.", "Logging cannot affect timing."], answer: 0, why: "Instrumentation can change the behavior being measured." },
+      { q: "What is fixed-point arithmetic useful for?", choices: ["Deterministic numeric work on hardware without fast floating point.", "Making pointers safe.", "Replacing all timers.", "Disabling overflow."], answer: 0, why: "Fixed-point needs careful scaling, saturation, and rounding." },
+      { q: "What should a safe failure mode do?", choices: ["Move outputs to a known safe state and preserve useful diagnostics.", "Continue blindly at full power.", "Erase every log first.", "Disable all resets."], answer: 0, why: "Safety design defines what happens when assumptions fail." },
+      { q: "Why test with real timing and hardware?", choices: ["Simulation and unit tests may miss interrupt timing, electrical behavior, and peripheral edge cases.", "Hardware tests are never needed.", "Timing cannot affect firmware.", "Peripherals always behave ideally."], answer: 0, why: "Embedded bugs often appear at the boundary between software and physical hardware." }
+    ]}
+  ],
+  resources: [
+    { title: "FreeRTOS", text: "Official RTOS documentation for queues, semaphores, mutexes, and kernel primitives.", links: [{ label: "Queues", href: "https://freertos.org/Documentation/02-Kernel/02-Kernel-features/02-Queues-mutexes-and-semaphores/01-Queues" }, { label: "Mutexes", href: "https://freertos.org/Documentation/02-Kernel/02-Kernel-features/02-Queues-mutexes-and-semaphores/04-Mutexes" }] },
+    { title: "Arm documentation", text: "Embedded memory layout, linker script, and volatile MMIO guidance.", links: [{ label: "Linker scripts", href: "https://developer.arm.com/documentation/107976/22-1-0/Map-code-and-data-to-your-target-device/Linker-scripts" }, { label: "Volatile MMIO", href: "https://developer.arm.com/documentation/dui0056/d/writing-code-for-rom/using-scatter-loading-with-memory-mapped-i-o/using-pointers-to-access-i-o" }] },
+    { title: "Cortex-M interrupts", text: "Background on exceptions, NVIC, priorities, and interrupt handling.", links: [{ label: "Cortex-M exception guide", href: "https://interrupt.memfault.com/blog/arm-cortex-m-exceptions-and-nvic" }] },
+    { title: "GNU linker", text: "Reference material for linker scripts, section placement, and map-file thinking.", links: [{ label: "LD scripts", href: "https://sourceware.org/binutils/docs/ld/Scripts.html" }] }
+  ]
+};
+</script>
+<script src="practice-common.js"></script>
+</body>
+</html>
