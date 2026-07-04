@@ -1,0 +1,2627 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="AI compiler and NPU practice questions.">
+<title>AI Compiler and NPU Practice Lab</title>
+<style>
+  :root {
+    color-scheme: dark;
+    --bg: #0f1419;
+    --panel: #161b22;
+    --panel2: #1c2330;
+    --ink: #e6edf3;
+    --ink-dim: #9fb0c3;
+    --line: #2a3341;
+    --accent: #4aa3ff;
+    --accent-2: #7c5cff;
+    --green-bg: #0f2a17;
+    --green-ink: #7ee787;
+    --amber-bg: #2a2109;
+    --amber-ink: #f2cc60;
+    --red-bg: #2d1113;
+    --red-ink: #ff9d97;
+    --code: #0b0f14;
+    --code-ink: #cdd9e5;
+    --hero-grad: linear-gradient(135deg, #12233d, #1a1436);
+    --chip-bg: #0d1826;
+    --head-ink: #cbe3ff;
+    --row-alt: #12171f;
+    --info-border: #204060;
+    --info-bg: #0d1f33;
+    --good-border: #1c5a2c;
+    --warn-border: #5a4a12;
+    --summary-hover: #20293a;
+    --why-bg: #0d1f33;
+    --why-ink: #d7ebff;
+    --mark-bg: #7c5cff44;
+    --mark-ink: #ffffff;
+    --hover-bg: #1a2230;
+    --core-border: #1f4b73;
+    --core-bg: #12283f;
+    --core-ink: #79c0ff;
+    --deep-border: #40306a;
+    --deep-bg: #241a33;
+    --deep-ink: #c39bff;
+    --wrong-border: #5a2323;
+    --shadow: rgba(0, 0, 0, .35);
+    --radius: 10px;
+    --font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, "Noto Sans", sans-serif;
+    --mono: ui-monospace, "SF Mono", "Cascadia Code", "Segoe UI Mono", Consolas, "Liberation Mono", monospace;
+  }
+
+  :root[data-theme="light"] {
+    color-scheme: light;
+    --bg: #f6f8fa;
+    --panel: #ffffff;
+    --panel2: #eaeef2;
+    --ink: #1f2328;
+    --ink-dim: #57606a;
+    --line: #d0d7de;
+    --accent: #0969da;
+    --accent-2: #8250df;
+    --green-bg: #e6f6ea;
+    --green-ink: #1a7f37;
+    --amber-bg: #fff8c5;
+    --amber-ink: #7d4e00;
+    --red-bg: #ffebe9;
+    --red-ink: #cf222e;
+    --code: #eff1f4;
+    --code-ink: #24292f;
+    --hero-grad: linear-gradient(135deg, #e6effb, #efeafb);
+    --chip-bg: #eaeef2;
+    --head-ink: #0550ae;
+    --row-alt: #f6f8fa;
+    --info-border: #b6d4f0;
+    --info-bg: #ddf0ff;
+    --good-border: #a0d8b0;
+    --warn-border: #e0d080;
+    --summary-hover: #eaeef2;
+    --why-bg: #ddf0ff;
+    --why-ink: #0a3d66;
+    --mark-bg: #fff3a3;
+    --mark-ink: #1f2328;
+    --hover-bg: #eef2f7;
+    --core-border: #b6d4f0;
+    --core-bg: #ddf0ff;
+    --core-ink: #0550ae;
+    --deep-border: #d0c4f0;
+    --deep-bg: #f0eafc;
+    --deep-ink: #6639ba;
+    --wrong-border: #f0b0b0;
+    --shadow: rgba(140, 149, 159, .3);
+  }
+
+  * { box-sizing: border-box; }
+
+  html {
+    scroll-behavior: smooth;
+    scroll-padding-top: 72px;
+  }
+
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: var(--font);
+    font-size: 16px;
+    line-height: 1.6;
+  }
+
+  a {
+    color: var(--accent);
+    text-decoration: none;
+  }
+
+  a:hover { text-decoration: underline; }
+
+  code {
+    border: 1px solid var(--line);
+    border-radius: 5px;
+    padding: 1px 5px;
+    background: var(--code);
+    color: var(--code-ink);
+    font-family: var(--mono);
+    font-size: .88em;
+  }
+
+  pre {
+    overflow: auto;
+    margin: 12px 0;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 12px 14px;
+    background: var(--code);
+    color: var(--code-ink);
+    font-family: var(--mono);
+    font-size: .86rem;
+    line-height: 1.5;
+  }
+
+  pre code {
+    border: 0;
+    padding: 0;
+    background: transparent;
+  }
+
+  h1, h2, h3 {
+    margin: 0;
+    line-height: 1.25;
+  }
+
+  p { margin: .55em 0; }
+
+  ul, ol {
+    margin: .45em 0 .75em;
+    padding-left: 1.45em;
+  }
+
+  li { margin: .25em 0; }
+
+  .wrap {
+    display: flex;
+    max-width: 1600px;
+    margin: 0 auto;
+  }
+
+  nav.toc {
+    position: sticky;
+    top: 0;
+    align-self: flex-start;
+    overflow-y: auto;
+    width: 280px;
+    height: 100vh;
+    flex: 0 0 280px;
+    border-right: 1px solid var(--line);
+    padding: 16px 12px;
+    background: var(--panel);
+  }
+
+  nav.toc h1 {
+    color: var(--accent);
+    font-size: 1.08rem;
+  }
+
+  nav.toc .sub {
+    margin: 6px 0 12px;
+    color: var(--ink-dim);
+    font-size: .76rem;
+    line-height: 1.4;
+  }
+
+  nav.toc ol {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    counter-reset: sec;
+  }
+
+  nav.toc li { margin: 1px 0; }
+
+  nav.toc a {
+    display: block;
+    border-radius: 6px;
+    padding: 5px 8px;
+    color: var(--ink-dim);
+    font-size: .84rem;
+  }
+
+  nav.toc a::before {
+    counter-increment: sec;
+    content: counter(sec) ". ";
+    color: var(--accent);
+    font-variant-numeric: tabular-nums;
+  }
+
+  nav.toc a:hover {
+    background: var(--panel2);
+    color: var(--ink);
+    text-decoration: none;
+  }
+
+  main {
+    min-width: 0;
+    max-width: 1120px;
+    flex: 1 1 auto;
+    padding: 28px 34px 100px;
+  }
+
+  header.hero {
+    margin-bottom: 22px;
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    padding: 22px 26px;
+    background: var(--hero-grad);
+  }
+
+  header.hero .role {
+    margin: 0;
+    font-size: 1.8rem;
+    font-weight: 800;
+  }
+
+  header.hero .tag {
+    color: var(--accent);
+    font-weight: 700;
+  }
+
+  header.hero .pos {
+    max-width: 78ch;
+    margin: .55em 0 0;
+    color: var(--ink-dim);
+  }
+
+  header.hero .meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 12px;
+    margin-top: 14px;
+    font-size: .85rem;
+  }
+
+  header.hero .meta span {
+    border: 1px solid var(--line);
+    border-radius: 20px;
+    padding: 4px 12px;
+    background: var(--chip-bg);
+    color: var(--ink);
+  }
+
+  section {
+    margin-bottom: 26px;
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    padding: 22px 26px;
+    background: var(--panel);
+    scroll-margin-top: 20px;
+  }
+
+  h2 {
+    margin-bottom: .35em;
+    border-bottom: 2px solid var(--line);
+    padding-bottom: .35em;
+    font-size: 1.55rem;
+  }
+
+  h3 {
+    margin: 1.35em 0 .5em;
+    color: var(--head-ink);
+    font-size: 1.16rem;
+  }
+
+  table {
+    width: 100%;
+    margin: 12px 0;
+    border-collapse: collapse;
+    font-size: .9rem;
+  }
+
+  th, td {
+    border: 1px solid var(--line);
+    padding: 8px 10px;
+    text-align: left;
+    vertical-align: top;
+  }
+
+  th {
+    background: var(--panel2);
+    color: var(--head-ink);
+  }
+
+  tr:nth-child(even) td { background: var(--row-alt); }
+
+  .box {
+    margin: 14px 0;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 14px 16px;
+  }
+
+  .box.info {
+    border-color: var(--info-border);
+    background: var(--info-bg);
+  }
+
+  .box.good {
+    border-color: var(--good-border);
+    background: var(--green-bg);
+  }
+
+  .box.warn {
+    border-color: var(--warn-border);
+    background: var(--amber-bg);
+  }
+
+  .box .bt {
+    display: block;
+    margin-bottom: 6px;
+    font-weight: 800;
+  }
+
+  .small {
+    color: var(--ink-dim);
+    font-size: .88rem;
+  }
+
+  .muted { color: var(--ink-dim); }
+
+  .tag-lg {
+    display: inline-block;
+    vertical-align: middle;
+    border: 1px solid transparent;
+    border-radius: 5px;
+    padding: 2px 7px;
+    font-size: .68rem;
+    font-weight: 800;
+    letter-spacing: .04em;
+    text-transform: uppercase;
+    white-space: nowrap;
+  }
+
+  .t-core {
+    border-color: var(--core-border);
+    background: var(--core-bg);
+    color: var(--core-ink);
+  }
+
+  .t-memory {
+    border-color: var(--good-border);
+    background: var(--green-bg);
+    color: var(--green-ink);
+  }
+
+  .t-deep {
+    border-color: var(--deep-border);
+    background: var(--deep-bg);
+    color: var(--deep-ink);
+  }
+
+  .searchbar {
+    position: sticky;
+    top: 0;
+    z-index: 5;
+    margin: -4px 0 12px;
+    padding: 10px 0 12px;
+    background: var(--panel);
+  }
+
+  .searchbar input {
+    width: 100%;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 11px 14px;
+    background: var(--code);
+    color: var(--ink);
+    font: inherit;
+  }
+
+  .searchbar input:focus {
+    outline: none;
+    border-color: var(--accent);
+  }
+
+  .searchbar .hint {
+    margin-top: 5px;
+    color: var(--ink-dim);
+    font-size: .76rem;
+  }
+
+  details.qa {
+    overflow: hidden;
+    margin: 10px 0;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: var(--panel2);
+  }
+
+  details.qa > summary {
+    display: flex;
+    gap: 10px;
+    align-items: flex-start;
+    padding: 12px 14px;
+    cursor: pointer;
+    font-weight: 700;
+    list-style: none;
+  }
+
+  details.qa > summary::-webkit-details-marker { display: none; }
+
+  details.qa > summary::before {
+    content: "\25B8";
+    margin-top: 2px;
+    color: var(--accent);
+    font-size: .9em;
+    transition: transform .15s;
+  }
+
+  details.qa[open] > summary::before { transform: rotate(90deg); }
+
+  details.qa > summary:hover { background: var(--summary-hover); }
+
+  details.qa .ans {
+    border-top: 1px solid var(--line);
+    padding: 4px 16px 16px 34px;
+    color: var(--ink);
+    font-size: .95rem;
+  }
+
+  .qmeta {
+    display: flex;
+    flex-shrink: 0;
+    gap: 6px;
+    margin-left: auto;
+  }
+
+  .choices {
+    margin: .45em 0 .8em;
+    padding-left: 1.8em;
+  }
+
+  .choices li {
+    border-left: 3px solid transparent;
+    padding-left: 6px;
+  }
+
+  /* Interactive multiple choice */
+  .qa.mcq .choices li {
+    margin: 5px 0;
+    border: 1px solid var(--line);
+    border-left: 3px solid transparent;
+    border-radius: 6px;
+    padding: 7px 10px;
+    background: var(--row-alt);
+    transition: background .12s, border-color .12s;
+  }
+
+  .qa.mcq:not(.answered) .choices li { cursor: pointer; }
+
+  .qa.mcq:not(.answered) .choices li:hover {
+    border-color: var(--accent);
+    background: var(--hover-bg);
+  }
+
+  .qa.mcq:not(.answered) .choices li:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 1px;
+  }
+
+  .qa.mcq.answered .choices li.correct {
+    border-color: var(--good-border);
+    border-left-color: var(--green-ink);
+    background: var(--green-bg);
+    color: var(--green-ink);
+    font-weight: 700;
+  }
+
+  .qa.mcq.answered .choices li.chosen.wrong {
+    border-color: var(--wrong-border);
+    border-left-color: var(--red-ink);
+    background: var(--red-bg);
+    color: var(--red-ink);
+    font-weight: 700;
+  }
+
+  .mcq-hint {
+    margin: .2em 0 .7em;
+    color: var(--ink-dim);
+    font-size: .82rem;
+    font-style: italic;
+  }
+
+  .qa.answered .mcq-hint { display: none; }
+
+  /* Hide the answer/explanation of an MCQ card until an option is chosen */
+  .qa.mcq .ans > *:not(.choices):not(.mcq-hint) { display: none; }
+  .qa.mcq.answered .ans > *:not(.mcq-hint) { display: block; }
+
+  .why {
+    border-left: 3px solid var(--accent);
+    border-radius: 6px;
+    margin: .75em 0;
+    padding: 9px 11px;
+    background: var(--why-bg);
+    color: var(--why-ink);
+  }
+
+  .termdef {
+    margin: 12px 0;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 12px 14px;
+    background: var(--row-alt);
+    color: var(--ink-dim);
+    font-size: .9rem;
+  }
+
+  .termdef b {
+    color: var(--ink);
+  }
+
+  .grid2 {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 14px;
+  }
+
+  .nohit { display: none !important; }
+
+  mark {
+    border-radius: 3px;
+    padding: 0 1px;
+    background: var(--mark-bg);
+    color: var(--mark-ink);
+  }
+
+  .topbtn {
+    position: fixed;
+    right: 18px;
+    bottom: 18px;
+    width: 42px;
+    height: 42px;
+    border: 1px solid var(--line);
+    border-radius: 50%;
+    background: var(--panel2);
+    color: var(--ink);
+    cursor: pointer;
+    font-size: 1.2rem;
+    box-shadow: 0 2px 10px var(--shadow);
+  }
+
+  .themebtn {
+    position: fixed;
+    right: 18px;
+    bottom: 68px;
+    z-index: 20;
+    display: inline-flex;
+    gap: 6px;
+    align-items: center;
+    height: 42px;
+    padding: 0 14px;
+    border: 1px solid var(--line);
+    border-radius: 21px;
+    background: var(--panel2);
+    color: var(--ink);
+    cursor: pointer;
+    font: inherit;
+    font-size: .82rem;
+    box-shadow: 0 2px 10px var(--shadow);
+  }
+
+  .themebtn:hover { border-color: var(--accent); }
+
+  .themebtn .theme-icon { font-size: 1rem; line-height: 1; }
+
+  footer {
+    padding: 10px 0 36px;
+    color: var(--ink-dim);
+    text-align: center;
+    font-size: .82rem;
+  }
+
+  @media (max-width: 1000px) {
+    .wrap { display: block; }
+    nav.toc {
+      position: relative;
+      width: auto;
+      height: auto;
+      border-right: 0;
+      border-bottom: 1px solid var(--line);
+    }
+    nav.toc ol {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 2px 8px;
+    }
+    main { padding: 22px 16px 90px; }
+    .grid2 { grid-template-columns: 1fr; }
+  }
+
+  @media (max-width: 640px) {
+    nav.toc ol { grid-template-columns: 1fr; }
+    header.hero, section { padding: 18px 16px; }
+    details.qa > summary { display: block; }
+    details.qa > summary::before { display: inline-block; margin-right: 8px; }
+    .qmeta { margin: 8px 0 0 0; }
+  }
+
+  @media print {
+    nav.toc, .searchbar, .topbtn, .themebtn { display: none; }
+    body { background: #fff; color: #111; }
+    main { max-width: none; padding: 0; }
+    section, header.hero, details.qa {
+      break-inside: avoid;
+      border-color: #aaa;
+      background: #fff;
+      color: #111;
+    }
+    details.qa { page-break-inside: avoid; }
+  }
+</style>
+<script>
+  // Apply the saved (or system-preferred) theme before first paint to avoid a flash.
+  (function () {
+    try {
+      var t = localStorage.getItem("npu-theme");
+      if (!t) {
+        t = (window.matchMedia && window.matchMedia("(prefers-color-scheme: light)").matches) ? "light" : "dark";
+      }
+      if (t === "light") document.documentElement.setAttribute("data-theme", "light");
+    } catch (e) {}
+  })();
+</script>
+</head>
+<body>
+<div class="wrap">
+<nav class="toc" aria-label="Table of contents">
+  <h1>AI Compiler Practice</h1>
+  <p class="sub">Self-contained study notes and practice questions for AI compiler and NPU topics.</p>
+  <ol>
+    <li><a href="#overview">How to use</a></li>
+    <li><a href="#mental-model">Mental model</a></li>
+    <li><a href="#processor-map">Processor map</a></li>
+    <li><a href="#transformer-basics">Transformer basics</a></li>
+    <li><a href="#tenstorrent">Tenstorrent stack</a></li>
+    <li><a href="#graph">Graph optimization</a></li>
+    <li><a href="#memory">Tiling and memory</a></li>
+    <li><a href="#ir">IR, MLIR, and TVM</a></li>
+    <li><a href="#quant">Quantization</a></li>
+    <li><a href="#runtime">Runtime and hardware</a></li>
+    <li><a href="#question-bank">Question bank</a></li>
+    <li><a href="#coding">Coding drills</a></li>
+    <li><a href="#resources">Resources</a></li>
+    <li><a href="#glossary">Glossary</a></li>
+  </ol>
+</nav>
+
+<main>
+<header class="hero">
+  <p class="role"><span class="tag">Practice</span> AI Compiler and NPU Practice Lab</p>
+  <p class="pos">A self-contained study page for multiple-choice and open-ended practice on graph compilers, Tenstorrent-style NPU programming, memory planning, MLIR-style lowering, quantization, runtime scheduling, and small coding drills.</p>
+  <div class="meta">
+    <span>Offline HTML</span>
+    <span>MCQ + open-ended</span>
+    <span>Collapsible answers</span>
+    <span>Public resources</span>
+  </div>
+</header>
+
+<section id="overview">
+  <h2>How to use</h2>
+  <div class="searchbar">
+    <input id="q" type="search" placeholder="Search questions, answers, tags, or terms..." aria-label="Search questions">
+    <div class="hint">Examples: Tenstorrent, Tensix, circular buffer, GEMM, core grid, fusion, SRAM, bufferization, quantization. Press Escape to clear.</div>
+  </div>
+  <div class="box info">
+    <span class="bt">Study flow</span>
+    <ol>
+      <li>Read each question and pick an answer before opening the card.</li>
+      <li>Open the card to check the correct option and the short explanation.</li>
+      <li>Use the expanded question bank for verbal rehearsal: answer first, then open the card.</li>
+      <li>Use the coding drills as whiteboard practice: state assumptions, give complexity, test edge cases.</li>
+    </ol>
+  </div>
+  <p class="small">This page keeps public technical vendor, framework, and hardware names where they are useful for AI compiler and NPU study.</p>
+</section>
+
+<section id="mental-model">
+  <h2>Mental model</h2>
+  <p>An AI compiler turns a model graph into efficient execution on a target accelerator. The central job is not only choosing arithmetic instructions. The compiler must preserve graph semantics, select layouts, tile work into local memory, schedule data movement, fuse or split operators, choose quantization boundaries, and coordinate runtime execution.</p>
+
+  <div class="termdef">
+    <b>Pipeline:</b>
+    framework graph &rarr; graph optimization &rarr; high-level IR &rarr; layout and memory planning &rarr; target lowering &rarr; runtime packets and kernels.
+  </div>
+
+  <table>
+    <tr><th>Level</th><th>Main information</th><th>Good optimizations here</th></tr>
+    <tr><td>Graph</td><td>Operators, shapes, constants, dependencies</td><td>Fusion, folding, dead-node removal, partitioning</td></tr>
+    <tr><td>Tensor IR</td><td>Loops, tensors, indexing, affine structure</td><td>Tiling, loop ordering, vectorization, bufferization planning</td></tr>
+    <tr><td>Target IR</td><td>Memory spaces, DMA, hardware intrinsics, launch shape</td><td>SRAM placement, double buffering, sharding, kernel selection</td></tr>
+    <tr><td>Runtime</td><td>Compiled programs, queues, synchronization, cache state</td><td>Warmup, program cache, async dispatch, profiling</td></tr>
+  </table>
+</section>
+
+<section id="processor-map">
+  <h2>Processor map</h2>
+  <p>This is a public-study comparison of common processor labels used around AI systems. Exact architecture varies by vendor, so treat this as a mental model, not a hardware specification.</p>
+
+  <table>
+    <tr><th>Unit</th><th>Primary role</th><th>Strengths</th><th>Common AI use</th><th>Watch-outs</th></tr>
+    <tr>
+      <td><b>CPU</b><br>Central Processing Unit</td>
+      <td>General-purpose control processor with strong single-thread and branch performance.</td>
+      <td>Operating system work, orchestration, irregular control flow, low-latency decisions, scalar code.</td>
+      <td>Pre/post-processing, graph orchestration, fallback ops, tokenization, small dynamic tasks.</td>
+      <td>Lower throughput and energy efficiency for large dense tensor math than specialized accelerators.</td>
+    </tr>
+    <tr>
+      <td><b>GPU</b><br>Graphics Processing Unit</td>
+      <td>High-throughput parallel processor with many lightweight threads.</td>
+      <td>Massive data parallelism, dense tensor math, training, rendering, large batched workloads.</td>
+      <td>Deep learning training, large inference batches, CUDA-style custom kernels, transformer matmuls.</td>
+      <td>Needs enough parallel work to stay full; host launch overhead and memory movement still matter.</td>
+    </tr>
+    <tr>
+      <td><b>VPU</b><br>Vision Processing Unit</td>
+      <td>Vision-oriented low-power accelerator, often for edge computer-vision and DNN inference.</td>
+      <td>Camera/vision pipelines, low-power edge inference, image processing, embedded deployment.</td>
+      <td>Object detection, classification, face/person detection, surveillance, retail, transportation, smart cameras.</td>
+      <td>Usually narrower than a GPU; best when the workload matches supported vision/DNN operators.</td>
+    </tr>
+    <tr>
+      <td><b>NPU</b><br>Neural Processing Unit</td>
+      <td>Neural-network accelerator optimized for AI inference or training primitives.</td>
+      <td>Matrix multiply, convolution, activation pipelines, quantized inference, power-efficient AI.</td>
+      <td>On-device AI, image/audio/text inference, sustained AI workloads, CPU/GPU offload.</td>
+      <td>Vendor-specific op support, layouts, memory hierarchy, quantization formats, and compiler stack.</td>
+    </tr>
+    <tr>
+      <td><b>LPU</b><br>Language Processing Unit</td>
+      <td>Groq-specific term for an inference architecture designed around predictable language-model execution.</td>
+      <td>Compiler-planned execution, on-chip SRAM emphasis, deterministic scheduling, token-generation latency.</td>
+      <td>LLM inference, especially latency-sensitive token generation.</td>
+      <td>Not a generic standard like CPU/GPU. Treat it as a vendor architecture category unless another source defines it explicitly.</td>
+    </tr>
+  </table>
+
+  <div class="box info">
+    <span class="bt">How to choose a target</span>
+    <p>Use the CPU for control-heavy or irregular work, the GPU for large parallel dense workloads, the VPU for low-power vision pipelines, the NPU for power-efficient neural-network acceleration, and an LPU-style system when the deployment is specifically optimized for predictable language-model inference.</p>
+  </div>
+
+  <details class="qa"><summary>Knowledge check. Which processor is usually best for branchy graph orchestration and unsupported fallback operators?<span class="qmeta"><span class="tag-lg t-core">core</span></span></summary>
+  <div class="ans">
+    <ol class="choices" type="A">
+      <li class="correct">CPU</li>
+      <li>Only NPU</li>
+      <li>Only VPU</li>
+      <li>Only LPU</li>
+    </ol>
+    <p class="why"><b>Answer: A.</b> CPUs are general-purpose and handle irregular control flow well. Accelerators can be faster for supported tensor regions, but unsupported or branch-heavy parts often return to CPU or a custom kernel path.</p>
+  </div></details>
+
+  <details class="qa"><summary>Knowledge check. Why do modern AI PCs often include CPU, GPU, and NPU together?<span class="qmeta"><span class="tag-lg t-core">core</span></span></summary>
+  <div class="ans">
+    <ol class="choices" type="A">
+      <li>Because all three do exactly the same job.</li>
+      <li class="correct">Because different workloads trade off latency, throughput, power, programmability, and operator support.</li>
+      <li>Because NPUs replace operating systems.</li>
+      <li>Because GPUs cannot run parallel code.</li>
+    </ol>
+    <p class="why"><b>Answer: B.</b> A runtime can place each task where it fits best: CPU for orchestration, GPU for high-throughput parallel work, and NPU for efficient sustained AI tasks.</p>
+  </div></details>
+</section>
+
+<section id="transformer-basics">
+  <h2>Transformer basics</h2>
+  <p>Transformers are the dominant architecture behind many modern LLMs. The original Transformer replaced recurrence and convolution with attention-based blocks, making sequence modeling more parallelizable during training.</p>
+
+  <div class="termdef">
+    <b>Core idea:</b>
+    A token representation attends to other token representations. Attention builds context-aware vectors, then feed-forward layers transform each token independently.
+  </div>
+
+  <table>
+    <tr><th>Component</th><th>What it does</th><th>Compiler / NPU relevance</th></tr>
+    <tr><td>Tokenization</td><td>Converts text into token IDs consumed by the model.</td><td>Usually CPU-side or preprocessing; affects sequence length.</td></tr>
+    <tr><td>Embedding</td><td>Maps token IDs to dense vectors.</td><td>Memory lookup plus layout choice.</td></tr>
+    <tr><td>Self-attention</td><td>Uses Q, K, V projections so each token can mix information from other tokens.</td><td>GEMMs, softmax, masking, KV cache, memory bandwidth.</td></tr>
+    <tr><td>MLP / feed-forward</td><td>Per-token dense layers, often the largest FLOP contributor.</td><td>Large GEMMs, activation fusion, quantization.</td></tr>
+    <tr><td>LayerNorm / RMSNorm</td><td>Normalizes activations for stable computation.</td><td>Reduction-heavy, often less matrix-engine-friendly than GEMM.</td></tr>
+    <tr><td>KV cache</td><td>Stores past keys and values during autoregressive generation.</td><td>Critical for token latency and memory footprint.</td></tr>
+  </table>
+
+  <pre><code>Scaled dot-product attention:
+
+  Attention(Q, K, V) = softmax(Q * K^T / sqrt(d_k)) * V
+
+Common LLM inference shape:
+
+  prompt prefill:
+    many tokens at once
+    large GEMMs and attention matrices
+
+  decode:
+    one new token per step
+    reuses KV cache
+    latency and memory bandwidth become very important</code></pre>
+
+  <details class="qa"><summary>Knowledge check. Why are GEMM and memory bandwidth central to Transformer inference?<span class="qmeta"><span class="tag-lg t-core">core</span></span></summary>
+  <div class="ans">
+    <ol class="choices" type="A">
+      <li>Transformers have no matrix multiplications.</li>
+      <li class="correct">Q/K/V projections, output projections, and MLP layers are dominated by matrix multiplications, while attention and KV cache stress memory movement.</li>
+      <li>All Transformer work is scalar branching.</li>
+      <li>KV cache removes all memory traffic.</li>
+    </ol>
+    <p class="why"><b>Answer: B.</b> Transformer blocks are mostly dense linear algebra plus memory-heavy attention/cache operations. That is why GPU, NPU, and LPU-style systems focus heavily on GEMM throughput, memory locality, and scheduling.</p>
+  </div></details>
+
+  <details class="qa"><summary>Knowledge check. What is the difference between prefill and decode in LLM inference?<span class="qmeta"><span class="tag-lg t-deep">deep</span></span></summary>
+  <div class="ans">
+    <ol class="choices" type="A">
+      <li class="correct">Prefill processes the input prompt, often with many tokens in parallel; decode generates new tokens step by step while reusing the KV cache.</li>
+      <li>Prefill is training and decode is data loading.</li>
+      <li>Decode ignores all previous tokens.</li>
+      <li>Prefill only runs on CPUs.</li>
+    </ol>
+    <p class="why"><b>Answer: A.</b> Prefill tends to be throughput-friendly. Decode is often latency-sensitive because each new token depends on the previous generated token.</p>
+  </div></details>
+</section>
+
+<section id="tenstorrent">
+  <h2>Tenstorrent stack</h2>
+  <p>This section focuses on Tenstorrent-style accelerator concepts, the public software stack, TT-Metalium programming ideas, tiled tensors, circular buffers, explicit data movement, program caching, and fast dispatch.</p>
+
+  <div class="termdef">
+    <b>Memory hook:</b>
+    Tenstorrent-style low-level programming is easiest to remember as <b>reader &rarr; compute &rarr; writer</b>. Reader kernels move tiles into local buffers, compute kernels consume local tiles, and writer kernels move output tiles onward.
+  </div>
+
+  <div class="box info">
+    <span class="bt">Software stack snapshot</span>
+    <p><b>TT-BUDA / PyBuda</b> was the older high-level AI/ML compiler path. It could import models from frameworks such as PyTorch, TensorFlow, ONNX, and TFLite, but the public repository is now archived and points users toward TT-Forge.</p>
+    <p><b>TT-Forge</b> is the current MLIR-based compiler stack. Think of it as the model-import and graph-lowering path: frontends such as TT-XLA and TT-Forge-ONNX feed TT-MLIR, which lowers toward execution on Tenstorrent hardware.</p>
+    <p><b>TT-NN</b> is the higher-level neural-network operation library with Python and C++ APIs. It is the practical layer for writing or porting model code with optimized operations without manually writing every low-level kernel.</p>
+    <p><b>TT-Metalium</b> is the low-level SDK and programming model. It exposes host programs, device kernels, circular buffers, explicit memory movement, NoC behavior, and Tensix compute resources for custom performance work.</p>
+    <p><b>TT-Lang</b> is useful to watch as a kernel/programming-language layer for expressing Tenstorrent-style operations, dataflow buffers, simulation, and lower-level tutorials such as elementwise and matmul examples.</p>
+  </div>
+
+  <table>
+    <tr><th>Layer</th><th>Main role</th><th>When to study it</th></tr>
+    <tr><td>TT-Forge</td><td>Current high-level compiler path from framework graphs toward Tenstorrent execution.</td><td>Model import, graph lowering, unsupported ops, compiler diagnostics, model bring-up.</td></tr>
+    <tr><td>TT-MLIR</td><td>MLIR-based compiler infrastructure and backend used inside the compiler flow.</td><td>Dialect design, lowering passes, layout constraints, runtime/codegen boundaries.</td></tr>
+    <tr><td>TT-NN</td><td>High-level neural-network op library built on TT-Metalium.</td><td>Porting model layers, using optimized ops, profiling tensors/ops, adding new operations.</td></tr>
+    <tr><td>TT-Metalium</td><td>Low-level SDK for host/device programs and custom kernels.</td><td>Reader/compute/writer kernels, circular buffers, NoC movement, core grids, SRAM pressure.</td></tr>
+    <tr><td>TT-Lang</td><td>Kernel/programming-language layer with simulator and tutorials.</td><td>Learning dataflow-buffer concepts and experimenting with operation-level implementations.</td></tr>
+    <tr><td>TT-BUDA</td><td>Legacy high-level compiler stack; useful historically, but archived.</td><td>Understanding older Tenstorrent terminology and why current material points to TT-Forge.</td></tr>
+  </table>
+
+  <table>
+    <tr><th>Concept</th><th>Study meaning</th><th>Compiler angle</th></tr>
+    <tr><td>Tensix-style core grid</td><td>Many local compute nodes with nearby memory and data-movement capability</td><td>Placement, sharding, synchronization, and load balance matter.</td></tr>
+    <tr><td>Tile layout</td><td>Tensors are processed in hardware-friendly blocks rather than arbitrary scalar order</td><td>Padding, layout conversion, and tile-size selection become backend decisions.</td></tr>
+    <tr><td>Circular buffers</td><td>Local producer-consumer queues between data movement and compute</td><td>Buffer depth controls overlap and SRAM pressure.</td></tr>
+    <tr><td>TT-Metalium-style kernels</td><td>Explicit host programs plus device kernels for movement and compute</td><td>The compiler/runtime must emit launch configs, runtime args, and synchronization.</td></tr>
+  </table>
+
+  <div class="box info">
+    <span class="bt">Kernel build and dispatch lifecycle</span>
+    <p>In TT-Metalium, device-side kernel source is typically C++ compiled just-in-time for the programmable RISC-V processors in Tenstorrent cores. DeepWiki describes the JIT build system as translating kernel source into RISC-V binaries using the SFPI toolchain, then linking ELF images with architecture/core-specific settings. The runtime tracks whether program binaries have been written to device DRAM and uses command queues plus dispatch kernels to issue writes, synchronization, launch messages, and go signals.</p>
+  </div>
+  <table>
+    <tr><th>Stage</th><th>What happens</th><th>Why it matters</th></tr>
+    <tr><td>Kernel source</td><td>Kernels can come from file paths or inline source; compile-time args and defines specialize the kernel.</td><td>Changing source, defines, or compile-time args should invalidate stale binaries.</td></tr>
+    <tr><td>Generated files</td><td>The JIT emits helper files such as <code>kernel_includes.hpp</code>, <code>defines_generated.h</code>, and Metal 2.0 binding headers.</td><td>Generated accessors connect source code to dataflow buffers, semaphores, and runtime/named arguments.</td></tr>
+    <tr><td>Compile</td><td>The build environment selects the SFPI RISC-V compiler, commonly <code>riscv-tt-elf-g++</code>, from <code>runtime/sfpi</code> or <code>/opt/tenstorrent/sfpi</code>.</td><td>Compiler version, flags, includes, and defines are part of the build cache identity.</td></tr>
+    <tr><td>Link</td><td>Objects are linked into ELF binaries using a linker script selected through the HAL/JIT build query.</td><td>The linker script controls text/data/stack placement and per-processor memory limits.</td></tr>
+    <tr><td>Load and dispatch</td><td>The program command sequence stages binaries and commands; fast dispatch kernels process command pages and send go signals to workers.</td><td>Program launch overhead, binary transfer, runtime arguments, and synchronization affect first-run and steady-state timing.</td></tr>
+  </table>
+  <pre><code>Host program / TTNN op
+        |
+        v
+Create Program + Kernels + RT args + CBs
+        |
+        v
+JIT generate headers/defines
+        |
+        v
+riscv-tt-elf-g++ compile -&gt; .o
+        |
+        v
+link with processor linker script -&gt; .elf kernel binary
+        |
+        v
+write binaries/commands to device memory
+        |
+        v
+dispatch kernels send launch/go signals to target cores</code></pre>
+
+  <h3>TT-Metalium basics</h3>
+
+  <details class="qa"><summary>Q31. In a TT-Metalium-style program, what are the reader, compute, and writer kernels responsible for?<span class="qmeta"><span class="tag-lg t-core">core</span></span></summary>
+  <div class="ans">
+    <ol class="choices" type="A">
+      <li>The reader compiles source code, the compute kernel allocates host memory, and the writer trains the model.</li>
+      <li class="correct">The reader moves input tiles into local buffers, the compute kernel operates on those tiles, and the writer drains output tiles.</li>
+      <li>All three kernels perform the same dense matrix multiply.</li>
+      <li>The writer always runs before the reader.</li>
+    </ol>
+    <p class="why"><b>Answer: B.</b> This split makes data movement explicit. It is useful for understanding why compiler backends care so much about tile order, buffer depth, and synchronization.</p>
+<pre><code>DRAM or peer core
+      |
+      v
+reader kernel  -&gt;  input circular buffer  -&gt;  compute kernel
+                                                    |
+                                                    v
+DRAM or peer core  &lt;- output circular buffer &lt;- writer kernel</code></pre>
+  </div></details>
+
+  <details class="qa"><summary>Q32. What does a circular buffer represent in this programming model?<span class="qmeta"><span class="tag-lg t-memory">memory</span></span></summary>
+  <div class="ans">
+    <ol class="choices" type="A">
+      <li>A global database of compiled models.</li>
+      <li class="correct">A local FIFO-like contract between a producer kernel and a consumer kernel.</li>
+      <li>A replacement for graph-level optimization.</li>
+      <li>A way to make every tensor shape static.</li>
+    </ol>
+    <p class="why"><b>Answer: B.</b> Calls that reserve, push, wait, and pop buffer slots express ownership. The same idea generalizes to many NPUs: keep local memory full enough to overlap movement and compute, but not so full that SRAM is wasted.</p>
+  </div></details>
+
+  <details class="qa"><summary>Q33. Why do tile shape and page size matter for Tenstorrent-style tensor execution?<span class="qmeta"><span class="tag-lg t-memory">memory</span></span></summary>
+  <div class="ans">
+    <ol class="choices" type="A">
+      <li>They only affect file naming.</li>
+      <li class="correct">They determine how tensor data maps to hardware-friendly blocks, local memory, and data movement transactions.</li>
+      <li>They remove the need for quantization.</li>
+      <li>They are chosen randomly by the operating system.</li>
+    </ol>
+    <p class="why"><b>Answer: B.</b> A backend may need to pad dimensions, choose tiled layouts, and align work to hardware tile sizes. Poor layout choices can cause extra movement or underutilized compute.</p>
+  </div></details>
+
+  <details class="qa"><summary>Q34. What is sharding in an NPU memory-layout context?<span class="qmeta"><span class="tag-lg t-memory">memory</span></span></summary>
+  <div class="ans">
+    <ol class="choices" type="A">
+      <li>Deleting part of a tensor to reduce accuracy.</li>
+      <li class="correct">Splitting a tensor across multiple cores or local memories so each core owns a slice.</li>
+      <li>Converting every operator to a CPU fallback.</li>
+      <li>A synonym for constant folding.</li>
+    </ol>
+    <p class="why"><b>Answer: B.</b> Sharding can improve locality and parallelism. The tradeoff is that later operators may require a different layout, creating resharding cost.</p>
+  </div></details>
+
+  <details class="qa"><summary>Q35. What does resharding usually cost?<span class="qmeta"><span class="tag-lg t-memory">memory</span></span></summary>
+  <div class="ans">
+    <ol class="choices" type="A">
+      <li>Nothing; it is only metadata.</li>
+      <li class="correct">Data movement, synchronization, and sometimes temporary buffers.</li>
+      <li>Only a source-code comment.</li>
+      <li>It always reduces peak memory.</li>
+    </ol>
+    <p class="why"><b>Answer: B.</b> Resharding can be necessary, but it is often pure overhead. A good layout plan tries to minimize avoidable layout conversions across adjacent operators.</p>
+  </div></details>
+
+  <h3>Runtime and compiler stack</h3>
+
+  <details class="qa"><summary>Q36. How should program cache and warmup be explained in accelerator benchmarking?<span class="qmeta"><span class="tag-lg t-core">core</span></span></summary>
+  <div class="ans">
+    <ol class="choices" type="A">
+      <li>The first run is always the only valid number.</li>
+      <li class="correct">Warmup may populate compiled programs, kernel configs, memory allocations, or runtime caches; steady-state latency should be measured separately.</li>
+      <li>Program caching changes the model's numerical output.</li>
+      <li>Warmup is only relevant for web browsers.</li>
+    </ol>
+    <p class="why"><b>Answer: B.</b> Tenstorrent-style program caching is one concrete example of a broader runtime idea: avoid paying setup costs repeatedly when shapes and programs are reused.</p>
+  </div></details>
+
+  <details class="qa"><summary>Q37. What is fast dispatch trying to reduce?<span class="qmeta"><span class="tag-lg t-deep">deep</span></span></summary>
+  <div class="ans">
+    <ol class="choices" type="A">
+      <li>Numerical precision.</li>
+      <li class="correct">Host-side launch overhead and gaps between device work items.</li>
+      <li>The number of model parameters.</li>
+      <li>The need for graph correctness.</li>
+    </ol>
+    <p class="why"><b>Answer: B.</b> Fast dispatch is about keeping the device fed with work. It pairs naturally with command queues, prefetching, and careful synchronization.</p>
+  </div></details>
+
+  <details class="qa"><summary>Q38. Why are TT-Forge and older TT-BUDA-style high-level compiler paths useful to study even when focusing on low-level kernels?<span class="qmeta"><span class="tag-lg t-deep">deep</span></span></summary>
+  <div class="ans">
+    <ol class="choices" type="A">
+      <li>It proves low-level kernels are unnecessary for performance work.</li>
+      <li class="correct">It shows the full vertical path from model import and graph lowering down to tile layout, scheduling, and runtime execution.</li>
+      <li>It replaces all memory planning with Python syntax.</li>
+      <li>It only teaches frontend UI design.</li>
+    </ol>
+    <p class="why"><b>Answer: B.</b> A strong NPU mental model connects both ends: high-level graph decisions and low-level hardware execution. TT-BUDA is mainly historical now; TT-Forge is the current MLIR-based compiler stack to follow for model bring-up and lowering.</p>
+  </div></details>
+
+  <details class="qa"><summary>JIT 1. What is the main job of TT-Metalium's JIT build system?<span class="qmeta"><span class="tag-lg t-core">core</span></span></summary>
+  <div class="ans">
+    <ol class="choices" type="A">
+      <li>Train the model weights on the host CPU.</li>
+      <li class="correct">Compile device-side C++ kernel code into RISC-V binaries for programmable Tenstorrent cores.</li>
+      <li>Convert every tensor to JSON.</li>
+      <li>Replace all graph scheduling decisions with CSS layout.</li>
+    </ol>
+    <p class="why"><b>Answer: B.</b> The JIT build system specializes kernels using source, compile-time arguments, defines, target core type, and runtime options, then produces device binaries used by the runtime.</p>
+  </div></details>
+
+  <details class="qa"><summary>JIT 2. What is the role of a linker script in this kernel build flow?<span class="qmeta"><span class="tag-lg t-deep">deep</span></span></summary>
+  <div class="ans">
+    <ol class="choices" type="A">
+      <li class="correct">It controls where text, data, stack, and related sections are placed for the target processor and memory map.</li>
+      <li>It chooses the best batch size for training.</li>
+      <li>It calibrates INT8 activation ranges.</li>
+      <li>It stores the Python package version only.</li>
+    </ol>
+    <p class="why"><b>Answer: A.</b> Linker scripts are low-level layout contracts. In a device kernel flow, they matter because BRISC, NCRISC, TRISC, Ethernet, firmware, and kernel images have different memory regions and size limits.</p>
+  </div></details>
+
+  <details class="qa"><summary>JIT 3. Why does TT-Metalium hash kernel source, compiler settings, and build parameters?<span class="qmeta"><span class="tag-lg t-core">core</span></span></summary>
+  <div class="ans">
+    <ol class="choices" type="A">
+      <li>To encrypt model weights.</li>
+      <li>To change the model's mathematical graph on every run.</li>
+      <li class="correct">To decide whether cached objects and ELF binaries are still valid or must be rebuilt.</li>
+      <li>To remove the need for runtime arguments.</li>
+    </ol>
+    <p class="why"><b>Answer: C.</b> JIT caching is useful only if stale binaries are not reused after source, flags, defines, linker scripts, or compiler versions change. Hashing captures those dependencies.</p>
+  </div></details>
+
+  <details class="qa"><summary>JIT 4. What does a program binary status such as <code>NotSent</code>, <code>InFlight</code>, or <code>Committed</code> track?<span class="qmeta"><span class="tag-lg t-memory">memory</span></span></summary>
+  <div class="ans">
+    <ol class="choices" type="A">
+      <li>Whether model accuracy is high enough.</li>
+      <li class="correct">Whether kernel binaries have not been sent, are being written, or are confirmed in device DRAM.</li>
+      <li>Whether a source file was formatted with clang-format.</li>
+      <li>Whether all tensors are stored in FP32.</li>
+    </ol>
+    <p class="why"><b>Answer: B.</b> Before device cores can execute a program, the runtime has to stage the needed binaries and command data. Tracking binary status prevents redundant writes and clarifies first-run overhead.</p>
+  </div></details>
+
+  <details class="qa"><summary>JIT 5. In fast dispatch, what do the prefetch and dispatcher kernels help do?<span class="qmeta"><span class="tag-lg t-deep">deep</span></span></summary>
+  <div class="ans">
+    <ol class="choices" type="A">
+      <li>They delete command queues after every operation.</li>
+      <li class="correct">They process command pages on device, coordinate writes/synchronization, and trigger worker execution with go signals.</li>
+      <li>They replace all compute kernels with host-side Python loops.</li>
+      <li>They are only used for HTML rendering.</li>
+    </ol>
+    <p class="why"><b>Answer: B.</b> Fast dispatch is a runtime mechanism for low-latency submission. The point is to keep work moving through command queues and dispatch cores so worker cores spend less time waiting for host intervention.</p>
+  </div></details>
+
+  <h3>Memory, core-grid, and GEMM</h3>
+
+  <details class="qa"><summary>Q39. Which circular-buffer operation order best describes producer-consumer ownership?<span class="qmeta"><span class="tag-lg t-memory">memory</span></span></summary>
+  <div class="ans">
+    <ol class="choices" type="A">
+      <li class="correct">Producer reserves a slot, writes data, pushes it; consumer waits, reads data, then pops it.</li>
+      <li>Consumer pops first, producer writes later, and both assume the slot is valid.</li>
+      <li>Producer and consumer write the same slot at the same time.</li>
+      <li>Circular buffers are only metadata and do not express ownership.</li>
+    </ol>
+    <p class="why"><b>Answer: A.</b> The important idea is ownership transfer. A producer should not overwrite a slot that has not been consumed, and a consumer should not read a slot that has not been produced.</p>
+<pre><code>Producer side:
+  reserve_back()     // claim free space
+  write tile data
+  push_back()        // publish tile to consumer
+
+Consumer side:
+  wait_front()       // wait until tile exists
+  read tile data
+  pop_front()        // release slot back to producer</code></pre>
+  </div></details>
+
+  <details class="qa"><summary>Q40. For double buffering with circular buffers, what does buffer depth buy you?<span class="qmeta"><span class="tag-lg t-memory">memory</span></span></summary>
+  <div class="ans">
+    <ol class="choices" type="A">
+      <li>It changes matrix multiplication into convolution.</li>
+      <li class="correct">It lets movement and compute overlap by keeping one tile active while another tile is being filled or drained.</li>
+      <li>It removes all synchronization from the program.</li>
+      <li>It makes DRAM unnecessary.</li>
+    </ol>
+    <p class="why"><b>Answer: B.</b> A depth of two is the classic ping-pong case. Deeper buffers can smooth jitter and support longer pipelines, but each extra slot consumes scarce local memory.</p>
+<pre><code>Depth-2 circular buffer:
+
+time 0: reader fills slot 0
+time 1: compute consumes slot 0, reader fills slot 1
+time 2: compute consumes slot 1, reader fills slot 0
+time 3: compute consumes slot 0, reader fills slot 1
+
+Good when:
+  load_time <= compute_time
+
+If load_time > compute_time:
+  compute still stalls, even with ping-pong buffering</code></pre>
+  </div></details>
+
+  <details class="qa"><summary>Q41. What makes an operator a good fit for a core-grid NPU mapping?<span class="qmeta"><span class="tag-lg t-core">core</span></span></summary>
+  <div class="ans">
+    <ol class="choices" type="A">
+      <li>It has one scalar operation and no parallel work.</li>
+      <li class="correct">It has enough regular parallelism, supported layout/dtype, local-memory fit, and low communication relative to compute.</li>
+      <li>It requires dynamic branches for every element.</li>
+      <li>It forces every tensor through host memory between layers.</li>
+    </ol>
+    <p class="why"><b>Answer: B.</b> Dense matmul, convolution, and elementwise chains often map well. Branchy, serial, or globally synchronized work may need a custom strategy, partial offload, or fallback.</p>
+<pre><code>Core-grid fit checklist:
+
+1. Is the op supported by available kernels or intrinsics?
+2. Does it expose enough tiles to fill the core grid?
+3. Do active tiles fit each core's local memory?
+4. Can input/output layouts be reused by neighboring ops?
+5. Is communication small compared with useful compute?
+6. Are dependencies ready, or will this op stall the graph?</code></pre>
+  </div></details>
+
+  <details class="qa"><summary>Q42. For GEMM <code>C[M,N] = A[M,K] x B[K,N]</code>, what are the basic compute and tile-memory calculations?<span class="qmeta"><span class="tag-lg t-deep">deep</span></span></summary>
+  <div class="ans">
+    <ol class="choices" type="A">
+      <li>Total MACs are <code>M + N + K</code>, and local memory does not matter.</li>
+      <li class="correct">Total MACs are <code>M*N*K</code>; a tile needs storage for <code>A[Mt,Kt]</code>, <code>B[Kt,Nt]</code>, and <code>C[Mt,Nt]</code>.</li>
+      <li>Only the output matrix size matters.</li>
+      <li>The K dimension is ignored after tiling.</li>
+    </ol>
+    <p class="why"><b>Answer: B.</b> GEMM is the cleanest place to practice NPU arithmetic. The K dimension is reduced across multiple K tiles, so partial sums for <code>C</code> must stay in accumulators or local memory until the full K loop completes.</p>
+<pre><code>Whole GEMM:
+  A[M,K] x B[K,N] = C[M,N]
+  MACs  = M * N * K
+  FLOPs = 2 * M * N * K   // if multiply and add count separately
+
+One tiled step:
+  A_tile[Mt,Kt]
+  B_tile[Kt,Nt]
+  C_tile[Mt,Nt]
+
+Single-buffer local bytes:
+  bytes(A_tile) + bytes(B_tile) + bytes(C_tile)
+
+Double-buffer A/B, keep one C accumulator:
+  2 * (bytes(A_tile) + bytes(B_tile)) + bytes(C_tile)</code></pre>
+<pre><code>Example:
+  M=N=K=1024
+  Mt=Nt=Kt=32
+  input dtype = FP16, accumulator = FP32
+
+One K tile:
+  A_tile = 32*32*2 bytes = 2048
+  B_tile = 32*32*2 bytes = 2048
+  C_tile = 32*32*4 bytes = 4096
+
+Single-buffer local memory = 8192 bytes
+Double-buffer A/B          = 12288 bytes
+
+One output tile over full K:
+  MACs = 32*32*1024 = 1,048,576
+
+Whole GEMM:
+  MACs  = 1024*1024*1024 = 1.07B
+  FLOPs = 2.15B</code></pre>
+  </div></details>
+
+  <h3>TTNN operation practice</h3>
+
+  <details class="qa"><summary>Q43. In TTNN-style convolution, why can some <code>1x1</code> convolutions be treated like matmul?<span class="qmeta"><span class="tag-lg t-core">core</span></span></summary>
+  <div class="ans">
+    <ol class="choices" type="A">
+      <li>Because convolution and matmul always have identical padding behavior.</li>
+      <li class="correct">Because a <code>1x1</code>, stride-1 convolution without padding or dilation reduces to a per-position channel projection.</li>
+      <li>Because the input height and width are ignored.</li>
+      <li>Because all convolution weights are scalar constants.</li>
+    </ol>
+    <p class="why"><b>Answer: B.</b> A <code>1x1</code> convolution mixes channels at each spatial position. The backend can view the activation volume as rows and weights as a matrix, so the operation becomes GEMM-like when stride, padding, and dilation do not require sliding-window halo logic.</p>
+  </div></details>
+
+  <details class="qa"><summary>Q44. Which TTNN convolution sharding choice is most natural for large spatial images?<span class="qmeta"><span class="tag-lg t-memory">memory</span></span></summary>
+  <div class="ans">
+    <ol class="choices" type="A">
+      <li class="correct">Height sharding, because work can be split across the <code>N*H*W</code> spatial dimension.</li>
+      <li>Width sharding, because it always removes all communication.</li>
+      <li>No sharding, because convolution cannot use multiple cores.</li>
+      <li>Only batch sharding, because channels cannot be tiled.</li>
+    </ol>
+    <p class="why"><b>Answer: A.</b> Height sharding distributes the activation rows or spatial positions across cores. Width sharding is more channel-oriented and can be attractive for smaller images with many channels. Block sharding uses a 2D split when both dimensions can benefit.</p>
+  </div></details>
+
+  <details class="qa"><summary>Q45. Why does convolution weight preparation matter on tiled accelerators?<span class="qmeta"><span class="tag-lg t-memory">memory</span></span></summary>
+  <div class="ans">
+    <ol class="choices" type="A">
+      <li>It changes trained model accuracy by retraining the weights.</li>
+      <li class="correct">It converts weights into hardware-friendly tiled and aligned layouts before execution.</li>
+      <li>It removes the need for input activation tiles.</li>
+      <li>It makes every convolution depthwise.</li>
+    </ol>
+    <p class="why"><b>Answer: B.</b> The mathematical weights are the same, but their physical layout can be transformed for tiled matrix engines, sharding schemes, alignment rules, and multicast/reuse patterns. Good preparation reduces runtime layout work and improves data reuse.</p>
+  </div></details>
+
+  <details class="qa"><summary>Q46. What extra transformation does transposed convolution usually require compared with ordinary convolution?<span class="qmeta"><span class="tag-lg t-deep">deep</span></span></summary>
+  <div class="ans">
+    <ol class="choices" type="A">
+      <li>It never uses weights.</li>
+      <li class="correct">It often flips or prepares weights differently and expands the input geometry, such as inserting zeros for stride greater than one.</li>
+      <li>It always runs only on the CPU.</li>
+      <li>It converts the operation into softmax.</li>
+    </ol>
+    <p class="why"><b>Answer: B.</b> Transposed convolution is not just "normal convolution backward" in implementation terms. Backends must account for output-size formulas, output padding, transformed weights, and expanded spatial positions before mapping the work to convolution or matmul-like kernels.</p>
+  </div></details>
+
+  <details class="qa"><summary>Q47. What does a matmul program configuration primarily control in TTNN-style execution?<span class="qmeta"><span class="tag-lg t-core">core</span></span></summary>
+  <div class="ans">
+    <ol class="choices" type="A">
+      <li>The Python package name used to import the operation.</li>
+      <li class="correct">The core-grid strategy, sub-blocking, reuse/multicast behavior, and memory layout assumptions.</li>
+      <li>The model's loss function.</li>
+      <li>Whether matrix dimensions need to match.</li>
+    </ol>
+    <p class="why"><b>Answer: B.</b> Different matmul factories target different tradeoffs: basic multicore distribution, optimized reuse, 1D or 2D multicast, DRAM-sharded inputs, and batched/sharded cases. The compiler question is how to choose a program shape that fits both the tensor shape and the hardware grid.</p>
+  </div></details>
+
+  <details class="qa"><summary>Q48. In a linear layer, when can bias or activation fusion fall back to a separate operation?<span class="qmeta"><span class="tag-lg t-deep">deep</span></span></summary>
+  <div class="ans">
+    <ol class="choices" type="A">
+      <li>Never; bias and activation fusion are always legal.</li>
+      <li class="correct">When the bias shape, batched weight/bias case, dtype, or selected program config cannot support the fused path.</li>
+      <li>Only when the input tensor is all zeros.</li>
+      <li>Only when the output is smaller than one tile.</li>
+    </ol>
+    <p class="why"><b>Answer: B.</b> A linear layer is usually matmul plus optional bias and activation. Fusing the epilogue saves memory traffic, but legality depends on layout, shape, and kernel support. A robust compiler keeps a correct unfused fallback such as matmul followed by add or activation.</p>
+  </div></details>
+
+  <details class="qa"><summary>Q49. What is the main idea of Flash Attention or streaming SDPA?<span class="qmeta"><span class="tag-lg t-memory">memory</span></span></summary>
+  <div class="ans">
+    <ol class="choices" type="A">
+      <li>Materialize the full attention score matrix in DRAM before softmax.</li>
+      <li class="correct">Compute attention in chunks while maintaining online softmax state, avoiding the full <code>S x S</code> matrix.</li>
+      <li>Replace all matmuls with scalar loops.</li>
+      <li>Remove the value tensor from attention.</li>
+    </ol>
+    <p class="why"><b>Answer: B.</b> SDPA computes <code>softmax(QK^T / sqrt(d))V</code>. Streaming implementations keep running normalization statistics so the backend can process blocks of keys/values and reduce memory pressure instead of storing every attention score.</p>
+  </div></details>
+
+  <details class="qa"><summary>Q50. How do prefill and decode attention differ for LLM inference?<span class="qmeta"><span class="tag-lg t-deep">deep</span></span></summary>
+  <div class="ans">
+    <ol class="choices" type="A">
+      <li>Prefill handles one new token, while decode handles the whole prompt.</li>
+      <li class="correct">Prefill processes the prompt sequence in larger parallel chunks; decode processes a new token against the growing KV cache.</li>
+      <li>Decode never reads keys or values.</li>
+      <li>Prefill cannot use parallel hardware.</li>
+    </ol>
+    <p class="why"><b>Answer: B.</b> Prefill has more sequence-level parallelism. Decode is latency-sensitive because each generated token depends on previous tokens, and the new query attends over cached keys and values. That is why decode paths often need careful KV-cache layout, paging, and reduction strategy.</p>
+  </div></details>
+
+  <details class="qa"><summary>Q51. Why is paged KV cache useful in transformer serving?<span class="qmeta"><span class="tag-lg t-memory">memory</span></span></summary>
+  <div class="ans">
+    <ol class="choices" type="A">
+      <li>It makes every sequence exactly the same length.</li>
+      <li class="correct">It lets the runtime manage non-contiguous KV blocks, reducing wasted memory and supporting dynamic sequence growth.</li>
+      <li>It removes the need for attention masks.</li>
+      <li>It stores Q, K, and V only in CPU registers.</li>
+    </ol>
+    <p class="why"><b>Answer: B.</b> LLM serving has variable-length requests. Paging the KV cache makes allocation more flexible, but it adds address translation and block-table work that the attention kernel or runtime must handle efficiently.</p>
+  </div></details>
+
+  <details class="qa"><summary>Q52. What problem do ring or distributed attention variants try to solve?<span class="qmeta"><span class="tag-lg t-deep">deep</span></span></summary>
+  <div class="ans">
+    <ol class="choices" type="A">
+      <li>They make attention independent of sequence length.</li>
+      <li class="correct">They partition attention work across devices or core groups and pass partial state so long sequences or large models can run.</li>
+      <li>They replace softmax with convolution.</li>
+      <li>They are only a logging feature.</li>
+    </ol>
+    <p class="why"><b>Answer: B.</b> Distributed attention must preserve the same mathematical result while splitting Q/K/V blocks across hardware. The hard part is carrying partial softmax state, reductions, and communication without losing numerical stability or stalling compute.</p>
+  </div></details>
+
+  <h3>Collective communication</h3>
+
+  <details class="qa"><summary>Q53. In collective communication, what does <code>all_gather</code> do?<span class="qmeta"><span class="tag-lg t-core">core</span></span></summary>
+  <div class="ans">
+    <ol class="choices" type="A">
+      <li>Each device deletes its local shard.</li>
+      <li class="correct">Each device gathers shards from all devices, so the gathered dimension grows by the number of participating devices.</li>
+      <li>Only device 0 receives the result.</li>
+      <li>It performs a local activation function.</li>
+    </ol>
+    <p class="why"><b>Answer: B.</b> If each device owns a shard along dimension <code>dim</code>, an all-gather builds a larger tensor containing every shard. This is common after tensor-parallel operations that need the full activation for the next stage.</p>
+  </div></details>
+
+  <details class="qa"><summary>Q54. How do <code>reduce_scatter</code> and <code>all_reduce</code> differ?<span class="qmeta"><span class="tag-lg t-deep">deep</span></span></summary>
+  <div class="ans">
+    <ol class="choices" type="A">
+      <li><code>reduce_scatter</code> broadcasts full results to all devices, while <code>all_reduce</code> deletes them.</li>
+      <li class="correct"><code>reduce_scatter</code> reduces across devices and leaves each device with one shard; <code>all_reduce</code> leaves every device with the full reduced result.</li>
+      <li>They are identical names for matrix multiplication.</li>
+      <li>Neither operation communicates between devices.</li>
+    </ol>
+    <p class="why"><b>Answer: B.</b> A common all-reduce implementation is reduce-scatter followed by all-gather. Reduce-scatter is useful when the next computation can stay sharded; all-reduce is useful when every device needs the complete reduced tensor.</p>
+  </div></details>
+
+  <details class="qa"><summary>Q55. Why does CCL topology matter for multi-device Tenstorrent execution?<span class="qmeta"><span class="tag-lg t-memory">memory</span></span></summary>
+  <div class="ans">
+    <ol class="choices" type="A">
+      <li>Topology only changes variable names.</li>
+      <li class="correct">Ring, line, mesh, or fabric paths affect hop count, buffering, synchronization, and overlap with compute.</li>
+      <li>Topology removes all need for tensor sharding.</li>
+      <li>Topology is only relevant to CSS layout.</li>
+    </ol>
+    <p class="why"><b>Answer: B.</b> Collectives are data movement algorithms. On multi-chip systems, the route and active links determine how much buffering is needed, how reductions are staged, and whether communication can overlap with matmul, attention, or layernorm work.</p>
+  </div></details>
+</section>
+
+<section id="graph">
+  <h2>Graph optimization</h2>
+
+  <details class="qa"><summary>Q1. What is the main performance reason to fuse adjacent operators?<span class="qmeta"><span class="tag-lg t-core">core</span></span></summary>
+  <div class="ans">
+    <ol class="choices" type="A">
+      <li>It always reduces the number of mathematical operations.</li>
+      <li class="correct">It avoids writing and rereading intermediate tensors from slower memory.</li>
+      <li>It removes the need for shape inference.</li>
+      <li>It makes every operator legal for every accelerator.</li>
+    </ol>
+    <p class="why"><b>Answer: B.</b> Fusion usually keeps intermediate values in registers or local SRAM, reducing DRAM traffic and dispatch overhead. The math may be the same.</p>
+  </div></details>
+
+  <details class="qa"><summary>Q2. Which pattern is usually a strong fusion candidate on an NPU?<span class="qmeta"><span class="tag-lg t-core">core</span></span></summary>
+  <div class="ans">
+    <ol class="choices" type="A">
+      <li class="correct"><code>MatMul -&gt; BiasAdd -&gt; Requantize -&gt; ReLU</code></li>
+      <li><code>Sort -&gt; NonMaximumSuppression -&gt; TopK</code></li>
+      <li><code>RandomUniform -&gt; Dropout</code> during inference</li>
+      <li>A producer with many consumers and different layouts</li>
+    </ol>
+    <p class="why"><b>Answer: A.</b> Bias, requantization, and activation are common epilogue operations that can often run while the output tile is still local.</p>
+  </div></details>
+
+  <details class="qa"><summary>Q3. What is the difference between folding and fusion?<span class="qmeta"><span class="tag-lg t-core">core</span></span></summary>
+  <div class="ans">
+    <ol class="choices" type="A">
+      <li>Folding is for CPUs; fusion is for NPUs.</li>
+      <li>They are identical words for combining operators.</li>
+      <li class="correct">Folding removes or absorbs work before runtime; fusion combines runtime work into one kernel or region.</li>
+      <li>Folding requires quantization; fusion requires floating point.</li>
+    </ol>
+    <p class="why"><b>Answer: C.</b> Constant folding and batch-normalization folding can delete runtime work. Fusion still performs work at runtime but avoids materializing intermediates.</p>
+  </div></details>
+
+  <details class="qa"><summary>Q4. When should legal fusion still be rejected?<span class="qmeta"><span class="tag-lg t-deep">deep</span></span></summary>
+  <div class="ans">
+    <ol class="choices" type="A">
+      <li>Never; legal fusion is always faster.</li>
+      <li class="correct">When the fused working set exceeds local memory or destroys reuse for other consumers.</li>
+      <li>Only when the graph has no constants.</li>
+      <li>Only when the model is already quantized.</li>
+    </ol>
+    <p class="why"><b>Answer: B.</b> Fusion is a cost-model decision. A larger fused region can increase SRAM pressure, cause spills, force worse tiling, or require recomputation for another branch.</p>
+  </div></details>
+
+  <details class="qa"><summary>Q5. In graph partitioning, what does an unsupported operator usually create?<span class="qmeta"><span class="tag-lg t-core">core</span></span></summary>
+  <div class="ans">
+    <ol class="choices" type="A">
+      <li>A guarantee that the whole model cannot run.</li>
+      <li class="correct">A boundary between accelerator regions and fallback regions.</li>
+      <li>A reason to quantize every tensor to 4 bits.</li>
+      <li>A way to remove all layout conversions.</li>
+    </ol>
+    <p class="why"><b>Answer: B.</b> A compiler/runtime can partition supported subgraphs to the accelerator and route unsupported pieces to another engine, paying careful attention to copies and layout conversion.</p>
+  </div></details>
+
+  <details class="qa"><summary>Q6. Why is a topological order required before many graph optimizations?<span class="qmeta"><span class="tag-lg t-core">core</span></span></summary>
+  <div class="ans">
+    <ol class="choices" type="A">
+      <li>It sorts operators by tensor size.</li>
+      <li>It proves all operators are elementwise.</li>
+      <li class="correct">It gives an execution order where each producer appears before its consumers.</li>
+      <li>It replaces memory planning.</li>
+    </ol>
+    <p class="why"><b>Answer: C.</b> Many passes need a valid dependency order for scheduling, liveness, memory reuse, and cycle detection.</p>
+  </div></details>
+</section>
+
+<section id="memory">
+  <h2>Tiling and memory</h2>
+
+  <details class="qa"><summary>Q7. What is the main reason to tile a large matrix multiplication?<span class="qmeta"><span class="tag-lg t-memory">memory</span></span></summary>
+  <div class="ans">
+    <ol class="choices" type="A">
+      <li>To change the mathematical result.</li>
+      <li class="correct">To make active input, weight, and output blocks fit in fast local memory.</li>
+      <li>To avoid accumulation.</li>
+      <li>To remove the need for a scheduler.</li>
+    </ol>
+    <p class="why"><b>Answer: B.</b> Tiling increases locality. Good tiles fit the scratchpad, align with hardware tile shapes, and allow reuse before data returns to DRAM.</p>
+  </div></details>
+
+  <details class="qa"><summary>Q8. What does double buffering try to overlap?<span class="qmeta"><span class="tag-lg t-memory">memory</span></span></summary>
+  <div class="ans">
+    <ol class="choices" type="A">
+      <li>Two independent model graphs.</li>
+      <li class="correct">Data transfer for the next tile with compute on the current tile.</li>
+      <li>Two compiler frontends.</li>
+      <li>Two different quantization schemes.</li>
+    </ol>
+    <p class="why"><b>Answer: B.</b> Ping-pong buffers let DMA fill one buffer while compute consumes the other, hiding transfer latency when transfer time is less than or close to compute time.</p>
+  </div></details>
+
+  <details class="qa"><summary>Q9. Which condition is most important for hiding DMA latency completely?<span class="qmeta"><span class="tag-lg t-memory">memory</span></span></summary>
+  <div class="ans">
+    <ol class="choices" type="A">
+      <li>The graph must have only one operator.</li>
+      <li class="correct">Per-tile transfer time should not exceed per-tile compute time.</li>
+      <li>The model must be FP32.</li>
+      <li>All tensors must be stored interleaved.</li>
+    </ol>
+    <p class="why"><b>Answer: B.</b> If transfer takes longer than compute, the compute engine will eventually wait. Larger tiles, fusion, better layout, or more bandwidth may help.</p>
+  </div></details>
+
+  <details class="qa"><summary>Q10. What does liveness analysis tell a memory planner?<span class="qmeta"><span class="tag-lg t-memory">memory</span></span></summary>
+  <div class="ans">
+    <ol class="choices" type="A">
+      <li>The exact floating-point accuracy of every tensor.</li>
+      <li class="correct">Which tensors are alive at the same time and therefore cannot reuse the same buffer.</li>
+      <li>Which compiler frontend imported the model.</li>
+      <li>Which activation function is fastest.</li>
+    </ol>
+    <p class="why"><b>Answer: B.</b> Non-overlapping live intervals can reuse storage. Overlapping intervals need distinct storage unless recomputation or in-place transformation is legal.</p>
+  </div></details>
+
+  <details class="qa"><summary>Q11. What is resharding?<span class="qmeta"><span class="tag-lg t-memory">memory</span></span></summary>
+  <div class="ans">
+    <ol class="choices" type="A">
+      <li>Compressing weights into INT8.</li>
+      <li>Replacing an unsupported op with a CPU op.</li>
+      <li class="correct">Converting a tensor from one physical shard layout to another.</li>
+      <li>Removing unused graph nodes.</li>
+    </ol>
+    <p class="why"><b>Answer: C.</b> Resharding can be necessary when adjacent operators prefer different layouts, but it can be expensive because it moves data between cores or memory regions.</p>
+  </div></details>
+
+  <details class="qa"><summary>Q12. If tensor dimensions are not multiples of the hardware tile shape, what is a common backend strategy?<span class="qmeta"><span class="tag-lg t-memory">memory</span></span></summary>
+  <div class="ans">
+    <ol class="choices" type="A">
+      <li>Reject the model.</li>
+      <li class="correct">Use padding, masks, or specialized edge kernels for ragged tiles.</li>
+      <li>Change the model weights randomly.</li>
+      <li>Disable all fusion in the graph.</li>
+    </ol>
+    <p class="why"><b>Answer: B.</b> Hardware often prefers fixed tile shapes. The compiler handles ragged edges through padding, masks, cleanup kernels, or a mix of those options.</p>
+  </div></details>
+</section>
+
+<section id="ir">
+  <h2>IR, MLIR, and TVM</h2>
+
+  <details class="qa"><summary>Q13. What is an MLIR dialect?<span class="qmeta"><span class="tag-lg t-core">core</span></span></summary>
+  <div class="ans">
+    <ol class="choices" type="A">
+      <li>A CPU assembly language only.</li>
+      <li class="correct">A namespace of operations, types, and attributes for a particular abstraction level or domain.</li>
+      <li>A model accuracy metric.</li>
+      <li>A runtime scheduler queue.</li>
+    </ol>
+    <p class="why"><b>Answer: B.</b> Dialects let multiple abstraction levels coexist, such as tensor operations, structured loops, vector operations, and target-specific operations.</p>
+  </div></details>
+
+  <details class="qa"><summary>Q14. Why use progressive lowering instead of lowering directly to a low-level IR?<span class="qmeta"><span class="tag-lg t-core">core</span></span></summary>
+  <div class="ans">
+    <ol class="choices" type="A">
+      <li>It makes compilation slower on purpose.</li>
+      <li class="correct">It preserves useful structure long enough to run the right optimization at the right level.</li>
+      <li>It avoids the need for legality checks.</li>
+      <li>It prevents code generation.</li>
+    </ol>
+    <p class="why"><b>Answer: B.</b> Fusion is easier while tensors and operators are visible. DMA insertion and memory-space decisions belong later, when buffers and target details are explicit.</p>
+  </div></details>
+
+  <details class="qa"><summary>Q15. In MLIR-style programs, what is the practical difference between <code>tensor</code> and <code>memref</code>?<span class="qmeta"><span class="tag-lg t-deep">deep</span></span></summary>
+  <div class="ans">
+    <ol class="choices" type="A">
+      <li>There is no difference.</li>
+      <li class="correct"><code>tensor</code> is an immutable value; <code>memref</code> describes concrete mutable storage, layout, and memory space.</li>
+      <li><code>tensor</code> is only for CPUs; <code>memref</code> is only for GPUs.</li>
+      <li><code>tensor</code> stores source code tokens.</li>
+    </ol>
+    <p class="why"><b>Answer: B.</b> Bufferization converts value semantics into explicit storage, which is when SRAM, DRAM, in-place updates, and DMA become natural to represent.</p>
+  </div></details>
+
+  <details class="qa"><summary>Q16. What does TVM's compute/schedule separation mean?<span class="qmeta"><span class="tag-lg t-core">core</span></span></summary>
+  <div class="ans">
+    <ol class="choices" type="A">
+      <li class="correct">The algorithm describes what to compute; the schedule describes how to map it to hardware.</li>
+      <li>The compiler and runtime must be written in separate languages.</li>
+      <li>Quantization must run before graph import.</li>
+      <li>Every model must have a hand-written kernel.</li>
+    </ol>
+    <p class="why"><b>Answer: A.</b> The same matrix multiply definition can be scheduled differently for CPU caches, GPU threads, or NPU tiles and local memory.</p>
+<pre><code>Compute = what:
+  C[i,j] = sum_k A[i,k] * B[k,j]
+
+Schedule = how:
+  split i,j,k into tiles
+  reorder loops for reuse
+  cache_read A/B into SRAM
+  cache_write C partials
+  tensorize inner loop to a hardware matmul primitive
+
+Same math, different hardware mapping.</code></pre>
+  </div></details>
+
+  <details class="qa"><summary>Q17. Which TVM schedule primitive maps an inner loop nest to a hardware intrinsic?<span class="qmeta"><span class="tag-lg t-deep">deep</span></span></summary>
+  <div class="ans">
+    <ol class="choices" type="A">
+      <li><code>split</code></li>
+      <li><code>compute_at</code></li>
+      <li class="correct"><code>tensorize</code></li>
+      <li><code>inline</code></li>
+    </ol>
+    <p class="why"><b>Answer: C.</b> Tensorization replaces a recognized loop pattern with a target intrinsic such as a fixed-shape matrix multiply instruction.</p>
+  </div></details>
+
+  <details class="qa"><summary>Q18. Why is LLVM IR often too low-level for early NPU optimizations?<span class="qmeta"><span class="tag-lg t-deep">deep</span></span></summary>
+  <div class="ans">
+    <ol class="choices" type="A">
+      <li>LLVM IR cannot represent integers.</li>
+      <li class="correct">Tensor, layout, loop, and operator intent may already be lost as scalar loads, stores, and branches.</li>
+      <li>LLVM IR has no control flow.</li>
+      <li>LLVM IR can only target one processor.</li>
+    </ol>
+    <p class="why"><b>Answer: B.</b> NPU optimizations need high-level structure. Once lowered too far, recovering fusion legality, tiling structure, and memory hierarchy intent is difficult.</p>
+  </div></details>
+</section>
+
+<section id="quant">
+  <h2>Quantization</h2>
+
+  <div class="box info">
+    <span class="bt">Data type mental model</span>
+    <p>Lower precision is useful when the model is limited by memory bandwidth, cache capacity, interconnect traffic, or matrix-engine throughput. The tradeoff is always numerical: smaller formats save bytes and energy, but they reduce range, precision, or both.</p>
+  </div>
+
+  <table>
+    <tr><th>Type</th><th>Good for</th><th>Main caveat</th></tr>
+    <tr><td>FP32 / float32</td><td>Reference accuracy, debugging, numerically sensitive reductions, calibration baselines.</td><td>Large memory footprint and bandwidth cost; often overkill for inference.</td></tr>
+    <tr><td>BF16 / bfloat16</td><td>Training or inference when wide dynamic range is helpful and tensor hardware supports it.</td><td>Less mantissa precision than FP32, but similar exponent range.</td></tr>
+    <tr><td>BFLOAT8_B / block float 8</td><td>Compact tiled tensor execution when values in a block have compatible magnitude.</td><td>Block-floating formats share exponent information across a group, so small values can lose precision when mixed with large values.</td></tr>
+    <tr><td>BFLOAT4_B / block float 4</td><td>More aggressive memory and bandwidth reduction for tolerant tensors, often weights or selected activations.</td><td>Even less precision; format support can be operation- and layout-dependent.</td></tr>
+    <tr><td>INT8 / UINT8</td><td>Production inference on hardware with integer dot-product support; common for conv, matmul, and edge deployment.</td><td>Needs scale/zero-point handling, calibration or QAT, wider accumulators, and requantization.</td></tr>
+    <tr><td>INT4 / FP4-style formats</td><td>Weight compression and LLM memory-bandwidth reduction when accuracy survives.</td><td>Usually needs group scales, mixed precision, or QAT; activation quantization is harder than weight-only quantization.</td></tr>
+    <tr><td>1-bit / binary</td><td>Research or special hardware paths where weights and/or activations can be represented as signs.</td><td>Not a drop-in replacement: accuracy, training method, hardware support, and operator coverage dominate.</td></tr>
+  </table>
+
+  <div class="box good">
+    <span class="bt">Tenstorrent-specific note</span>
+    <p>TTNN exposes floating-point tensor formats such as <code>FLOAT32</code>, <code>BFLOAT16</code>, <code>BFLOAT8_B</code>, and <code>BFLOAT4_B</code> for many tiled tensor paths. Some APIs support integer dtypes for conversion or elementwise work, but high-performance matmul/linear dtype support should be checked per operation instead of assuming every low-bit format is accepted everywhere.</p>
+  </div>
+
+  <div class="box info">
+    <span class="bt">Qualcomm AIMET for ONNX</span>
+    <p><b>AIMET</b>, sometimes mistyped as AMET, is Qualcomm's AI Model Efficiency Toolkit. For ONNX, a common post-training quantization path is: start with a clean ONNX model, simplify/check it, create an <code>aimet_onnx.QuantizationSimModel</code>, run representative calibration data through <code>compute_encodings</code>, evaluate the simulated quantized model, then export model/encoding files or produce an ONNX QDQ graph with <code>to_onnx_qdq()</code>. If the starting point is an AIMET Torch <code>QuantizationSimModel</code>, <code>aimet_torch.onnx.export</code> can export ONNX with QuantizeLinear and DequantizeLinear nodes embedded.</p>
+  </div>
+  <table>
+    <tr><th>Step</th><th>Purpose</th><th>Practical check</th></tr>
+    <tr><td>1. Baseline ONNX</td><td>Make sure the floating-point ONNX model is valid before quantization.</td><td>Run ONNX shape checks and compare baseline ONNX Runtime accuracy.</td></tr>
+    <tr><td>2. Build QuantSim</td><td>Wrap the graph with simulated quantizers, often using INT8 for weights and activations.</td><td>Select a config that matches the intended backend, such as a default or Qualcomm HTP-oriented config when available.</td></tr>
+    <tr><td>3. Calibrate</td><td>Use <code>compute_encodings</code> to observe representative inputs and derive quantization ranges.</td><td>Use data that matches real deployment; too few or biased samples can create bad scales.</td></tr>
+    <tr><td>4. Validate</td><td>Compare floating-point and quantized outputs before deployment conversion.</td><td>If accuracy drops, inspect sensitive layers, outliers, unsupported ops, and mixed-precision candidates.</td></tr>
+    <tr><td>5. Export</td><td>Use <code>export()</code> for model plus encodings or <code>to_onnx_qdq()</code> for QuantizeLinear/DequantizeLinear nodes embedded in ONNX.</td><td>Confirm whether the downstream runtime/compiler expects QDQ nodes or separate encoding files.</td></tr>
+  </table>
+  <pre><code>// Pseudocode only; check the installed AIMET version for exact imports.
+onnx_model = onnx.load("model.onnx")
+sim = aimet_onnx.QuantizationSimModel(
+    onnx_model,
+    param_type="int8",
+    activation_type="int8",
+    quant_scheme="min_max",
+    config_file="default"
+)
+
+sim.compute_encodings(calibration_inputs)
+quantized_onnx = sim.to_onnx_qdq()
+onnx.save(quantized_onnx, "model.int8.qdq.onnx")</code></pre>
+
+  <details class="qa"><summary>Q19. What does affine INT8 quantization usually store for a tensor?<span class="qmeta"><span class="tag-lg t-core">core</span></span></summary>
+  <div class="ans">
+    <ol class="choices" type="A">
+      <li class="correct">A scale and often a zero-point.</li>
+      <li>A source-code line number.</li>
+      <li>A topological sort index only.</li>
+      <li>A branch predictor state.</li>
+    </ol>
+    <p class="why"><b>Answer: A.</b> A common mapping is <code>q = round(x / scale) + zero_point</code>. The scale and zero-point connect real values to integer values.</p>
+  </div></details>
+
+  <details class="qa"><summary>Q20. Which setup is common for INT8 convolution inference?<span class="qmeta"><span class="tag-lg t-core">core</span></span></summary>
+  <div class="ans">
+    <ol class="choices" type="A">
+      <li>Per-channel activation scales and random weight scales.</li>
+      <li class="correct">Per-tensor activation quantization and per-output-channel weight quantization.</li>
+      <li>Only FP64 activations.</li>
+      <li>No bias scaling.</li>
+    </ol>
+    <p class="why"><b>Answer: B.</b> Per-channel weight scales improve accuracy with manageable hardware cost. Per-channel activation scales are harder because a single accumulation would mix scales.</p>
+  </div></details>
+
+  <details class="qa"><summary>Q21. During quantized convolution, what type commonly holds the accumulated sum?<span class="qmeta"><span class="tag-lg t-core">core</span></span></summary>
+  <div class="ans">
+    <ol class="choices" type="A">
+      <li>INT4</li>
+      <li>INT8</li>
+      <li class="correct">INT32</li>
+      <li>A string</li>
+    </ol>
+    <p class="why"><b>Answer: C.</b> Many INT8 products are summed, so the accumulator needs a wider type. The result is later requantized back to the output precision.</p>
+  </div></details>
+
+  <details class="qa"><summary>Q22. What is requantization?<span class="qmeta"><span class="tag-lg t-core">core</span></span></summary>
+  <div class="ans">
+    <ol class="choices" type="A">
+      <li>Changing a graph from a DAG to a cyclic graph.</li>
+      <li class="correct">Rescaling an integer accumulator to the next layer's integer output format.</li>
+      <li>Removing all batch dimensions.</li>
+      <li>Converting source code to tokens.</li>
+    </ol>
+    <p class="why"><b>Answer: B.</b> A typical flow multiplies by a fixed-point scale ratio, shifts, rounds, clamps, and writes INT8 or another target format.</p>
+  </div></details>
+
+  <details class="qa"><summary>Q23. If PTQ causes a large accuracy drop, what is a good first debugging method?<span class="qmeta"><span class="tag-lg t-deep">deep</span></span></summary>
+  <div class="ans">
+    <ol class="choices" type="A">
+      <li>Immediately rewrite the whole runtime.</li>
+      <li class="correct">Compare floating-point and quantized outputs layer by layer to locate the first major divergence.</li>
+      <li>Remove all calibration data.</li>
+      <li>Force every tensor to use the same scale.</li>
+    </ol>
+    <p class="why"><b>Answer: B.</b> Layer-wise comparison with metrics such as cosine similarity or signal-to-quantization-noise ratio localizes the damage before trying fixes.</p>
+  </div></details>
+
+  <details class="qa"><summary>Q24. When might QAT be preferred over PTQ?<span class="qmeta"><span class="tag-lg t-deep">deep</span></span></summary>
+  <div class="ans">
+    <ol class="choices" type="A">
+      <li>When there is no training data and no accuracy target.</li>
+      <li class="correct">When calibration-only quantization cannot meet accuracy, especially at low bit widths or sensitive layers.</li>
+      <li>When the model has only one constant.</li>
+      <li>When all tensors are already exact integers.</li>
+    </ol>
+    <p class="why"><b>Answer: B.</b> Quantization-aware training simulates quantization during training so the model can adapt to rounding and clipping effects.</p>
+  </div></details>
+
+  <details class="qa"><summary>DType 1. Why is INT8 often a strong inference format?<span class="qmeta"><span class="tag-lg t-core">core</span></span></summary>
+  <div class="ans">
+    <ol class="choices" type="A">
+      <li>It has exactly the same numerical range and precision as FP32.</li>
+      <li class="correct">It reduces model and activation bytes, improves cache/bandwidth behavior, and can use efficient integer dot-product hardware.</li>
+      <li>It removes the need for calibration.</li>
+      <li>It guarantees no accuracy loss for every model.</li>
+    </ol>
+    <p class="why"><b>Answer: B.</b> INT8 is attractive because FP32 values use 4 bytes while INT8 values use 1 byte. That can reduce memory traffic and model size, and many CPUs, GPUs, DSPs, and NPUs have efficient INT8 dot-product paths. Accuracy depends on scale choice, calibration, operator coverage, and whether sensitive layers stay in higher precision.</p>
+  </div></details>
+
+  <details class="qa"><summary>DType 2. What is the key difference between INT8 quantization and block-floating formats such as BFLOAT8_B?<span class="qmeta"><span class="tag-lg t-deep">deep</span></span></summary>
+  <div class="ans">
+    <ol class="choices" type="A">
+      <li>There is no difference; both always use one global scale for the whole model.</li>
+      <li class="correct">INT8 typically maps real values through scale/zero-point arithmetic; block-floating formats keep floating-like values but share exponent information across a block.</li>
+      <li>Block-floating formats cannot be tiled.</li>
+      <li>INT8 never needs accumulation.</li>
+    </ol>
+    <p class="why"><b>Answer: B.</b> INT8 quantization is usually explicit affine mapping plus integer accumulation and requantization. Block-floating types compress floating-point-like values by sharing exponent context across a group, which can be efficient but can lose small values when the block contains a very large value.</p>
+  </div></details>
+
+  <details class="qa"><summary>DType 3. Why can BFLOAT8_B or BFLOAT4_B be risky for high-variance values?<span class="qmeta"><span class="tag-lg t-memory">memory</span></span></summary>
+  <div class="ans">
+    <ol class="choices" type="A">
+      <li>Because they store every value as a string.</li>
+      <li class="correct">Because a shared block exponent can be dominated by large-magnitude values, causing small values in the same block to lose precision or flush toward zero.</li>
+      <li>Because they always use FP64 internally.</li>
+      <li>Because they forbid tiled layout.</li>
+    </ol>
+    <p class="why"><b>Answer: B.</b> Block-floating formats are best when values grouped together have similar magnitude. If one value sets a very large shared exponent, neighboring small values have fewer effective bits and may become numerically useless for operations such as reciprocal, normalization, or softmax-adjacent math.</p>
+  </div></details>
+
+  <details class="qa"><summary>DType 4. Why does quantized matmul commonly accumulate into a wider type?<span class="qmeta"><span class="tag-lg t-core">core</span></span></summary>
+  <div class="ans">
+    <ol class="choices" type="A">
+      <li>Because low-bit multiplication cannot produce overflow.</li>
+      <li class="correct">Because many low-precision products are summed across K, and the sum needs more range than one product.</li>
+      <li>Because the output must always be FP64.</li>
+      <li>Because zero-points are illegal.</li>
+    </ol>
+    <p class="why"><b>Answer: B.</b> Even if inputs are INT8, a dot product sums many products. Wider accumulators such as INT32 preserve range during the reduction. The backend then requantizes, clamps, or casts the accumulator to the next tensor format.</p>
+  </div></details>
+
+  <details class="qa"><summary>DType 5. How can 1-bit neural networks still work at all?<span class="qmeta"><span class="tag-lg t-deep">deep</span></span></summary>
+  <div class="ans">
+    <ol class="choices" type="A">
+      <li>They secretly store every weight as FP32 at inference time.</li>
+      <li class="correct">They constrain weights and/or activations to signs such as <code>+1</code>/<code>-1</code>, then rely on training methods, scaling, and bitwise-friendly computation.</li>
+      <li>They remove nonlinearities and attention entirely.</li>
+      <li>They are guaranteed to match full precision on all tasks.</li>
+    </ol>
+    <p class="why"><b>Answer: B.</b> Binary neural networks are a real research direction: the forward path can use signs and bit operations, while training usually needs tricks such as straight-through estimators or quantization-aware training. They are not automatically a production win unless the model, accuracy target, and hardware kernels are designed for binary execution.</p>
+  </div></details>
+
+  <details class="qa"><summary>DType 6. What is a good mixed-precision rule of thumb for compiler backends?<span class="qmeta"><span class="tag-lg t-deep">deep</span></span></summary>
+  <div class="ans">
+    <ol class="choices" type="A">
+      <li>Force every tensor to the smallest available type.</li>
+      <li class="correct">Use low precision where error is tolerated and bandwidth dominates; keep sensitive reductions, normalization, logits, or outlier-heavy tensors in higher precision.</li>
+      <li>Use FP32 only for model weights and 1-bit for everything else.</li>
+      <li>Ignore operator support and insert casts later.</li>
+    </ol>
+    <p class="why"><b>Answer: B.</b> Real deployments are usually mixed precision. Good compilers reason about dtype legality, cast placement, fusion boundaries, calibration data, per-layer error, and whether the hardware has a fast path for that dtype.</p>
+  </div></details>
+
+  <details class="qa"><summary>AIMET 1. What is the correct public name of Qualcomm's AMET-like quantization toolkit?<span class="qmeta"><span class="tag-lg t-core">core</span></span></summary>
+  <div class="ans">
+    <ol class="choices" type="A">
+      <li>AMET, the Automatic Matrix Engine Toolkit.</li>
+      <li class="correct">AIMET, the AI Model Efficiency Toolkit.</li>
+      <li>QDQ-Only Compiler.</li>
+      <li>ONNX Runtime itself.</li>
+    </ol>
+    <p class="why"><b>Answer: B.</b> Qualcomm's public toolkit is AIMET. It provides quantization and compression workflows for trained models, including ONNX and PyTorch-oriented paths in current documentation.</p>
+  </div></details>
+
+  <details class="qa"><summary>AIMET 2. In AIMET-ONNX, what does <code>compute_encodings</code> primarily do?<span class="qmeta"><span class="tag-lg t-core">core</span></span></summary>
+  <div class="ans">
+    <ol class="choices" type="A">
+      <li>Compile CUDA kernels from Python source.</li>
+      <li class="correct">Run calibration data through the simulated quantized model to compute quantization ranges/encodings.</li>
+      <li>Delete every QuantizeLinear node from the final model.</li>
+      <li>Convert ONNX graphs into HTML.</li>
+    </ol>
+    <p class="why"><b>Answer: B.</b> Calibration observes representative tensors so the simulator can assign encodings such as ranges/scales for quantizers before accuracy evaluation and export.</p>
+  </div></details>
+
+  <details class="qa"><summary>AIMET 3. What does exporting an ONNX QDQ model usually mean?<span class="qmeta"><span class="tag-lg t-deep">deep</span></span></summary>
+  <div class="ans">
+    <ol class="choices" type="A">
+      <li class="correct">The graph contains QuantizeLinear and DequantizeLinear nodes to mark quantized boundaries.</li>
+      <li>The graph has no visible quantization information.</li>
+      <li>The model has been converted into a training-only checkpoint.</li>
+      <li>All weights are stored as plain text.</li>
+    </ol>
+    <p class="why"><b>Answer: A.</b> QDQ form makes quantization explicit in the ONNX graph. Downstream tools can use those nodes to preserve intended quantization boundaries or lower to backend-specific integer execution.</p>
+  </div></details>
+
+  <details class="qa"><summary>AIMET 4. Why validate the floating-point ONNX model before AIMET quantization?<span class="qmeta"><span class="tag-lg t-deep">deep</span></span></summary>
+  <div class="ans">
+    <ol class="choices" type="A">
+      <li>Because quantization can fix every model conversion error automatically.</li>
+      <li>Because calibration data is unnecessary if the baseline runs.</li>
+      <li class="correct">It separates ONNX export/runtime problems from quantization-induced accuracy loss.</li>
+      <li>Because AIMET only accepts models with no inputs.</li>
+    </ol>
+    <p class="why"><b>Answer: C.</b> If the FP32 ONNX baseline is already wrong, quantization debugging becomes confusing. Establish a correct baseline, then compare simulated quantized outputs against it.</p>
+  </div></details>
+
+  <details class="qa"><summary>AIMET 5. What should guide the AIMET quantization config choice?<span class="qmeta"><span class="tag-lg t-deep">deep</span></span></summary>
+  <div class="ans">
+    <ol class="choices" type="A">
+      <li>The alphabetic order of model layer names.</li>
+      <li class="correct">The target runtime/compiler constraints, supported ops, precision rules, and deployment hardware.</li>
+      <li>A requirement to quantize every tensor to 1 bit.</li>
+      <li>The HTML page theme color.</li>
+    </ol>
+    <p class="why"><b>Answer: B.</b> A config should reflect what the target backend can actually run. For edge deployment, that can include backend-specific constraints such as supported activation/weight dtypes, per-channel rules, and which ops must remain higher precision.</p>
+  </div></details>
+
+  <details class="qa"><summary>AIMET 6. If quantization simulation starts in AIMET Torch, what is the ONNX export path for QDQ?<span class="qmeta"><span class="tag-lg t-deep">deep</span></span></summary>
+  <div class="ans">
+    <ol class="choices" type="A">
+      <li>Save the Python object directly as an ONNX graph.</li>
+      <li class="correct">Use <code>aimet_torch.onnx.export</code> to export a model with QuantizeLinear and DequantizeLinear nodes embedded.</li>
+      <li>Remove all fake-quantization operators and ignore encodings.</li>
+      <li>Convert the model to CSV first.</li>
+    </ol>
+    <p class="why"><b>Answer: B.</b> AIMET's Torch ONNX export API is designed for exporting a <code>QuantizationSimModel</code> to ONNX with QDQ nodes in the graph, which gives downstream ONNX tooling explicit quantization boundaries.</p>
+  </div></details>
+</section>
+
+<section id="runtime">
+  <h2>Runtime and hardware</h2>
+
+  <details class="qa"><summary>Q25. Why does program caching reduce inference latency after warmup?<span class="qmeta"><span class="tag-lg t-core">core</span></span></summary>
+  <div class="ans">
+    <ol class="choices" type="A">
+      <li>It improves model accuracy.</li>
+      <li class="correct">It avoids repeating program creation, compilation, or setup for shapes and kernels already seen.</li>
+      <li>It makes DRAM as fast as SRAM.</li>
+      <li>It removes all synchronization.</li>
+    </ol>
+    <p class="why"><b>Answer: B.</b> The first run may allocate buffers, compile or instantiate kernels, and fill caches. Steady-state latency should be measured after warmup.</p>
+  </div></details>
+
+  <details class="qa"><summary>Q26. What does a roofline-style analysis help classify?<span class="qmeta"><span class="tag-lg t-core">core</span></span></summary>
+  <div class="ans">
+    <ol class="choices" type="A">
+      <li class="correct">Whether performance is mostly compute-bound or bandwidth-bound.</li>
+      <li>Whether a graph has comments.</li>
+      <li>Whether source code uses tabs.</li>
+      <li>The exact number of frontend dialects.</li>
+    </ol>
+    <p class="why"><b>Answer: A.</b> Compare achieved operations per second, bytes moved, and hardware limits. The fix differs for compute utilization problems versus memory traffic problems.</p>
+  </div></details>
+
+  <details class="qa"><summary>Q27. A model misses its latency target by 2x. What is the best first step?<span class="qmeta"><span class="tag-lg t-core">core</span></span></summary>
+  <div class="ans">
+    <ol class="choices" type="A">
+      <li>Change every tile size randomly.</li>
+      <li class="correct">Profile per-layer timelines and classify the bottleneck before changing the compiler.</li>
+      <li>Assume the hardware is defective.</li>
+      <li>Disable all graph optimizations.</li>
+    </ol>
+    <p class="why"><b>Answer: B.</b> Measure first. Look for compute stalls, DMA stalls, layout conversions, fallback boundaries, dispatch overhead, or a small set of slow layers.</p>
+  </div></details>
+
+  <details class="qa"><summary>Q28. What is an async command queue useful for in accelerator runtimes?<span class="qmeta"><span class="tag-lg t-deep">deep</span></span></summary>
+  <div class="ans">
+    <ol class="choices" type="A">
+      <li>Converting all tensors to source code.</li>
+      <li class="correct">Letting the host enqueue work while device-side scheduling and execution continue independently.</li>
+      <li>Preventing overlapping execution.</li>
+      <li>Making every operation blocking by default.</li>
+    </ol>
+    <p class="why"><b>Answer: B.</b> Async dispatch can reduce host overhead and enable overlap, but correctness depends on explicit dependencies and synchronization.</p>
+  </div></details>
+
+  <details class="qa"><summary>Q29. Why can detector post-processing be awkward on an NPU?<span class="qmeta"><span class="tag-lg t-deep">deep</span></span></summary>
+  <div class="ans">
+    <ol class="choices" type="A">
+      <li>It is always just one dense matrix multiply.</li>
+      <li class="correct">Steps such as Top-K and NMS are branchy, data-dependent, and less regular than dense tensor kernels.</li>
+      <li>It never uses memory.</li>
+      <li>It cannot run on any processor.</li>
+    </ol>
+    <p class="why"><b>Answer: B.</b> Some accelerators handle dense math well but struggle with irregular control flow. Common strategies include candidate pruning, partial offload, custom kernels, or CPU fallback.</p>
+  </div></details>
+
+  <details class="qa"><summary>Q30. What is the safest way to report benchmark latency?<span class="qmeta"><span class="tag-lg t-core">core</span></span></summary>
+  <div class="ans">
+    <ol class="choices" type="A">
+      <li>Only report the first run, including all one-time setup.</li>
+      <li class="correct">Separate cold-start latency from warmed steady-state latency, and describe batch size, shape, precision, and hardware settings.</li>
+      <li>Hide layout conversion costs.</li>
+      <li>Report only theoretical peak TOPS.</li>
+    </ol>
+    <p class="why"><b>Answer: B.</b> Reproducible performance reporting needs context. Cold-start and steady-state numbers answer different questions.</p>
+  </div></details>
+</section>
+
+<section id="question-bank">
+  <h2>Interview question bank</h2>
+  <p class="small">Open-ended practice questions for AI compiler, NPU backend, runtime, and ML systems interviews.</p>
+
+  <div class="termdef">
+    <b>How to practice:</b>
+    Give a 60 to 120 second answer before opening each card. A strong answer usually has four parts: definition, why it matters, concrete example, and tradeoff.
+  </div>
+
+  <h3>Graph optimization and fusion</h3>
+
+  <details class="qa"><summary>QB1. What is operator fusion, and why is it often the highest-impact NPU graph optimization?<span class="qmeta"><span class="tag-lg t-core">core</span></span></summary>
+  <div class="ans">
+    <p><b>Answer:</b> Operator fusion combines adjacent runtime operations into one kernel or scheduled region so intermediate tensors do not need to be written to DRAM and read back. For many inference workloads, memory traffic and dispatch overhead dominate arithmetic, so fusion can be a large latency win.</p>
+    <p><b>Example:</b> <code>Conv -&gt; BatchNorm -&gt; ReLU</code> can become one Conv-like kernel with folded BatchNorm parameters and a fused activation epilogue.</p>
+<pre><code>Before:
+DRAM -&gt; Conv -&gt; DRAM -&gt; BN -&gt; DRAM -&gt; ReLU -&gt; DRAM
+
+After:
+DRAM -&gt; [Conv + folded BN + ReLU epilogue] -&gt; DRAM</code></pre>
+    <p><b>Tradeoff:</b> Fusion increases the live working set. If the fused region no longer fits local memory, it can spill or force smaller tiles and become slower.</p>
+  </div></details>
+
+  <details class="qa"><summary>QB2. What is the difference between fusion and folding?<span class="qmeta"><span class="tag-lg t-core">core</span></span></summary>
+  <div class="ans">
+    <p><b>Answer:</b> Fusion combines runtime work. Folding removes or absorbs work before runtime. Constant folding precomputes subgraphs whose inputs are constants. Layer folding absorbs a simple operation into a neighboring operation, such as folding BatchNorm into Conv weights and bias.</p>
+    <p><b>Interview phrasing:</b> Fusion keeps data local at runtime. Folding deletes or absorbs work before runtime. Both reduce data movement, but by different mechanisms.</p>
+<pre><code>BN(y) = gamma * (y - mean) / sqrt(var + eps) + beta
+y = Conv(x) = W*x + b
+
+W_folded = W * gamma / sqrt(var + eps)
+b_folded = (b - mean) * gamma / sqrt(var + eps) + beta</code></pre>
+  </div></details>
+
+  <details class="qa"><summary>QB3. Explain TVM or Relay-style fusion categories and how they guide NPU fusion rules.<span class="qmeta"><span class="tag-lg t-deep">deep</span></span></summary>
+  <div class="ans">
+    <p><b>Answer:</b> A useful mental model is: injective elementwise operations fuse freely; reductions can absorb simple producers or consumers if the schedule is legal; complex-out-fusible operations such as convolution or matmul can fuse epilogues; opaque operations such as sort and NMS usually form fusion boundaries.</p>
+<pre><code>injective -&gt; injective          usually fuse
+reduction -&gt; injective          maybe fuse epilogue
+matmul/conv -&gt; bias/requant     strong NPU candidate
+sort/NMS/dynamic control flow    often stop fusion</code></pre>
+    <p><b>Compiler angle:</b> Fusion rules should be target-parameterized. They need legality checks, local-memory checks, layout checks, precision-boundary checks, and cost modeling.</p>
+  </div></details>
+
+  <details class="qa"><summary>QB4. When would you deliberately avoid fusion even when it is legal?<span class="qmeta"><span class="tag-lg t-deep">deep</span></span></summary>
+  <div class="ans">
+    <p><b>Answer:</b> Avoid fusion when the fused region exceeds SRAM, forces worse tile shapes, breaks double buffering, uses incompatible layouts or engines, or harms reuse for another consumer. A producer with multiple consumers is especially tricky because fusion into one branch may force recomputation or materialization anyway.</p>
+    <p><b>Rule of thumb:</b> Legal fusion is not automatically profitable fusion. The cost model should compare saved DRAM traffic and dispatch overhead against added SRAM pressure, recompute, and scheduling constraints.</p>
+  </div></details>
+
+  <h3>Tiling and memory planning</h3>
+
+  <details class="qa"><summary>QB5. Operands do not fit in SRAM. How do you choose tile sizes?<span class="qmeta"><span class="tag-lg t-memory">memory</span></span></summary>
+  <div class="ans">
+    <p><b>Answer:</b> Tile the iteration space so active inputs, weights, and partial outputs fit in local memory. For matmul, choose <code>Mt</code>, <code>Nt</code>, and <code>Kt</code> so <code>A_tile</code>, <code>B_tile</code>, and <code>C_tile</code> fit the SRAM budget, with extra room for ping-pong buffers and alignment to hardware tile shapes.</p>
+<pre><code>C[M,N] += A[M,K] * B[K,N]
+
+Required local memory roughly:
+  A[Mt,Kt] + B[Kt,Nt] + C[Mt,Nt] + buffering overhead &lt;= SRAM budget</code></pre>
+    <p><b>Tradeoff:</b> Larger tiles improve reuse and arithmetic intensity, but can reduce parallelism or exceed local memory. Smaller tiles fit easily, but may move too much data.</p>
+  </div></details>
+
+  <details class="qa"><summary>QB6. How does an NPU compiler hide DMA latency?<span class="qmeta"><span class="tag-lg t-memory">memory</span></span></summary>
+  <div class="ans">
+    <p><b>Answer:</b> Use double buffering or software pipelining. While compute consumes tile <code>i</code>, DMA loads tile <code>i+1</code> and possibly stores tile <code>i-1</code>. The compiler generates the prologue, steady-state loop, epilogue, and synchronization.</p>
+<pre><code>Time ----&gt;
+
+DMA load:   T0 | T1 | T2 | T3
+Compute:      | T0 | T1 | T2 | T3
+Store:           | T0 | T1 | T2</code></pre>
+    <p><b>Condition:</b> Transfer is hidden when per-tile DMA time is less than or equal to per-tile compute time. Otherwise the kernel is bandwidth-bound.</p>
+<pre><code>Double-buffer loop shape:
+
+Prologue:
+  load T0
+
+Steady state:
+  for tile i:
+    load T(i+1) into the free buffer
+    compute T(i) from the active buffer
+    store T(i-1) if output is ready
+    swap active/free buffers
+
+Epilogue:
+  compute final loaded tile
+  store final outputs</code></pre>
+  </div></details>
+
+  <details class="qa"><summary>QB6a. How do circular buffers implement producer-consumer synchronization?<span class="qmeta"><span class="tag-lg t-memory">memory</span></span></summary>
+  <div class="ans">
+    <p><b>Answer:</b> A circular buffer is a bounded local queue. The producer owns free slots, reserves one, writes tile data, and publishes it. The consumer waits for a published slot, reads the tile, and releases the slot. The synchronization prevents overwrite-before-read and read-before-write hazards.</p>
+<pre><code>Producer kernel:
+  reserve_back(cb, 1)
+  ptr = get_write_ptr(cb)
+  write tile to ptr
+  push_back(cb, 1)
+
+Compute kernel:
+  wait_front(cb, 1)
+  ptr = get_read_ptr(cb)
+  consume tile from ptr
+  pop_front(cb, 1)
+
+Ownership:
+  free slot  - producer may write
+  full slot  - consumer may read
+  popped     - slot returns to producer</code></pre>
+    <p><b>Compiler angle:</b> Buffer depth is a scheduling knob. Depth 1 is simple but often stalls. Depth 2 enables ping-pong overlap. Larger depths can absorb jitter but consume more SRAM.</p>
+  </div></details>
+
+  <details class="qa"><summary>QB6b. How do you decide whether double buffering is worth the local-memory cost?<span class="qmeta"><span class="tag-lg t-memory">memory</span></span></summary>
+  <div class="ans">
+    <p><b>Answer:</b> Compare the saved stall time against the extra SRAM used by the second buffer. Double buffering is valuable when DMA and compute can overlap and the extra buffer does not force worse tile sizes, spills, or lower occupancy.</p>
+<pre><code>Useful overlap:
+  load_time <= compute_time
+  extra SRAM does not shrink tile too much
+  synchronization overhead is small
+
+May not help:
+  load_time >> compute_time
+  second buffer forces smaller tiles
+  op is already compute-bound with no DMA stalls
+  next op requires immediate layout conversion anyway</code></pre>
+    <p><b>Interview answer:</b> "I would inspect the timeline. If compute has DMA gaps, I try ping-pong buffers. If the timeline is already compute-bound, I spend effort on tile shape, tensorization, or arithmetic utilization instead."</p>
+  </div></details>
+
+  <details class="qa"><summary>QB7. Given tensor live ranges, how do you minimize peak memory?<span class="qmeta"><span class="tag-lg t-memory">memory</span></span></summary>
+  <div class="ans">
+    <p><b>Answer:</b> Run liveness analysis over the scheduled graph. Tensors with non-overlapping lifetimes can reuse the same buffer. Tensors whose lifetimes overlap need separate buffers unless in-place update, aliasing, or recomputation is legal.</p>
+<pre><code>op index:  1  2  3  4  5  6
+A live:    [===========]
+B live:       [====]
+C live:          [=========]
+D live:                [====]
+
+A and D can reuse storage.
+A and C cannot reuse storage.</code></pre>
+    <p><b>Compiler angle:</b> Scheduling and memory planning interact. Reordering operations can shorten or lengthen live ranges, so a memory-aware scheduler can reduce peak SRAM.</p>
+  </div></details>
+
+  <details class="qa"><summary>QB8. What is the difference between DRAM, L1/SRAM, interleaved layout, and sharded layout?<span class="qmeta"><span class="tag-lg t-memory">memory</span></span></summary>
+  <div class="ans">
+    <p><b>Answer:</b> DRAM versus L1/SRAM says where data lives. DRAM is large and slower; L1/SRAM is small and fast near the compute core. Interleaved versus sharded says how data is distributed. Interleaved spreads pages in a general-purpose way; sharded splits a tensor across cores or local memories so each core owns a slice.</p>
+    <p><b>Practical answer:</b> Keep hot tiles and fused intermediates in L1/SRAM when possible. Use sharding when it improves locality and parallelism. Avoid unnecessary resharding because it costs movement and synchronization.</p>
+  </div></details>
+
+  <h3>MLIR, TVM, and compiler internals</h3>
+
+  <details class="qa"><summary>QB9. What is an MLIR dialect, and what is progressive lowering?<span class="qmeta"><span class="tag-lg t-core">core</span></span></summary>
+  <div class="ans">
+    <p><b>Answer:</b> A dialect is a namespace of operations, types, and attributes for one abstraction level or domain. Progressive lowering means moving gradually from high-level model semantics to lower-level loops, buffers, memory spaces, and target operations.</p>
+<pre><code>PyTorch / ONNX / StableHLO
+  -&gt; tensor or linalg-style IR
+  -&gt; bufferization to memref
+  -&gt; affine / scf / vector loops
+  -&gt; target NPU dialect
+  -&gt; runtime packet, binary, or host launch</code></pre>
+    <p><b>Key idea:</b> Run each optimization where the right information is still visible. Fuse while operators are visible; insert DMA when buffers and memory spaces are visible.</p>
+  </div></details>
+
+  <details class="qa"><summary>QB10. Explain <code>tensor</code> versus <code>memref</code> and what bufferization does.<span class="qmeta"><span class="tag-lg t-deep">deep</span></span></summary>
+  <div class="ans">
+    <p><b>Answer:</b> A <code>tensor</code> is an immutable SSA value with no concrete storage location. It is ideal for algebraic rewrites because the compiler can treat values functionally. A <code>memref</code> is a concrete mutable buffer reference with shape, layout, strides, and memory-space information. Bufferization converts tensor programs into buffer programs, choosing where copies are required and where buffers can be reused in place.</p>
+    <p><b>Destination-passing style:</b> Many structured ops expose an output or destination operand. Bufferization can use that destination as the physical storage for the result when there is no read-after-write conflict. If overwriting would destroy a value still needed later, the compiler inserts a copy.</p>
+<pre><code>Before bufferization: value semantics
+
+  %y = linalg.matmul %a, %b : tensor&lt;...&gt;
+  %z = linalg.relu %y       : tensor&lt;...&gt;
+
+No concrete storage is promised yet.
+%y and %z are immutable SSA values.
+
+After bufferization: concrete storage
+
+  %A = memref&lt;..., space=DRAM&gt;
+  %B = memref&lt;..., space=DRAM&gt;
+  %Y = memref&lt;..., space=SRAM&gt;
+
+  dma DRAM -&gt; SRAM for A/B tiles
+  matmul into %Y
+  relu in-place on %Y if legal
+  dma SRAM -&gt; DRAM for final output
+
+tensor = value semantics
+memref = concrete storage + layout + memory space</code></pre>
+    <p><b>NPU angle:</b> After bufferization, the compiler can attach DRAM or SRAM memory spaces, insert DMA, plan allocation, reason about in-place updates, and decide whether an intermediate can stay local across fused operations.</p>
+<pre><code>Why bufferization matters for an NPU:
+
+High-level tensor IR:
+  good for fusion, folding, shape reasoning, algebraic rewrites
+
+Memref / buffer IR:
+  good for local memory allocation
+  good for DRAM vs SRAM placement
+  good for DMA insertion
+  good for alias and in-place-update decisions
+
+Too early:
+  memory details can block useful tensor-level rewrites
+
+Too late:
+  the compiler may miss chances to plan SRAM and data movement</code></pre>
+  </div></details>
+
+  <details class="qa"><summary>QB11. How does MLIR pattern rewriting work, and why not lower directly to LLVM for an NPU?<span class="qmeta"><span class="tag-lg t-deep">deep</span></span></summary>
+  <div class="ans">
+    <p><b>Answer:</b> Pattern rewriting matches IR patterns and replaces them with canonical, optimized, or lower-level forms. A pass can mark operations legal or illegal and apply rewrite patterns to reach a target dialect. Lowering directly to LLVM is usually too early for NPU work because tensor, loop, layout, and memory-hierarchy information may be lost as scalar loads and stores.</p>
+    <p><b>Example:</b> <code>transpose(transpose(x))</code> can canonicalize to <code>x</code>. A target pass might rewrite a tiled matmul loop into an NPU matrix intrinsic.</p>
+  </div></details>
+
+  <details class="qa"><summary>QB12. Explain TVM's compute/schedule separation.<span class="qmeta"><span class="tag-lg t-core">core</span></span></summary>
+  <div class="ans">
+    <p><b>Answer:</b> TVM inherits the Halide-style split between <b>compute</b> and <b>schedule</b>. The compute definition says what tensor expression is being computed. The schedule says how to execute that same math on a target. This lets one algorithm retarget to CPU caches, GPU threads, or NPU tiles without rewriting the mathematical definition.</p>
+    <p><b>Key schedule primitives:</b> <code>split</code> and <code>reorder</code> for tiling and loop permutation; <code>fuse</code> for combining loops; <code>vectorize</code>, <code>unroll</code>, and <code>parallel</code> for hardware parallelism; <code>cache_read</code> and <code>cache_write</code> for staging data into faster memory; <code>compute_at</code> for producer-consumer locality; and <code>tensorize</code> for mapping an inner loop nest to a hardware intrinsic.</p>
+<pre><code>Compute:
+  C[i,j] = sum_k A[i,k] * B[k,j]
+
+Schedule:
+  tile loops
+  cache A and B into SRAM
+  reorder for reuse
+  tensorize inner tile to hardware matmul</code></pre>
+<pre><code>TVM split, more explicitly:
+
+Compute = what
+  for i, j:
+    C[i,j] = sum_k A[i,k] * B[k,j]
+
+Schedule = how
+  split i into outer_i, inner_i
+  split j into outer_j, inner_j
+  split k into outer_k, inner_k
+  reorder loops to maximize reuse
+  cache_read A and B into local memory
+  cache_write C partial sums
+  tensorize inner_i/inner_j/inner_k to an NPU matmul primitive
+
+Same math:
+  CPU schedule  - cache blocking + SIMD + threads
+  GPU schedule  - blocks + warps + shared memory
+  NPU schedule  - tiles + SRAM + DMA + hardware matmul</code></pre>
+    <p><b>NPU angle:</b> The schedule is where hardware mapping becomes explicit. It chooses tile sizes, loop order, local-memory staging, double buffering, tensorization, and sometimes sharding. This is why compute/schedule separation is a useful mental model for NPU compiler backends.</p>
+  </div></details>
+
+  <details class="qa"><summary>QB13. Compare AutoTVM, Ansor, and MetaSchedule. Where does <code>tensorize</code> fit?<span class="qmeta"><span class="tag-lg t-deep">deep</span></span></summary>
+  <div class="ans">
+    <p><b>Answer:</b> AutoTVM tunes parameters inside hand-written schedule templates. Ansor generates schedule sketches and searches them with a learned cost model. MetaSchedule generalizes scheduling around TensorIR traces and composable rules. <code>tensorize</code> maps an inner loop pattern to a declared hardware intrinsic, which is critical for fixed-function NPU tiles.</p>
+    <p><b>Tradeoff:</b> Search-based scheduling can be expensive. Product compilers often combine analytical constraints, templates, profiling, and cached tuning results.</p>
+  </div></details>
+
+  <h3>Quantization</h3>
+
+  <details class="qa"><summary>QB14. Explain symmetric versus asymmetric and per-tensor versus per-channel quantization.<span class="qmeta"><span class="tag-lg t-core">core</span></span></summary>
+  <div class="ans">
+    <p><b>Answer:</b> Symmetric quantization maps real zero to integer zero using scale only. Asymmetric quantization adds a zero-point. Per-tensor quantization uses one scale for the whole tensor. Per-channel quantization uses separate scales, commonly per output channel for weights.</p>
+    <p><b>Common recipe:</b> Asymmetric per-tensor activations plus symmetric per-channel weights. This balances accuracy and hardware simplicity.</p>
+  </div></details>
+
+  <details class="qa"><summary>QB15. Walk through quantized convolution including requantization.<span class="qmeta"><span class="tag-lg t-deep">deep</span></span></summary>
+  <div class="ans">
+    <p><b>Answer:</b> INT8 activations and INT8 weights multiply and accumulate into INT32. Bias is stored or converted using the product of activation scale and weight scale. The INT32 accumulator is then requantized to the output integer type using a fixed-point multiplier, shift, rounding, saturation, and output zero-point.</p>
+<pre><code>int8 activation * int8 weight
+        |
+        v
+int32 accumulator + int32 bias
+        |
+        v
+fixed-point rescale + clamp
+        |
+        v
+int8 output</code></pre>
+  </div></details>
+
+  <details class="qa"><summary>QB16. A quantized model loses accuracy. How do you debug it?<span class="qmeta"><span class="tag-lg t-deep">deep</span></span></summary>
+  <div class="ans">
+    <p><b>Answer:</b> Compare floating-point and quantized outputs layer by layer to find the first major divergence. Inspect activation ranges, calibration data, clipping, outlier channels, depthwise convolutions, concat boundaries, layernorm, softmax, and GELU. Try better calibration, per-channel weights, bias correction, cross-layer equalization, mixed precision, or QAT if PTQ plateaus.</p>
+  </div></details>
+
+  <h3>Hardware mapping and runtime</h3>
+
+  <details class="qa"><summary>QB17. Compare weight-stationary, input-stationary, and output-stationary dataflows.<span class="qmeta"><span class="tag-lg t-core">core</span></span></summary>
+  <div class="ans">
+    <p><b>Answer:</b> Weight-stationary keeps weights local and streams activations. Input-stationary keeps input activations local and streams weights. Output-stationary keeps partial sums local until reduction completes. The best choice depends on reuse, local memory capacity, bandwidth, and accumulator pressure.</p>
+    <p><b>Compiler angle:</b> Dataflow choice drives tile shapes, loop order, buffer allocation, and which operand is reused most aggressively.</p>
+  </div></details>
+
+  <details class="qa"><summary>QB17a. How do you select which ready operators or tiles should run on a core grid?<span class="qmeta"><span class="tag-lg t-core">core</span></span></summary>
+  <div class="ans">
+    <p><b>Answer:</b> Start with correctness: only schedule operators whose dependencies are ready. Then rank ready work by grid fit, locality, memory pressure, and downstream layout reuse. Dense regular work with many independent tiles can fill the grid; small serial work may waste cores or become a synchronization bottleneck.</p>
+<pre><code>Ready set from graph scheduler:
+  ready = {op | all producers have completed}
+
+Core-grid placement score:
+  enough parallel tiles?
+  each tile fits local SRAM?
+  supported dtype/layout/kernel?
+  output layout useful for consumers?
+  communication small compared with compute?
+  balanced work across cores?
+  deterministic tie-breaker for reproducibility?</code></pre>
+    <p><b>Example:</b> A large GEMM with hundreds of output tiles is a good grid candidate. A final scalar threshold, a tiny reshape, or branch-heavy NMS may run on fewer cores, on a vector side path, as a custom kernel, or as final fallback.</p>
+  </div></details>
+
+  <details class="qa"><summary>QB17b. How do you map a GEMM tile to a core grid and estimate waves?<span class="qmeta"><span class="tag-lg t-deep">deep</span></span></summary>
+  <div class="ans">
+    <p><b>Answer:</b> Split the output matrix <code>C[M,N]</code> into <code>Mt x Nt</code> output tiles. Each output tile needs all K blocks, so each core assigned a C tile loops over <code>Kt</code> chunks and accumulates partial sums. If the number of C tiles exceeds the number of cores, execution proceeds in waves.</p>
+<pre><code>GEMM:
+  A[M,K] x B[K,N] = C[M,N]
+
+Output tile grid:
+  tiles_M = ceil(M / Mt)
+  tiles_N = ceil(N / Nt)
+  output_tiles = tiles_M * tiles_N
+
+Core grid:
+  cores = grid_rows * grid_cols
+  waves = ceil(output_tiles / cores)</code></pre>
+<pre><code>Example:
+  M=N=K=1024
+  Mt=Nt=32
+  core grid = 8 x 8 = 64 cores
+
+Output tiles:
+  tiles_M = 1024/32 = 32
+  tiles_N = 1024/32 = 32
+  output_tiles = 1024
+
+Waves:
+  waves = 1024 / 64 = 16
+
+Each output tile:
+  K loop count = 1024/32 = 32 K-blocks
+  MACs = 32*32*1024 = 1,048,576</code></pre>
+    <p><b>Compiler angle:</b> The scheduler also needs to choose output sharding, K-block order, local-memory allocation, double buffering for A/B tiles, and whether C partial sums stay in registers, accumulator memory, or SRAM.</p>
+  </div></details>
+
+  <details class="qa"><summary>QB17c. What are the basic GEMM memory and arithmetic calculations for an NPU tile?<span class="qmeta"><span class="tag-lg t-deep">deep</span></span></summary>
+  <div class="ans">
+    <p><b>Answer:</b> For <code>C[M,N] = A[M,K] x B[K,N]</code>, total MACs are <code>M*N*K</code>. If multiply and add are counted separately, FLOPs are <code>2*M*N*K</code>. A local step needs an A tile, a B tile, and a C partial-sum tile. With double buffering, A and B often need two slots each, while C stays resident until the K reduction completes.</p>
+<pre><code>Tile memory:
+  A_tile bytes = Mt * Kt * bytes(A)
+  B_tile bytes = Kt * Nt * bytes(B)
+  C_tile bytes = Mt * Nt * bytes(accumulator)
+
+Single-buffer:
+  A_tile + B_tile + C_tile
+
+Double-buffer A and B:
+  2 * (A_tile + B_tile) + C_tile</code></pre>
+<pre><code>Concrete example:
+  Mt=Nt=Kt=32
+  A/B = FP16 = 2 bytes
+  accumulator C = FP32 = 4 bytes
+
+  A_tile = 32*32*2 = 2048 bytes
+  B_tile = 32*32*2 = 2048 bytes
+  C_tile = 32*32*4 = 4096 bytes
+
+  single-buffer = 8192 bytes
+  double-buffer A/B = 12288 bytes
+
+Question to ask:
+  Does 12 KB fit per core after circular buffers,
+  runtime args, alignment, and other intermediates?</code></pre>
+  </div></details>
+
+  <details class="qa"><summary>QB18. How do you map a 2D convolution onto a matmul engine?<span class="qmeta"><span class="tag-lg t-deep">deep</span></span></summary>
+  <div class="ans">
+    <p><b>Answer:</b> One method is im2col: lower sliding windows into a matrix and use GEMM. It reuses optimized matmul hardware but may materialize a large expanded matrix. Another method is direct convolution lowering: tile the convolution loops and feed the matmul engine without fully materializing im2col.</p>
+    <p><b>Tradeoff:</b> im2col is simple and matmul-friendly. Direct lowering saves memory but needs more specialized scheduling and indexing.</p>
+  </div></details>
+
+  <details class="qa"><summary>QB19. How does a backend select hardware intrinsics and handle shapes that do not match hardware granularity?<span class="qmeta"><span class="tag-lg t-deep">deep</span></span></summary>
+  <div class="ans">
+    <p><b>Answer:</b> The backend matches loop patterns or tensor operations to hardware intrinsics with required tile sizes, layouts, dtypes, and alignment. If shapes do not match, it can pad, mask, split into main and cleanup tiles, or choose a fallback kernel. Cost modeling decides whether padding waste is acceptable.</p>
+  </div></details>
+
+  <details class="qa"><summary>QB20. An NPU supports only part of a model. How should compiler and runtime execute the whole graph?<span class="qmeta"><span class="tag-lg t-core">core</span></span></summary>
+  <div class="ans">
+    <p><b>Answer:</b> Partition the graph into supported accelerator subgraphs and fallback subgraphs for CPU, GPU, or another engine. Insert layout conversions and synchronization only at boundaries. Try to keep unsupported operators at the edges or group them to avoid repeated device crossings.</p>
+    <p><b>Risk:</b> A graph that is 80 percent supported by operator count can still be slow if the unsupported 20 percent sits between many accelerator regions and forces repeated copies.</p>
+  </div></details>
+
+  <details class="qa"><summary>QB21. Design a runtime for CPU + GPU + NPU execution with shared memory.<span class="qmeta"><span class="tag-lg t-deep">deep</span></span></summary>
+  <div class="ans">
+    <p><b>Answer:</b> Represent execution as a dependency graph over command queues. Each engine has its own queue. The runtime tracks buffer ownership, memory visibility, events, and synchronization. It should support async enqueue, shape-specialized program caches, profiling, fallback paths, and deterministic error handling.</p>
+    <p><b>Key concern:</b> Shared memory does not remove synchronization. The runtime still needs ordering, cache coherency rules, and explicit waits where engines exchange data.</p>
+  </div></details>
+
+  <details class="qa"><summary>QB22. A model misses its latency target by 2x. How do you triage?<span class="qmeta"><span class="tag-lg t-core">core</span></span></summary>
+  <div class="ans">
+    <p><b>Answer:</b> Profile first. Classify the bottleneck as compute-bound, bandwidth-bound, dispatch-bound, fallback-bound, layout-conversion-bound, or synchronization-bound. Compare achieved performance with hardware rooflines. Inspect worst layers, generated kernels, tile shapes, memory movement, and fallback boundaries.</p>
+    <p><b>Fix examples:</b> Fusion and layout planning for memory traffic, better tiling for compute utilization, program cache or command-queue replay for dispatch overhead, and custom kernels for expensive fallback operators.</p>
+  </div></details>
+
+  <details class="qa"><summary>QB22a. Explain program cache, warmup, and steady-state latency across accelerator runtimes.<span class="qmeta"><span class="tag-lg t-core">core</span></span></summary>
+  <div class="ans">
+    <p><b>Answer:</b> Many runtimes cache prepared execution artifacts: device programs, engines, timing choices, JIT kernels, captured launch graphs, or compiled model blobs. Warmup populates these caches and allocations. Steady-state latency measures repeated execution after setup costs are mostly paid.</p>
+    <p><b>Examples:</b> Tenstorrent program cache, TensorRT engines and timing cache, CUDA Graph replay, OpenVINO model cache, and ONNX Runtime provider engine caches all express the same broad idea.</p>
+  </div></details>
+
+  <details class="qa"><summary>QB22b. What are fast dispatch and prefetch in a command-queue accelerator runtime?<span class="qmeta"><span class="tag-lg t-deep">deep</span></span></summary>
+  <div class="ans">
+    <p><b>Answer:</b> Fast dispatch reduces host-side launch overhead by letting the host enqueue work while device-side dispatch logic drives execution. Prefetch stages command or data payloads so the dispatcher can keep kernels fed. The goal is fewer gaps between device work items and better overlap between host, dispatch, DMA, and compute.</p>
+  </div></details>
+
+  <h3>Large inputs, custom ops, and post-processing</h3>
+
+  <details class="qa"><summary>QB23. Large multi-camera plus LiDAR input is too big. How do you make it NPU-friendly?<span class="qmeta"><span class="tag-lg t-deep">deep</span></span></summary>
+  <div class="ans">
+    <p><b>Answer:</b> Avoid materializing huge intermediates. Process per-camera or per-spatial tile, shard the BEV or feature grid across cores, fuse preprocessing where possible, and use streaming pipelines. Keep each core's active tile in local memory and synchronize only where cross-view fusion or global reduction requires it.</p>
+    <p><b>Compiler angle:</b> This is a layout and scheduling problem as much as a model problem. The key is bounding working sets and minimizing large-format layout conversions.</p>
+  </div></details>
+
+  <details class="qa"><summary>QB24. In PointPillars-style workloads, why can large voxel or pillar inputs be hard for an NPU?<span class="qmeta"><span class="tag-lg t-deep">deep</span></span></summary>
+  <div class="ans">
+    <p><b>Answer:</b> Pillar workloads can be sparse, irregular, and shape-variable. Dense matrix engines like regular tiles, but sparse point clouds create gather/scatter, masking, sorting, and dynamic-count problems. A deployment-friendly path often bounds the number of pillars and points per pillar, pads to fixed shapes, and separates irregular preprocessing from dense backbone execution.</p>
+  </div></details>
+
+  <details class="qa"><summary>QB25. How would you compile or support deformable convolution on an NPU?<span class="qmeta"><span class="tag-lg t-deep">deep</span></span></summary>
+  <div class="ans">
+    <p><b>Answer:</b> First check whether the target has a custom DeformConv operator. If not, lower it to tiled loops: compute shifted sampling coordinates, handle boundaries, bilinear-sample four neighbors, optionally apply modulation masks, multiply by weights, and reduce. Keep offset and mask tiles local and avoid materializing a huge im2col buffer.</p>
+    <p><b>Tradeoff:</b> DeformConv is irregular compared with normal convolution. It may need a custom kernel, a GPU/CPU fallback, or a model rewrite if latency is critical.</p>
+  </div></details>
+
+  <details class="qa"><summary>QB26. How do you make Top-K and NMS work well for detector post-processing?<span class="qmeta"><span class="tag-lg t-core">core</span></span></summary>
+  <div class="ans">
+    <p><b>Answer:</b> Reduce candidates before NMS. Decode boxes and scores, apply a confidence threshold, run parallel local Top-K per shard, merge to a bounded global Top-K, then run NMS on the smaller set. Use fixed-size outputs with a valid-count or mask.</p>
+    <p><b>NPU angle:</b> Top-K can use partial selection or compare networks. NMS is branchy and data-dependent, so it may be a custom kernel, vector-engine kernel, or final CPU fallback. Avoid CPU fallback in the middle of an otherwise accelerated graph.</p>
+  </div></details>
+
+</section>
+
+<section id="coding">
+  <h2>Coding drills</h2>
+  <p class="small">These are practical graph, tiling, and liveness drills for whiteboard-style practice.</p>
+
+  <details class="qa" open><summary>Drill 1. Topological sort of a compute graph<span class="qmeta"><span class="tag-lg t-core">core</span></span></summary>
+  <div class="ans">
+    <p><b>Prompt:</b> Given <code>n</code> operations and adjacency list <code>adj[u]</code> containing consumers of <code>u</code>, return a valid execution order. Return an empty list if the graph has a cycle.</p>
+<pre><code>vector&lt;int&gt; topoOrder(int n, const vector&lt;vector&lt;int&gt;&gt;&amp; adj) {
+    vector&lt;int&gt; indeg(n, 0), order;
+    for (const auto&amp; nexts : adj)
+        for (int v : nexts) ++indeg[v];
+
+    queue&lt;int&gt; ready;
+    for (int i = 0; i &lt; n; ++i)
+        if (indeg[i] == 0) ready.push(i);
+
+    while (!ready.empty()) {
+        int u = ready.front();
+        ready.pop();
+        order.push_back(u);
+        for (int v : adj[u])
+            if (--indeg[v] == 0) ready.push(v);
+    }
+
+    return order.size() == static_cast&lt;size_t&gt;(n) ? order : vector&lt;int&gt;{};
+}</code></pre>
+    <p><b>Complexity:</b> O(V + E). <b>Explain:</b> Kahn's algorithm repeatedly schedules ready nodes whose dependencies are done. Fewer than <code>n</code> emitted nodes means a cycle.</p>
+  </div></details>
+
+  <details class="qa"><summary>Drill 2. Group simple fusable chains<span class="qmeta"><span class="tag-lg t-core">core</span></span></summary>
+  <div class="ans">
+    <p><b>Prompt:</b> Fuse <code>u</code> into <code>v</code> when both are elementwise and <code>u</code> has exactly one consumer. Return groups.</p>
+<pre><code>struct DSU {
+    vector&lt;int&gt; p;
+    DSU(int n) : p(n) { iota(p.begin(), p.end(), 0); }
+    int find(int x) { return p[x] == x ? x : p[x] = find(p[x]); }
+    void unite(int a, int b) { p[find(a)] = find(b); }
+};
+
+vector&lt;vector&lt;int&gt;&gt; fuseChains(
+    int n,
+    const vector&lt;pair&lt;int, int&gt;&gt;&amp; edges,
+    const vector&lt;bool&gt;&amp; isElementwise
+) {
+    vector&lt;int&gt; outdeg(n, 0);
+    for (auto [u, v] : edges) ++outdeg[u];
+
+    DSU dsu(n);
+    for (auto [u, v] : edges) {
+        if (isElementwise[u] &amp;&amp; isElementwise[v] &amp;&amp; outdeg[u] == 1) {
+            dsu.unite(u, v);
+        }
+    }
+
+    map&lt;int, vector&lt;int&gt;&gt; grouped;
+    for (int i = 0; i &lt; n; ++i) grouped[dsu.find(i)].push_back(i);
+
+    vector&lt;vector&lt;int&gt;&gt; result;
+    for (auto&amp; [root, members] : grouped) result.push_back(members);
+    return result;
+}</code></pre>
+    <p><b>Explain:</b> The single-consumer check avoids accidentally forcing recomputation or materialization for branches. A real compiler also checks memory capacity, layout, precision, and kernel support.</p>
+  </div></details>
+
+  <details class="qa"><summary>Drill 3. Cover a 2D tensor with ragged edge tiles<span class="qmeta"><span class="tag-lg t-memory">memory</span></span></summary>
+  <div class="ans">
+    <p><b>Prompt:</b> Cover an <code>H x W</code> tensor using tile size <code>TH x TW</code>. Emit each tile origin and clamped size.</p>
+<pre><code>struct Tile {
+    int row;
+    int col;
+    int height;
+    int width;
+};
+
+vector&lt;Tile&gt; tileGrid(int H, int W, int TH, int TW) {
+    vector&lt;Tile&gt; tiles;
+    for (int r = 0; r &lt; H; r += TH) {
+        for (int c = 0; c &lt; W; c += TW) {
+            tiles.push_back({r, c, min(TH, H - r), min(TW, W - c)});
+        }
+    }
+    return tiles;
+}</code></pre>
+    <p><b>Explain:</b> The edge tile is often smaller than the preferred hardware tile. Production backends may clamp, pad, mask, or use cleanup kernels.</p>
+  </div></details>
+
+  <details class="qa"><summary>Drill 4. Peak live tensors by sweep line<span class="qmeta"><span class="tag-lg t-memory">memory</span></span></summary>
+  <div class="ans">
+    <p><b>Prompt:</b> Each tensor is alive across inclusive interval <code>[start, end]</code>. Return the maximum number alive at once.</p>
+<pre><code>int peakLive(const vector&lt;pair&lt;int, int&gt;&gt;&amp; intervals) {
+    vector&lt;pair&lt;int, int&gt;&gt; events;
+    for (auto [start, end] : intervals) {
+        events.push_back({start, +1});
+        events.push_back({end + 1, -1});
+    }
+
+    sort(events.begin(), events.end());
+
+    int current = 0;
+    int peak = 0;
+    for (auto [time, delta] : events) {
+        current += delta;
+        peak = max(peak, current);
+    }
+    return peak;
+}</code></pre>
+    <p><b>Complexity:</b> O(k log k). <b>Explain:</b> Weight each event by tensor bytes instead of 1 to estimate peak memory pressure. Scheduling order changes live intervals, so scheduling and memory planning interact.</p>
+  </div></details>
+
+  <div class="box good">
+    <span class="bt">Pattern picker</span>
+    <ul>
+      <li>Order respecting dependencies: topological sort.</li>
+      <li>Group or merge connected items: union-find or graph traversal.</li>
+      <li>Peak overlap or active intervals: sweep line.</li>
+      <li>Tiles, blocks, or windows: nested loops with clamped edges.</li>
+      <li>Shortest unweighted path: BFS.</li>
+      <li>Reachability or all paths: DFS/backtracking.</li>
+    </ul>
+  </div>
+</section>
+
+<section id="resources">
+  <h2>Resources</h2>
+  <p>Reading links for the main topics in this page. These links open external documentation, papers, or repositories when clicked.</p>
+  <div class="grid2">
+    <div class="termdef"><b>Tenstorrent TT-Metalium:</b> <a href="https://docs.tenstorrent.com/tt-metal/latest/tt-metalium/index.html" target="_blank" rel="noopener noreferrer">TT-Metalium documentation</a> for the programming model, kernels, memory movement, circular buffers, and tiled execution concepts.</div>
+    <div class="termdef"><b>Tenstorrent code:</b> <a href="https://github.com/tenstorrent/tt-metal" target="_blank" rel="noopener noreferrer">tt-metal GitHub repository</a> for examples, APIs, runtime code, and issue discussions around TT-Metalium.</div>
+    <div class="termdef"><b>Tenstorrent software stack:</b> <a href="https://docs.tenstorrent.com/getting-started/tt-software-stack.html" target="_blank" rel="noopener noreferrer">Software stack overview</a> for the official relationship among TT-Forge, TT-NN, and TT-Metalium.</div>
+    <div class="termdef"><b>TT-Forge:</b> <a href="https://docs.tenstorrent.com/forge/index.html" target="_blank" rel="noopener noreferrer">TT-Forge documentation</a> for the current MLIR-based compiler stack, frontends, TT-MLIR, and model bring-up path.</div>
+    <div class="termdef"><b>TT-MLIR:</b> <a href="https://docs.tenstorrent.com/tt-mlir/" target="_blank" rel="noopener noreferrer">TT-MLIR documentation</a> for Tenstorrent's MLIR-based compiler infrastructure and backend concepts.</div>
+    <div class="termdef"><b>TT-NN:</b> <a href="https://docs.tenstorrent.com/tt-metal/latest/ttnn/index.html" target="_blank" rel="noopener noreferrer">TT-NN documentation</a> for high-level tensor creation, layouts, neural-network operations, profiling, and model-porting examples.</div>
+    <div class="termdef"><b>TTNN data types:</b> <a href="https://docs.tenstorrent.com/tt-metal/latest/ttnn/ttnn/tensor.html" target="_blank" rel="noopener noreferrer">Tensor data type notes</a>, <a href="https://docs.tenstorrent.com/tt-metal/latest/ttnn/ttnn/api/ttnn.to_dtype.html" target="_blank" rel="noopener noreferrer">to_dtype</a>, and <a href="https://docs.tenstorrent.com/tt-metal/latest/ttnn/ttnn/api/ttnn.linear.html" target="_blank" rel="noopener noreferrer">linear dtype support</a> for checking layout and dtype legality per operation.</div>
+    <div class="termdef"><b>TT-Lang:</b> <a href="https://docs.tenstorrent.com/tt-lang/" target="_blank" rel="noopener noreferrer">TT-Lang documentation</a> for operation-level tutorials, dataflow buffers, functional simulation, and kernel-language concepts.</div>
+    <div class="termdef"><b>TT-BUDA:</b> <a href="https://github.com/tenstorrent/tt-buda" target="_blank" rel="noopener noreferrer">Archived TT-BUDA repository</a> for historical context on the previous high-level compiler stack and PyBuda terminology.</div>
+    <div class="termdef"><b>DeepWiki tt-metal map:</b> <a href="https://deepwiki.com/tenstorrent/tt-metal" target="_blank" rel="noopener noreferrer">tt-metal DeepWiki overview</a> for a searchable map of TT-Metalium, TTNN, operation implementations, tests, and repository structure.</div>
+    <div class="termdef"><b>DeepWiki kernel build path:</b> <a href="https://deepwiki.com/tenstorrent/tt-metal/2.6-jit-build-system-and-kernel-compilation" target="_blank" rel="noopener noreferrer">JIT build system</a>, <a href="https://deepwiki.com/tenstorrent/tt-metal/2.4-program-and-kernel-system" target="_blank" rel="noopener noreferrer">Program and Kernel System</a>, <a href="https://deepwiki.com/tenstorrent/tt-metal/2.5-fast-dispatch-and-command-queue-system" target="_blank" rel="noopener noreferrer">Fast Dispatch</a>, and <a href="https://github.com/tenstorrent/tt-metal/blob/main/tt_metal/hw/toolchain/main.ld" target="_blank" rel="noopener noreferrer">main linker script</a> for studying kernel compilation, ELF linking, binary staging, and dispatch.</div>
+    <div class="termdef"><b>DeepWiki TTNN ops:</b> <a href="https://deepwiki.com/tenstorrent/tt-metal/4.5-convolution-operations" target="_blank" rel="noopener noreferrer">Convolution</a>, <a href="https://deepwiki.com/tenstorrent/tt-metal/4.6-matrix-multiplication-and-linear-operations" target="_blank" rel="noopener noreferrer">matmul/linear</a>, <a href="https://deepwiki.com/tenstorrent/tt-metal/4.8-attention-and-transformer-operations" target="_blank" rel="noopener noreferrer">attention/transformer</a>, and <a href="https://deepwiki.com/tenstorrent/tt-metal/4.9-collective-communication-operations-%28ccl%29" target="_blank" rel="noopener noreferrer">collective communication</a> pages used as a code-index reading path.</div>
+    <div class="termdef"><b>MLIR:</b> <a href="https://mlir.llvm.org/docs/" target="_blank" rel="noopener noreferrer">MLIR documentation</a> for dialects, operations, passes, lowering, and compiler infrastructure patterns.</div>
+    <div class="termdef"><b>MLIR tutorial:</b> <a href="https://mlir.llvm.org/docs/Tutorials/Toy/" target="_blank" rel="noopener noreferrer">Toy tutorial</a> for a hands-on walk through building and lowering a small language with MLIR.</div>
+    <div class="termdef"><b>Apache TVM:</b> <a href="https://tvm.apache.org/docs/" target="_blank" rel="noopener noreferrer">TVM documentation</a> for tensor IR, scheduling, compilation flows, Relay, TensorIR, and deployment ideas.</div>
+    <div class="termdef"><b>ONNX Runtime:</b> <a href="https://onnxruntime.ai/docs/" target="_blank" rel="noopener noreferrer">ONNX Runtime documentation</a> for execution providers, graph optimizations, quantization, and model deployment.</div>
+    <div class="termdef"><b>INT8 quantization:</b> <a href="https://onnxruntime.ai/docs/performance/model-optimizations/quantization.html" target="_blank" rel="noopener noreferrer">ONNX Runtime quantization guide</a> and <a href="https://developers.google.com/edge/litert/conversion/tensorflow/quantization/post_training_quantization" target="_blank" rel="noopener noreferrer">Google AI Edge post-training quantization</a> for INT8 workflows, calibration, QDQ, and deployment tradeoffs.</div>
+    <div class="termdef"><b>Qualcomm AIMET:</b> <a href="https://www.qualcomm.com/developer/software/ai-model-efficiency-toolkit" target="_blank" rel="noopener noreferrer">Qualcomm AIMET overview</a>, <a href="https://github.com/qualcomm/aimet" target="_blank" rel="noopener noreferrer">AIMET GitHub repository</a>, <a href="https://quic.github.io/aimet-pages/releases/latest/apiref/onnx/quantsim.html" target="_blank" rel="noopener noreferrer">AIMET-ONNX QuantSim API</a>, and <a href="https://quic.github.io/aimet-pages/releases/latest/apiref/torch/onnx.html" target="_blank" rel="noopener noreferrer">AIMET Torch ONNX QDQ export</a> for Qualcomm-backed quantization workflows.</div>
+    <div class="termdef"><b>Binary neural networks:</b> <a href="https://arxiv.org/abs/1602.02830" target="_blank" rel="noopener noreferrer">Binarized Neural Networks</a> for the classic 1-bit weights/activations idea and why binary inference needs special training and hardware-aware kernels.</div>
+    <div class="termdef"><b>Runtime performance:</b> <a href="https://onnxruntime.ai/docs/performance/" target="_blank" rel="noopener noreferrer">ONNX Runtime performance guide</a> for profiling, threading, execution providers, graph optimization levels, and tuning knobs.</div>
+    <div class="termdef"><b>CUDA and GPU:</b> <a href="https://docs.nvidia.com/cuda/cuda-programming-guide/index.html" target="_blank" rel="noopener noreferrer">CUDA C Programming Guide</a> for GPU execution hierarchy, memory spaces, synchronization, and performance mental models.</div>
+    <div class="termdef"><b>NPU on Windows:</b> <a href="https://learn.microsoft.com/en-us/windows/ai/npu-devices/" target="_blank" rel="noopener noreferrer">Microsoft NPU device guidance</a> for understanding how NPUs fit into AI PC application deployment.</div>
+    <div class="termdef"><b>OpenVINO NPU:</b> <a href="https://docs.openvino.ai/2026/openvino-workflow/running-inference/inference-devices-and-modes/npu-device.html" target="_blank" rel="noopener noreferrer">OpenVINO NPU device documentation</a> for inference-device configuration, precision support, and practical NPU deployment notes.</div>
+    <div class="termdef"><b>Intel Movidius VPU:</b> <a href="https://www.intel.com/content/www/us/en/developer/topic-technology/edge-5g/hardware/vision-accelerator-movidius-vpu.html" target="_blank" rel="noopener noreferrer">Intel Movidius VPU page</a> for a vendor example of low-power vision acceleration hardware.</div>
+    <div class="termdef"><b>Groq LPU:</b> <a href="https://groq.com/lpu-architecture/" target="_blank" rel="noopener noreferrer">Groq LPU architecture overview</a> for reading about an inference system designed around predictable language-model execution.</div>
+    <div class="termdef"><b>Transformer paper:</b> <a href="https://arxiv.org/abs/1706.03762" target="_blank" rel="noopener noreferrer">Attention Is All You Need</a> for the original Transformer architecture: self-attention, multi-head attention, positional encoding, and encoder-decoder structure.</div>
+    <div class="termdef"><b>Transformer practice:</b> <a href="https://huggingface.co/docs/transformers/index" target="_blank" rel="noopener noreferrer">Hugging Face Transformers documentation</a> for model families, tokenizer/model usage, pipelines, and common LLM workflow vocabulary.</div>
+  </div>
+</section>
+
+<section id="glossary">
+  <h2>Glossary</h2>
+  <div class="grid2">
+    <div class="termdef"><b>NPU:</b> Neural Processing Unit, an accelerator for tensor-heavy inference or training workloads.</div>
+    <div class="termdef"><b>IR:</b> Intermediate Representation, the compiler's internal form of a program or model.</div>
+    <div class="termdef"><b>DAG:</b> Directed Acyclic Graph. Model compute graphs are usually expected to be DAGs for scheduling.</div>
+    <div class="termdef"><b>SRAM/L1:</b> Small fast local memory near compute units; much smaller than DRAM.</div>
+    <div class="termdef"><b>DMA:</b> Direct Memory Access, hardware-assisted data movement between memory regions.</div>
+    <div class="termdef"><b>Fusion:</b> Combining adjacent runtime operations to reduce intermediate memory traffic.</div>
+    <div class="termdef"><b>Folding:</b> Removing or absorbing work before runtime, such as constant folding.</div>
+    <div class="termdef"><b>QDQ:</b> Quantize/Dequantize nodes that mark quantized boundaries in a graph.</div>
+    <div class="termdef"><b>PTQ:</b> Post-Training Quantization using calibration without retraining.</div>
+    <div class="termdef"><b>QAT:</b> Quantization-Aware Training, where training simulates quantization effects.</div>
+    <div class="termdef"><b>AIMET:</b> Qualcomm AI Model Efficiency Toolkit for model compression, quantization simulation, calibration, and export workflows.</div>
+    <div class="termdef"><b>FP32:</b> 32-bit floating point; useful as a reference format and for numerically sensitive work, but expensive in memory bandwidth.</div>
+    <div class="termdef"><b>BF16:</b> 16-bit brain floating point; keeps a wide exponent range with fewer mantissa bits than FP32.</div>
+    <div class="termdef"><b>BFLOAT8_B:</b> Tenstorrent block-floating 8-bit-style format where values in a block share exponent context.</div>
+    <div class="termdef"><b>BFLOAT4_B:</b> More compact Tenstorrent block-floating format with lower precision and operation/layout-dependent support.</div>
+    <div class="termdef"><b>INT8:</b> 8-bit integer quantized format, usually paired with scale and zero-point metadata and wider accumulation.</div>
+    <div class="termdef"><b>Binary neural network:</b> Network style that constrains weights and/or activations to signs such as <code>+1</code>/<code>-1</code> for bitwise-friendly inference.</div>
+    <div class="termdef"><b>NMS:</b> Non-Maximum Suppression, a detector post-processing step that removes overlapping boxes.</div>
+    <div class="termdef"><b>Warmup:</b> Initial runs used to populate caches and allocate resources before steady-state timing.</div>
+    <div class="termdef"><b>Tenstorrent:</b> Public NPU hardware/software ecosystem useful for studying tiled execution, explicit data movement, and compiler/runtime boundaries.</div>
+    <div class="termdef"><b>TT-Metalium:</b> Low-level programming model centered on host programs, device kernels, circular buffers, and explicit memory movement.</div>
+    <div class="termdef"><b>SFPI toolchain:</b> Tenstorrent's specialized RISC-V compiler/toolchain path used by the JIT build system for device kernels and SFPU-oriented code.</div>
+    <div class="termdef"><b>Linker script:</b> Low-level build file that places text, data, stack, debug, and metadata sections into target device memory regions when producing ELF binaries.</div>
+    <div class="termdef"><b>Program binary status:</b> Runtime state for whether a compiled kernel binary has not been sent, is in flight, or is committed in device memory.</div>
+    <div class="termdef"><b>Tensix:</b> Tenstorrent compute-core concept often discussed as a grid of local-memory compute nodes.</div>
+    <div class="termdef"><b>TT-Forge:</b> Current Tenstorrent MLIR-based compiler stack for bringing high-level models toward Tenstorrent hardware execution.</div>
+    <div class="termdef"><b>TT-NN:</b> Higher-level Python and C++ neural-network operation library built on TT-Metalium.</div>
+    <div class="termdef"><b>TT-MLIR:</b> MLIR-based compiler infrastructure used for Tenstorrent hardware lowering and backend work.</div>
+    <div class="termdef"><b>TT-Lang:</b> Operation-level language and tooling for expressing Tenstorrent-style computation and dataflow concepts.</div>
+    <div class="termdef"><b>TT-BUDA:</b> Legacy Tenstorrent high-level compiler stack; useful for historical terminology, but archived in favor of TT-Forge.</div>
+    <div class="termdef"><b>SDPA:</b> Scaled Dot-Product Attention, usually computed as <code>softmax(QK^T / sqrt(d))V</code>.</div>
+    <div class="termdef"><b>KV cache:</b> Stored key and value tensors from previous tokens, reused during autoregressive decode.</div>
+    <div class="termdef"><b>CCL:</b> Collective communication library or layer for multi-device tensor movement and reductions.</div>
+    <div class="termdef"><b>All-gather:</b> A collective where every device gathers shards from all participating devices.</div>
+    <div class="termdef"><b>Reduce-scatter:</b> A collective where devices reduce data across peers and each device keeps a shard of the reduced result.</div>
+    <div class="termdef"><b>All-reduce:</b> A collective where devices reduce data across peers and every device receives the full reduced result.</div>
+    <div class="termdef"><b>Circular buffer:</b> Local FIFO-style producer-consumer buffer used to overlap data movement and compute.</div>
+    <div class="termdef"><b>Double buffering:</b> Ping-pong buffering where one tile is consumed while another tile is loaded or stored.</div>
+    <div class="termdef"><b>Core grid:</b> A 2D set of accelerator cores; compilers map tiles or shards onto the grid and execute them in waves if work exceeds core count.</div>
+    <div class="termdef"><b>GEMM:</b> General matrix multiply, usually <code>C[M,N] = A[M,K] x B[K,N]</code>; total MACs are <code>M*N*K</code>.</div>
+  </div>
+</section>
+
+<footer>
+  Self-contained study page for AI compiler and NPU practice.
+</footer>
+</main>
+</div>
+
+<button class="themebtn" id="themeBtn" type="button" title="Toggle light/dark theme" aria-label="Toggle light and dark theme"><span class="theme-icon" aria-hidden="true">&#9728;</span><span class="theme-label">Light</span></button>
+<button class="topbtn" id="topBtn" title="Back to top" aria-label="Back to top">&#8679;</button>
+
+<script>
+(function () {
+  "use strict";
+
+  var topBtn = document.getElementById("topBtn");
+  topBtn.addEventListener("click", function () {
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  });
+
+  // Theme toggle. The initial theme is applied by the inline <head> script.
+  var root = document.documentElement;
+  var themeBtn = document.getElementById("themeBtn");
+  var themeIcon = themeBtn.querySelector(".theme-icon");
+  var themeLabel = themeBtn.querySelector(".theme-label");
+
+  function syncThemeButton() {
+    var isLight = root.getAttribute("data-theme") === "light";
+    // Show the mode the button will switch to.
+    themeIcon.innerHTML = isLight ? "&#127769;" : "&#9728;";
+    themeLabel.textContent = isLight ? "Dark" : "Light";
+  }
+  syncThemeButton();
+
+  themeBtn.addEventListener("click", function () {
+    var next = root.getAttribute("data-theme") === "light" ? "dark" : "light";
+    if (next === "light") root.setAttribute("data-theme", "light");
+    else root.removeAttribute("data-theme");
+    try { localStorage.setItem("npu-theme", next); } catch (e) {}
+    syncThemeButton();
+  });
+
+  var q = document.getElementById("q");
+  var cards = Array.prototype.slice.call(document.querySelectorAll("details.qa, .termdef"));
+
+  cards.forEach(function (card) {
+    card.dataset.text = card.textContent.toLowerCase();
+  });
+
+  function debounce(fn, ms) {
+    var timer;
+    return function () {
+      var args = arguments;
+      var self = this;
+      clearTimeout(timer);
+      timer = setTimeout(function () {
+        fn.apply(self, args);
+      }, ms);
+    };
+  }
+
+  var run = debounce(function () {
+    var term = q.value.trim().toLowerCase();
+    cards.forEach(function (card) {
+      if (!term) {
+        card.classList.remove("nohit");
+        if (card.tagName.toLowerCase() === "details" && card !== document.querySelector("#coding details.qa")) {
+          card.removeAttribute("open");
+        }
+        return;
+      }
+
+      var hit = card.dataset.text.indexOf(term) !== -1;
+      card.classList.toggle("nohit", !hit);
+      if (card.tagName.toLowerCase() === "details") {
+        if (hit) card.setAttribute("open", "");
+        else card.removeAttribute("open");
+      }
+    });
+  }, 120);
+
+  q.addEventListener("input", run);
+  q.addEventListener("keydown", function (event) {
+    if (event.key === "Escape") {
+      q.value = "";
+      run();
+    }
+  });
+
+  // Interactive multiple choice: reveal the answer only after an option is picked.
+  Array.prototype.slice.call(document.querySelectorAll("details.qa")).forEach(function (card) {
+    var list = card.querySelector("ol.choices");
+    if (!list) return;
+    card.classList.add("mcq");
+
+    var hint = document.createElement("p");
+    hint.className = "mcq-hint";
+    hint.textContent = "Pick an option to reveal the answer.";
+    list.parentNode.insertBefore(hint, list);
+
+    function choose(li) {
+      if (card.classList.contains("answered")) return;
+      card.classList.add("answered");
+      li.classList.add("chosen");
+      if (!li.classList.contains("correct")) li.classList.add("wrong");
+    }
+
+    Array.prototype.slice.call(list.querySelectorAll("li")).forEach(function (li) {
+      li.tabIndex = 0;
+      li.setAttribute("role", "button");
+      li.addEventListener("click", function () { choose(li); });
+      li.addEventListener("keydown", function (event) {
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          choose(li);
+        }
+      });
+    });
+  });
+})();
+</script>
+</body>
+</html>
