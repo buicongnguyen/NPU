@@ -1,7 +1,9 @@
-# buicongnguyen.github.io
+# NPU Study Guide
 
-Personal GitHub Pages hub for Bui Cong Nguyen.
+Standalone GitHub Pages project for AI accelerator and compiler study notes.
 
-Live site: https://buicongnguyen.github.io/
+Live site: https://buicongnguyen.github.io/NPU/
 
-The page highlights robotics simulation, Isaac Sim learning notes, AI tools, browser apps, and selected public projects.
+The guide covers NPU, VPU, LPU, GPU, and TPU accelerator tradeoffs, AI model
+deployment paths, LLVM/MLIR compiler concepts, Tenstorrent notes, and related
+interview practice pages.

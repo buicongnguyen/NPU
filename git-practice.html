@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Expert Git version control interview practice: repository management, branching strategies, collaboration workflows, core Git operations, and best practices. 50 questions.">
+<title>Expert Git Version Control Practice</title>
+<link rel="stylesheet" href="practice-common.css">
+</head>
+<body>
+<header>
+  <p class="eyebrow">Detailed plan 5</p>
+  <h1>Expert Git Version Control Practice</h1>
+  <p>Study plan, knowledge map, and 50 multiple-choice questions for expert-level Git: repository management, branching strategies, collaboration workflows, core Git operations, and everyday best practices.</p>
+  <nav>
+    <a href="#plan">Plan</a>
+    <a href="#knowledge">Knowledge</a>
+    <a href="#questions">Questions</a>
+    <a href="#resources">Sources</a>
+    <a href="interview-practice.html">Practice Hub</a>
+    <a href="index.html">Home</a>
+  </nav>
+</header>
+<main>
+  <section id="plan" class="section"><h2>Execution Plan</h2><div id="plan-root" class="grid"></div></section>
+  <section id="knowledge" class="section"><h2>Knowledge Map</h2><div id="knowledge-root" class="grid"></div></section>
+  <section class="toolbar">
+    <input id="search" type="search" placeholder="Search Git questions..." aria-label="Search Git questions">
+    <div id="stats" class="stats"></div>
+  </section>
+  <section id="questions" class="section"><h2>Question Bank</h2><div id="questions-root"></div></section>
+  <section id="resources" class="section"><h2>Sources</h2><div id="resources-root" class="grid"></div></section>
+</main>
+<script>
+window.practicePageData = {
+  plans: [
+    { phase: "Phase 1", title: "Repository management", text: "Review init, clone, the working tree/index/HEAD model, remotes, .gitignore, tags, bare repos, submodules, and object cleanup." },
+    { phase: "Phase 2", title: "Branching strategies", text: "Study branches as pointers, HEAD, fast-forward vs three-way merges, rebase, detached HEAD, and models like trunk-based and Git Flow." },
+    { phase: "Phase 3", title: "Collaboration", text: "Practice fetch/pull/push, forks and upstream, pull requests and review, conflict resolution, protected branches, and staying in sync." },
+    { phase: "Phase 4", title: "Core operations", text: "Master commit and amend, reset soft/mixed/hard, revert, cherry-pick, stash, reflog, bisect, and reading log and diff." },
+    { phase: "Phase 5", title: "Best practices", text: "Cover atomic commits and messages, never rewriting shared history, secrets hygiene, small PRs, signing, hooks, and safe force pushes." }
+  ],
+  knowledge: [
+    { title: "Three trees", text: "Git tracks the working directory, the staging area (index), and HEAD (the last commit). Most commands move changes between these three." },
+    { title: "Commits are snapshots", text: "Each commit records a full tree plus parent links and is identified by a content hash. Branches and tags are just named pointers to commits." },
+    { title: "Branch is a pointer", text: "A branch is a lightweight movable reference to a commit; creating and switching branches is cheap because no files are copied." },
+    { title: "Merge vs rebase", text: "Merge joins histories with a merge commit and preserves what really happened; rebase replays commits onto a new base for a linear history but rewrites commit IDs." },
+    { title: "Local vs remote", text: "fetch updates remote-tracking refs without touching your work; pull also integrates; push publishes your commits. You always commit locally first." },
+    { title: "Rewriting history", text: "amend, rebase, and reset --hard rewrite commits. This is fine on local/unpushed work but breaks collaborators when done to shared branches." },
+    { title: "Reflog safety net", text: "The reflog records where HEAD and branches have pointed, so 'lost' commits after a bad reset or rebase are usually recoverable." },
+    { title: "Undo tools", text: "revert makes a new commit that undoes another and is safe for public history; reset moves branch pointers and is best for local history." }
+  ],
+  groups: [
+    { id: "repo", title: "Repository Management", tag: "repo", questions: [
+      { q: "What does `git init` do?", choices: ["Creates a new empty repository by adding a .git directory in the current folder.", "Downloads a repository from a server.", "Creates the first commit automatically.", "Connects to a remote named origin."], answer: 0, why: "It initializes the object database and refs; nothing is committed until you stage and commit." },
+      { q: "What does `git clone <url>` do?", choices: ["Copies a remote repository including its history and sets up a remote named origin.", "Copies only the latest files with no history.", "Creates a bare mirror only.", "Initializes an empty repo."], answer: 0, why: "clone also checks out the default branch and creates remote-tracking branches for origin." },
+      { q: "What is the staging area (index)?", choices: ["A place where you assemble exactly the changes that will go into the next commit.", "A backup of the remote.", "The list of ignored files.", "A branch that holds work in progress."], answer: 0, why: "git add moves changes into the index; git commit records the index as a new commit." },
+      { q: "What does a .gitignore file control?", choices: ["Which untracked files Git should not show or stage.", "Which committed files to delete.", "Which branches are protected.", "Which remotes are trusted."], answer: 0, why: ".gitignore only affects untracked files; a file already tracked keeps being tracked until you git rm --cached it." },
+      { q: "What is a remote in Git?", choices: ["A named reference (like origin) to another copy of the repository, usually on a server.", "A branch on your local machine.", "A snapshot of the working tree.", "A type of commit."], answer: 0, why: "You interact with remotes via fetch, pull, and push; a repo can have several remotes such as origin and upstream." },
+      { q: "What does `git remote add origin <url>` do?", choices: ["Registers a remote named origin pointing at the given URL.", "Pushes your code immediately.", "Creates a new branch called origin.", "Clones the repository."], answer: 0, why: "After adding the remote you still need to push (often with -u to set the upstream tracking branch)." },
+      { q: "What is a bare repository?", choices: ["A repository with no working tree, used as a shared/central remote to push to and pull from.", "A repository with no commits.", "A repository with no branches.", "A read-only clone."], answer: 0, why: "Server-side repos are bare because a checked-out working tree there would conflict with incoming pushes." },
+      { q: "What is the difference between a lightweight and an annotated tag?", choices: ["An annotated tag is a full object with tagger, date, message, and can be signed; a lightweight tag is just a name pointing to a commit.", "They are identical.", "Lightweight tags can be signed but annotated cannot.", "Annotated tags cannot point to commits."], answer: 0, why: "Releases usually use annotated (or signed) tags so the tag carries metadata; tags are not pushed automatically." },
+      { q: "What does `git gc` do?", choices: ["Cleans up and compresses the object database, removing unreachable objects and packing loose ones.", "Deletes all branches.", "Garbage-collects the working directory files.", "Removes remote-tracking branches."], answer: 0, why: "Git runs gc automatically at times; unreachable objects may still be recoverable from the reflog until it expires." },
+      { q: "What is a Git submodule?", choices: ["A separate repository embedded in a parent repo at a pinned commit.", "A branch inside another branch.", "A compressed archive of history.", "A backup of the index."], answer: 0, why: "The parent records the submodule's URL and exact commit; you must update submodules explicitly to move that pointer." }
+    ]},
+    { id: "branch", title: "Branching Strategies", tag: "branch", questions: [
+      { q: "What is a branch in Git?", choices: ["A lightweight, movable pointer to a commit.", "A full copy of the repository files.", "A snapshot of the staging area.", "A remote server."], answer: 0, why: "Because a branch is just a ref, creating one is instant and cheap; the commit graph does the real work." },
+      { q: "What does HEAD refer to?", choices: ["A reference to the currently checked-out commit, usually via the current branch.", "The first commit in history.", "The remote's latest commit.", "The staging area."], answer: 0, why: "Normally HEAD points at a branch; when it points directly at a commit you are in 'detached HEAD' state." },
+      { q: "What is a fast-forward merge?", choices: ["Moving the branch pointer forward to the target commit because there was no divergence, creating no merge commit.", "A merge that always creates a merge commit.", "A rebase in disguise.", "A merge that deletes the other branch."], answer: 0, why: "Fast-forward is possible when the current branch is a direct ancestor of the branch being merged in." },
+      { q: "What is a three-way (true) merge?", choices: ["Combining two diverged branches using their common ancestor, producing a merge commit with two parents.", "Merging three branches at once.", "A merge that rewrites history.", "A merge that requires a rebase first."], answer: 0, why: "Git uses the merge base plus both tips to compute the result; conflicts arise where both sides changed the same lines." },
+      { q: "What does `git rebase <base>` do?", choices: ["Reapplies your branch's commits on top of <base>, creating new commits and a linear history.", "Merges base into your branch with a merge commit.", "Deletes commits since base.", "Pushes your branch to base."], answer: 0, why: "Rebase rewrites commit IDs, so it should be used on local/unpublished commits to avoid disrupting collaborators." },
+      { q: "What is a key difference between merge and rebase?", choices: ["Merge preserves the true, branching history with a merge commit; rebase produces a linear history by rewriting commits.", "Merge rewrites history and rebase does not.", "They produce identical commit graphs.", "Rebase can only be done on the main branch."], answer: 0, why: "Choose merge to keep an accurate record, or rebase to keep history tidy; never rebase shared branches." },
+      { q: "What is a detached HEAD state?", choices: ["HEAD points directly at a commit rather than a branch, so new commits are not on any branch.", "A corrupted repository.", "A branch with no commits.", "A branch that was deleted remotely."], answer: 0, why: "Commits made while detached can be lost when you switch away unless you create a branch to keep them." },
+      { q: "What characterizes trunk-based development?", choices: ["Everyone integrates small changes into one main branch frequently, using very short-lived branches or none.", "Many long-lived feature branches merged once a quarter.", "No use of a main branch.", "Every developer keeps a permanent personal branch."], answer: 0, why: "Frequent integration keeps merges small and pairs well with feature flags and continuous integration." },
+      { q: "What is Git Flow?", choices: ["A branching model with long-lived main and develop branches plus feature, release, and hotfix branches.", "A single-branch workflow.", "A Git command that auto-merges.", "A hosting service."], answer: 0, why: "Git Flow suits scheduled releases but can be heavy; many teams prefer simpler trunk-based or GitHub-flow models." },
+      { q: "Why keep feature branches short-lived?", choices: ["The longer a branch diverges from main, the larger and riskier the eventual merge and conflicts become.", "Git deletes old branches automatically.", "Long branches use too much disk space.", "Short branches cannot have conflicts by definition."], answer: 0, why: "Frequent integration (or rebasing onto main) keeps a branch close to the mainline and easy to merge." }
+    ]},
+    { id: "collab", title: "Collaboration Workflows", tag: "collab", questions: [
+      { q: "What is the difference between `git fetch` and `git pull`?", choices: ["fetch only downloads remote changes into remote-tracking branches; pull fetches and then merges (or rebases) into your branch.", "They are identical.", "fetch merges and pull only downloads.", "pull only works on the main branch."], answer: 0, why: "fetch is non-destructive to your work, letting you inspect changes before integrating them." },
+      { q: "What does `git push` do?", choices: ["Uploads your local commits to a branch on a remote repository.", "Downloads commits from the remote.", "Creates a local branch.", "Stages your changes."], answer: 0, why: "You can only push commits; uncommitted working-tree changes are never pushed." },
+      { q: "What is a fork in the pull-request workflow?", choices: ["A server-side copy of a repository under your own account that you push to and propose changes from.", "A local branch.", "A merge conflict.", "A detached HEAD."], answer: 0, why: "Forks let outside contributors work without write access to the original, then open pull requests back to it." },
+      { q: "What does 'upstream' usually refer to?", choices: ["The original repository a fork was made from, or the remote branch a local branch tracks.", "The newest commit on main.", "A protected branch.", "The staging area."], answer: 0, why: "Contributors often add an 'upstream' remote to sync their fork with the original project." },
+      { q: "What is the purpose of a pull request (or merge request)?", choices: ["To propose merging a branch's changes, enabling review, discussion, and automated checks before integration.", "To pull the latest code from main.", "To force-push to a shared branch.", "To delete a remote branch."], answer: 0, why: "Pull requests are a collaboration and review gate, not a Git command themselves." },
+      { q: "How do you resolve a merge conflict?", choices: ["Edit the conflicted files to the desired result, remove the conflict markers, stage them, and commit.", "Delete the repository and re-clone.", "Run git push --force.", "Wait for Git to resolve it automatically."], answer: 0, why: "Conflicts occur where both sides changed the same region; Git needs a human to choose the correct combined content." },
+      { q: "What do the markers <<<<<<<, =======, and >>>>>>> indicate in a file?", choices: ["A conflict region: your side, the divider, and the other side's version.", "A syntax error in the code.", "A signed commit.", "A submodule boundary."], answer: 0, why: "You must edit out all three markers and keep the intended content before the merge can be committed." },
+      { q: "What is a protected branch?", choices: ["A branch with rules such as no force-push, no deletion, and required reviews or passing CI before merge.", "A branch only the owner can see.", "A branch stored in a bare repo.", "A branch that cannot be checked out."], answer: 0, why: "Protecting main prevents accidental history rewrites and enforces review/quality gates." },
+      { q: "When is `git pull --rebase` useful?", choices: ["When syncing with a shared branch and you want to replay your local commits on top, avoiding an extra merge commit.", "When you want to force-push.", "When deleting a branch.", "When creating a tag."], answer: 0, why: "It keeps history linear, but like any rebase it rewrites your local commit IDs before you push them." },
+      { q: "Why sync your feature branch with main frequently during collaboration?", choices: ["To surface and resolve conflicts in small increments instead of one large painful merge later.", "Because Git requires a daily merge.", "To reduce repository size.", "To avoid needing pull requests."], answer: 0, why: "Regular merges or rebases from main keep divergence small and integration smooth." }
+    ]},
+    { id: "ops", title: "Core Git Operations", tag: "ops", questions: [
+      { q: "What does `git commit --amend` do?", choices: ["Replaces the most recent commit with a new one, letting you fix its message or contents.", "Adds a second parent to the commit.", "Merges the last two commits on the remote.", "Creates a new branch."], answer: 0, why: "Because it rewrites the last commit, avoid amending a commit you have already pushed to a shared branch." },
+      { q: "How do `git reset --soft`, `--mixed`, and `--hard` differ?", choices: ["soft moves HEAD only (keeps index and working tree), mixed also resets the index, hard resets index and working tree, discarding changes.", "They are all identical.", "hard is the safest of the three.", "soft deletes files from disk."], answer: 0, why: "--hard is destructive to uncommitted work; --soft is useful to uncommit while keeping everything staged." },
+      { q: "What does `git revert <commit>` do?", choices: ["Creates a new commit that undoes the changes of the given commit, without rewriting history.", "Deletes the commit from history.", "Resets HEAD to the commit.", "Amends the commit."], answer: 0, why: "revert is the safe way to undo something already public, since it adds rather than rewrites history." },
+      { q: "What does `git cherry-pick <commit>` do?", choices: ["Applies the changes from a specific commit onto the current branch as a new commit.", "Merges an entire branch.", "Removes a commit from history.", "Renames a branch."], answer: 0, why: "It is handy for pulling one fix into another branch, though it duplicates the change as a new commit ID." },
+      { q: "What does `git stash` do?", choices: ["Saves your uncommitted changes and reverts the working tree to a clean state so you can switch context.", "Commits your changes to main.", "Deletes your uncommitted changes permanently.", "Pushes changes to a remote."], answer: 0, why: "git stash pop (or apply) restores the saved changes later; stashes are stored in a stack." },
+      { q: "What is the git reflog useful for?", choices: ["Recovering commits after a bad reset, rebase, or branch deletion by showing where HEAD and refs pointed.", "Listing remote branches.", "Showing the staged diff.", "Configuring hooks."], answer: 0, why: "Even 'lost' commits usually remain reachable via the reflog until it expires and gc runs." },
+      { q: "What does `git bisect` help you do?", choices: ["Binary-search the commit history to find the commit that introduced a bug.", "Split a commit into two.", "Merge two branches by half.", "Bisect a file into halves."], answer: 0, why: "You mark a known-good and known-bad commit, and bisect checks out midpoints until it isolates the culprit." },
+      { q: "What is the difference between `git diff` and `git diff --staged`?", choices: ["git diff shows unstaged changes (working tree vs index); --staged shows staged changes (index vs HEAD).", "They show the same thing.", "git diff shows staged changes only.", "--staged compares two branches."], answer: 0, why: "Understanding the working tree/index/HEAD trio is key to knowing which diff you are looking at." },
+      { q: "What does `git log --oneline --graph --all` display?", choices: ["A compact, visual commit history showing branch and merge topology across all refs.", "Only the current file's changes.", "The list of remotes.", "The staged files."], answer: 0, why: "The graph view is invaluable for understanding how branches diverged and merged." },
+      { q: "How do you unstage a file while keeping its changes in the working tree?", choices: ["git restore --staged <file> (or git reset HEAD <file>).", "git checkout <file>.", "git rm <file>.", "git commit <file>."], answer: 0, why: "This moves the change out of the index back to unstaged; git restore <file> (without --staged) would instead discard the changes." }
+    ]},
+    { id: "best", title: "Best Practices", tag: "best", questions: [
+      { q: "Why should you avoid rewriting history on a shared/published branch?", choices: ["Force-pushing rewritten commits breaks everyone else's history and causes painful re-syncs and lost work.", "It makes the repo larger.", "Git forbids it entirely.", "It has no downside."], answer: 0, why: "Rewrite freely on local, unpushed work; once others may have based work on it, prefer revert over rewrite." },
+      { q: "What makes a good commit message?", choices: ["A concise imperative summary line, a blank line, then a body explaining what and why when needed.", "A single word like 'fix'.", "The full diff pasted as text.", "The author's name repeated."], answer: 0, why: "Clear messages make history, blame, and reviews far more useful than 'update' or 'stuff'." },
+      { q: "What is an atomic commit?", choices: ["A commit containing one logical, self-contained change that builds and could be reverted on its own.", "A commit that touches every file.", "A commit with no message.", "A commit made by a bot."], answer: 0, why: "Small focused commits make review, revert, cherry-pick, and bisect much more effective." },
+      { q: "Why should you never commit secrets like API keys or passwords?", choices: ["They persist in history even after deletion and must be treated as compromised and rotated.", "They make commits larger.", "Git blocks them automatically.", "They only matter in public repos."], answer: 0, why: "Removing them requires history rewriting (e.g. git filter-repo) plus rotating the credential; prevention via .gitignore and secret scanning is better." },
+      { q: "How do you stop tracking a file that is already committed while keeping it on disk?", choices: ["git rm --cached <file>, then add it to .gitignore and commit.", "git rm <file>.", "Just add it to .gitignore.", "git reset --hard."], answer: 0, why: "Plain git rm deletes it locally too; --cached removes it only from the index/tracking." },
+      { q: "What are Git hooks?", choices: ["Scripts that run automatically on events like pre-commit, commit-msg, or pre-push.", "Remote branches.", "Tags that trigger releases.", "A type of merge."], answer: 0, why: "Hooks enforce local checks (linting, tests, message format); server-side hooks or CI enforce them for everyone." },
+      { q: "What problem does Git LFS solve?", choices: ["It stores large binary files outside normal history using lightweight pointers, keeping the repo small.", "It compresses commit messages.", "It speeds up branching.", "It signs commits."], answer: 0, why: "Committing large binaries directly bloats every clone; LFS keeps the working files but offloads their storage." },
+      { q: "What does a signed commit or tag provide?", choices: ["A cryptographic (GPG or SSH) signature verifying who authored it, improving trust and integrity.", "Faster pushes.", "Automatic conflict resolution.", "A smaller repository."], answer: 0, why: "Signing helps prove provenance, which matters for releases and supply-chain security." },
+      { q: "Why prefer small, focused pull requests?", choices: ["They are easier and faster to review thoroughly, so they catch more bugs and merge sooner.", "They use less bandwidth.", "Git requires them to be small.", "Large PRs cannot be merged."], answer: 0, why: "Huge PRs get shallow reviews; splitting work into reviewable units improves quality and velocity." },
+      { q: "When is `git push --force-with-lease` safer than `git push --force`?", choices: ["It refuses to overwrite the remote if someone else pushed changes you have not seen, preventing you from clobbering their work.", "It is never safer.", "It skips authentication.", "It force-pushes to every branch at once."], answer: 0, why: "--force-with-lease checks the remote ref matches your expectation first, unlike a blind --force." }
+    ]}
+  ],
+  resources: [
+    { title: "Official Git", text: "The reference manual and the free Pro Git book covering every command and concept.", links: [{ label: "Git reference", href: "https://git-scm.com/docs" }, { label: "Pro Git book", href: "https://git-scm.com/book/en/v2" }] },
+    { title: "Branching and workflows", text: "Interactive branching practice and popular collaboration models.", links: [{ label: "Learn Git Branching", href: "https://learngitbranching.js.org/" }, { label: "GitHub flow", href: "https://docs.github.com/en/get-started/using-github/github-flow" }] },
+    { title: "Collaboration platforms", text: "Pull requests, forks, protected branches, and review workflows.", links: [{ label: "GitHub docs", href: "https://docs.github.com/en/pull-requests" }, { label: "Atlassian Git tutorials", href: "https://www.atlassian.com/git/tutorials" }] },
+    { title: "Advanced tooling", text: "Large-file storage and history-rewriting tools for cleanup and maintenance.", links: [{ label: "Git LFS", href: "https://git-lfs.com/" }, { label: "git filter-repo", href: "https://github.com/newren/git-filter-repo" }] }
+  ]
+};
+</script>
+<script src="practice-common.js"></script>
+</body>
+</html>
