@@ -1,0 +1,592 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="An engineering study of NPU and SoC software architecture: compiler artifacts, SDKs, runtimes, drivers, firmware, scheduling, memory planning, C++ hardware models, profiling, debugging, and CI/CD.">
+  <title>NPU &amp; SoC Software Architecture | NPU Study Guide</title>
+  <link rel="stylesheet" href="analog-cim.css">
+  <link rel="stylesheet" href="npu-engineering.css">
+  <script src="npu-engineering.js" defer></script>
+</head>
+<body>
+  <header class="site-header">
+    <a class="brand" href="index.html" aria-label="NPU Study Guide home">
+      <img src="https://avatars.githubusercontent.com/u/72680210?v=4" alt="Bui Cong Nguyen avatar">
+      <span>NPU Study Guide</span>
+    </a>
+    <nav class="site-nav" aria-label="NPU engineering studies">
+      <a href="npu-soc-software-architecture.html" aria-current="page">SoC Software</a>
+      <a href="npu-framework-compiler-skills.html">Framework &amp; ISA</a>
+      <a href="analog-cim-architecture.html">Analog CIM</a>
+      <a href="npu-practice.html">Practice</a>
+      <a href="index.html">NPU Home</a>
+    </nav>
+  </header>
+
+  <main>
+    <section class="hero">
+      <div class="hero-copy">
+        <p class="eyebrow">Production engineering reference | updated 2026-07-11</p>
+        <h1>NPU and SoC Software Architecture</h1>
+        <p class="lede">
+          A contract-first view of the software that turns a model into work on an edge NPU. The focus is the space
+          between a graph compiler and silicon: deployable artifacts, SDK and runtime APIs, memory and command
+          lifecycles, kernel drivers, firmware, C++ hardware models, trace correlation, layer debugging, and release gates.
+        </p>
+        <div class="hero-actions">
+          <a class="button" href="#stack">Trace the complete stack</a>
+          <a class="button secondary" href="#contracts">Inspect interface contracts</a>
+          <a class="button secondary" href="#labs">Build the portfolio labs</a>
+        </div>
+        <div class="summary-strip" aria-label="NPU software architecture summary">
+          <div><strong>Compile</strong><span>Freeze graph, schedule, memory, and ABI decisions</span></div>
+          <div><strong>Dispatch</strong><span>Move buffers and commands through stable queues</span></div>
+          <div><strong>Correlate</strong><span>Keep model, command, cycle, and wall-clock identities aligned</span></div>
+          <div><strong>Qualify</strong><span>Gate correctness, performance, power, and compatibility</span></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="scope">
+      <div class="section-heading">
+        <p class="eyebrow">Coverage boundary</p>
+        <h2>This page adds system contracts instead of repeating existing lessons</h2>
+        <p class="section-note">
+          The current site already covers accelerator taxonomy, LLVM/MLIR fundamentals, graph optimization, tiling,
+          quantization, C, Git, and Analog CIM. Those remain prerequisites. This document begins where those introductions stop.
+        </p>
+      </div>
+      <div class="scope-ledger">
+        <article class="scope-item">
+          <strong>Accelerator comparison</strong>
+          <span>NPU, GPU, TPU, VPU, and LPU tradeoffs already exist.</span>
+          <a href="index.html#processors">Use existing processor study</a>
+        </article>
+        <article class="scope-item">
+          <strong>LLVM and MLIR foundations</strong>
+          <span>SSA, dialects, progressive lowering, and backend concepts already exist.</span>
+          <a href="index.html#llvm-mlir">Use existing compiler foundation</a>
+        </article>
+        <article class="scope-item">
+          <strong>Graph, tiling, and quantization</strong>
+          <span>Core rewrites, layouts, memory levels, TVM, and quantization already exist.</span>
+          <a href="npu-practice.html#graph">Use existing NPU practice</a>
+        </article>
+        <article class="scope-item new">
+          <strong>New: executable contracts</strong>
+          <span>Artifact schema, target manifest, ABI compatibility, and reproducibility.</span>
+          <a href="#contracts">Study compiler-to-runtime boundaries</a>
+        </article>
+        <article class="scope-item new">
+          <strong>New: production control plane</strong>
+          <span>SDK, runtime, driver, firmware, queues, synchronization, and recovery.</span>
+          <a href="#runtime">Study runtime ownership</a>
+        </article>
+        <article class="scope-item new">
+          <strong>New: model-to-silicon evidence</strong>
+          <span>C++ models, cycle correlation, power and bandwidth metrics, debugger, and CI gates.</span>
+          <a href="#modeling">Study verification and profiling</a>
+        </article>
+      </div>
+    </section>
+
+    <section class="section" id="stack">
+      <div class="section-heading">
+        <p class="eyebrow">End-to-end architecture</p>
+        <h2>The stack has two products: an executable artifact and a controlled device</h2>
+        <p class="section-note">
+          Data-plane work carries tensors and commands. Control-plane work owns discovery, allocation, power, faults,
+          version negotiation, and observability. A robust design makes both planes explicit.
+        </p>
+      </div>
+      <div class="stack-map" aria-label="NPU SoC software stack">
+        <div class="stack-lane">
+          <div class="lane-label">Model plane</div>
+          <div class="stack-nodes">
+            <article class="stack-node"><strong>Application</strong><span>Inputs, outputs, preprocessing, latency policy</span></article>
+            <article class="stack-node"><strong>Framework / ONNX</strong><span>Graph semantics, shapes, dtypes, constants</span></article>
+            <article class="stack-node"><strong>Deployment profile</strong><span>Target, precision, memory, fallback, power mode</span></article>
+          </div>
+        </div>
+        <div class="stack-lane">
+          <div class="lane-label">Build plane</div>
+          <div class="stack-nodes">
+            <article class="stack-node"><strong>Importer and analyzer</strong><span>Validate, infer, normalize, diagnose support</span></article>
+            <article class="stack-node"><strong>NPU compiler</strong><span>Partition, schedule, plan memory, lower kernels</span></article>
+            <article class="stack-node"><strong>Artifact packager</strong><span>Code, constants, commands, metadata, ABI versions</span></article>
+          </div>
+        </div>
+        <div class="boundary-line">Offline build boundary</div>
+        <div class="stack-lane">
+          <div class="lane-label">Host control</div>
+          <div class="stack-nodes">
+            <article class="stack-node control"><strong>SDK</strong><span>C/C++ API, Python tools, examples, diagnostics</span></article>
+            <article class="stack-node control"><strong>User runtime</strong><span>Sessions, buffers, queues, events, execution</span></article>
+            <article class="stack-node control"><strong>Kernel driver</strong><span>Isolation, DMA mapping, interrupts, power, reset</span></article>
+          </div>
+        </div>
+        <div class="boundary-line">User / kernel / device trust boundaries</div>
+        <div class="stack-lane">
+          <div class="lane-label">Device control</div>
+          <div class="stack-nodes">
+            <article class="stack-node control"><strong>Firmware scheduler</strong><span>Validate descriptors, sequence engines, report faults</span></article>
+            <article class="stack-node hardware"><strong>SoC services</strong><span>IOMMU, DMA, NoC, clocks, power domains, timers</span></article>
+            <article class="stack-node hardware"><strong>Trace and counters</strong><span>Correlation IDs, cycles, bytes, stalls, errors</span></article>
+          </div>
+        </div>
+        <div class="stack-lane">
+          <div class="lane-label">NPU data plane</div>
+          <div class="stack-nodes">
+            <article class="stack-node hardware"><strong>Command processors</strong><span>Queues, microcode, dependencies, events</span></article>
+            <article class="stack-node hardware"><strong>Compute engines</strong><span>Matrix, vector, scalar, activation, reduction</span></article>
+            <article class="stack-node hardware"><strong>Memory system</strong><span>SRAM banks, caches, DRAM, fabric, coherency</span></article>
+          </div>
+        </div>
+      </div>
+      <div class="callout" style="margin-top:12px">
+        <p>
+          <strong>The deployable artifact is the architectural hinge.</strong> It should identify the target and ABI,
+          define constants and mutable buffers, carry command or kernel payloads, preserve graph-to-command debug maps,
+          and include enough provenance to reproduce the compile. A binary blob without that contract is difficult to
+          validate, debug, cache, or evolve.
+        </p>
+      </div>
+    </section>
+
+    <section class="section" id="contracts">
+      <div class="section-heading">
+        <p class="eyebrow">Interface explorer</p>
+        <h2>Every boundary needs ownership, invariants, observability, and versioning</h2>
+      </div>
+      <div class="tabbed-explorer" data-tabset>
+        <div class="tab-list" role="tablist" aria-label="NPU software interface contracts">
+          <button class="tab-button" type="button" id="contract-tab-model" role="tab" aria-selected="true" aria-controls="contract-model">
+            <span class="tab-index">1</span><span><strong>Model to compiler</strong><span>Semantic import contract</span></span>
+          </button>
+          <button class="tab-button" type="button" id="contract-tab-artifact" role="tab" aria-selected="false" aria-controls="contract-artifact" tabindex="-1">
+            <span class="tab-index">2</span><span><strong>Compiler to runtime</strong><span>Executable artifact contract</span></span>
+          </button>
+          <button class="tab-button" type="button" id="contract-tab-driver" role="tab" aria-selected="false" aria-controls="contract-driver" tabindex="-1">
+            <span class="tab-index">3</span><span><strong>Runtime to driver</strong><span>Resource and submission ABI</span></span>
+          </button>
+          <button class="tab-button" type="button" id="contract-tab-firmware" role="tab" aria-selected="false" aria-controls="contract-firmware" tabindex="-1">
+            <span class="tab-index">4</span><span><strong>Driver to firmware</strong><span>Queue and fault protocol</span></span>
+          </button>
+          <button class="tab-button" type="button" id="contract-tab-engine" role="tab" aria-selected="false" aria-controls="contract-engine" tabindex="-1">
+            <span class="tab-index">5</span><span><strong>Firmware to engines</strong><span>Micro-operation contract</span></span>
+          </button>
+          <button class="tab-button" type="button" id="contract-tab-trace" role="tab" aria-selected="false" aria-controls="contract-trace" tabindex="-1">
+            <span class="tab-index">6</span><span><strong>Trace to tools</strong><span>Time and identity contract</span></span>
+          </button>
+        </div>
+
+        <article class="panel tab-panel" id="contract-model" role="tabpanel" aria-labelledby="contract-tab-model">
+          <span class="status-pill status-partial">Semantic boundary</span>
+          <h3>Model to compiler</h3>
+          <p>The importer must distinguish what the graph states, what it implies, and what remains dynamic. Operator names alone are not a contract: opset, attributes, layouts, quantization metadata, control flow, aliasing, and preprocessing assumptions all matter.</p>
+          <div class="contract-grid">
+            <div class="contract-cell"><strong>Inputs</strong><span>Model IR, opset imports, shape constraints, constants, calibration profile, target policy.</span></div>
+            <div class="contract-cell"><strong>Owned by</strong><span>Exporter and importer jointly; neither side may silently reinterpret semantics.</span></div>
+            <div class="contract-cell"><strong>Invariants</strong><span>Graph validates, dtypes and ranks are legal, outputs match a framework reference within declared tolerance.</span></div>
+            <div class="contract-cell"><strong>Diagnostics</strong><span>Unsupported node path, source location, shape state, fallback reason, and minimal reproducer.</span></div>
+          </div>
+        </article>
+
+        <article class="panel tab-panel" id="contract-artifact" role="tabpanel" aria-labelledby="contract-tab-artifact" hidden>
+          <span class="status-pill status-measured">Deployable boundary</span>
+          <h3>Compiler to runtime</h3>
+          <p>The compiler freezes decisions that the runtime must execute without reconstructing compiler intent. Treat the artifact format as a versioned product, not an internal serialization accident.</p>
+          <div class="contract-grid">
+            <div class="contract-cell"><strong>Payload</strong><span>Target code, command templates, constants, relocations, buffer plan, entry points, debug map.</span></div>
+            <div class="contract-cell"><strong>Compatibility</strong><span>Format version, runtime ABI, firmware ABI, target ID, feature bits, endianness, alignment.</span></div>
+            <div class="contract-cell"><strong>Security</strong><span>Bounds, signatures or hashes, section validation, integer-overflow checks, untrusted model policy.</span></div>
+            <div class="contract-cell"><strong>Reproducibility</strong><span>Compiler revision, pass configuration, model digest, target profile, deterministic build identifier.</span></div>
+          </div>
+        </article>
+
+        <article class="panel tab-panel" id="contract-driver" role="tabpanel" aria-labelledby="contract-tab-driver" hidden>
+          <span class="status-pill status-conditional">Privilege boundary</span>
+          <h3>Runtime to kernel driver</h3>
+          <p>User space asks for capabilities, memory, queues, and synchronization. The kernel validates ownership and lifetime, maps memory for DMA, controls reset and power, and prevents one process from corrupting another.</p>
+          <div class="contract-grid">
+            <div class="contract-cell"><strong>Objects</strong><span>Device, context, buffer, mapping, queue, fence/event, executable handle, telemetry stream.</span></div>
+            <div class="contract-cell"><strong>Submission</strong><span>Validated descriptors, dependency fences, completion event, timeout, cancellation and reset policy.</span></div>
+            <div class="contract-cell"><strong>Memory</strong><span>CPU virtual, physical, and device-visible DMA addresses remain distinct; mapping lifetime is explicit.</span></div>
+            <div class="contract-cell"><strong>Errors</strong><span>Stable codes separate invalid input, out-of-memory, timeout, page fault, firmware fault, and device loss.</span></div>
+          </div>
+        </article>
+
+        <article class="panel tab-panel" id="contract-firmware" role="tabpanel" aria-labelledby="contract-tab-firmware" hidden>
+          <span class="status-pill status-conditional">Asynchronous boundary</span>
+          <h3>Driver to firmware</h3>
+          <p>A ring, doorbell, and interrupt look simple until wraparound, reset, partial writes, stale generations, and malformed descriptors occur. Define producer and consumer indices, ownership transfer, memory ordering, and recovery together.</p>
+          <div class="contract-grid">
+            <div class="contract-cell"><strong>Transport</strong><span>Shared command/completion rings, MMIO doorbells, generation counters, interrupt or polling mode.</span></div>
+            <div class="contract-cell"><strong>Ordering</strong><span>Descriptor bytes become visible before the producer index; completion data becomes visible before signaling.</span></div>
+            <div class="contract-cell"><strong>Watchdog</strong><span>Per-command deadline, heartbeat, fault snapshot, queue quarantine, warm reset, full reset escalation.</span></div>
+            <div class="contract-cell"><strong>Upgrade</strong><span>Feature negotiation and backward-compatible message sizes protect driver/firmware combinations.</span></div>
+          </div>
+        </article>
+
+        <article class="panel tab-panel" id="contract-engine" role="tabpanel" aria-labelledby="contract-tab-engine" hidden>
+          <span class="status-pill status-partial">Hardware boundary</span>
+          <h3>Firmware to NPU engines</h3>
+          <p>The scheduler translates a command graph into engine work while preserving dependencies and resource limits. Register writes are only one part; descriptors, local-memory ownership, preemption points, and fault semantics complete the contract.</p>
+          <div class="contract-grid">
+            <div class="contract-cell"><strong>Work unit</strong><span>Kernel or micro-op ID, tensor views, addresses, strides, tile counts, precision, dependency tokens.</span></div>
+            <div class="contract-cell"><strong>Resources</strong><span>Engine slots, SRAM banks, DMA channels, NoC credits, scratch registers, power/clock state.</span></div>
+            <div class="contract-cell"><strong>Completion</strong><span>Architectural write visibility, status code, performance counters, timestamp, fault address.</span></div>
+            <div class="contract-cell"><strong>Model parity</strong><span>Bit-accurate result, bounded cycle estimate, and named differences from RTL or silicon.</span></div>
+          </div>
+        </article>
+
+        <article class="panel tab-panel" id="contract-trace" role="tabpanel" aria-labelledby="contract-tab-trace" hidden>
+          <span class="status-pill status-measured">Observability boundary</span>
+          <h3>Trace producer to debugger and profiler</h3>
+          <p>Every layer, partition, command, DMA, interrupt, and counter sample needs a correlation path. Clock-domain conversion must carry source frequency, wrap width, synchronization samples, and uncertainty.</p>
+          <div class="contract-grid">
+            <div class="contract-cell"><strong>Identity</strong><span>Model digest, graph node, fused region, executable, queue, command, engine, buffer, process.</span></div>
+            <div class="contract-cell"><strong>Time</strong><span>Host monotonic time plus device cycles, conversion epochs, wrap handling, and calibration error.</span></div>
+            <div class="contract-cell"><strong>Events</strong><span>Begin/end slices, counters, flows, faults, allocations, frequency and power-state changes.</span></div>
+            <div class="contract-cell"><strong>Schema</strong><span>Versioned fields, stable units, optional extensions, bounded overhead, loss accounting.</span></div>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <section class="section" id="sdk">
+      <div class="section-heading">
+        <p class="eyebrow">Edge NPU framework and SDK</p>
+        <h2>An SDK is the supported path through the architecture</h2>
+        <p class="section-note">
+          Headers and bindings are only the surface. A production SDK also defines packaging, target discovery,
+          diagnostics, examples, compatibility policy, telemetry, and the boundary between compile time and run time.
+        </p>
+      </div>
+      <div class="engineering-flow six" aria-label="NPU SDK developer workflow">
+        <article class="flow-step"><b>1</b><strong>Inspect</strong><span>Validate model, shapes, operators, precision, target support</span></article>
+        <article class="flow-step"><b>2</b><strong>Compile</strong><span>Apply target policy and produce a reproducible artifact</span></article>
+        <article class="flow-step"><b>3</b><strong>Package</strong><span>Bundle artifact, labels, preprocessing, version manifest</span></article>
+        <article class="flow-step"><b>4</b><strong>Load</strong><span>Negotiate target and allocate session resources</span></article>
+        <article class="flow-step"><b>5</b><strong>Run</strong><span>Bind buffers, submit asynchronously, synchronize explicitly</span></article>
+        <article class="flow-step"><b>6</b><strong>Diagnose</strong><span>Export trace, counters, tensor checkpoints, and errors</span></article>
+      </div>
+      <div class="table-wrap" style="margin-top:12px">
+        <table>
+          <thead>
+            <tr><th scope="col">SDK surface</th><th scope="col">Required contract</th><th scope="col">Failure that good design prevents</th></tr>
+          </thead>
+          <tbody>
+            <tr><th scope="row">C ABI</th><td>Opaque handles, explicit ownership, size-versioned structs, stable error codes, no C++ ABI leakage.</td><td>Applications breaking when compiler, STL, or internal object layouts change.</td></tr>
+            <tr><th scope="row">C++ API</th><td>RAII wrappers, typed views, move semantics, futures/events, exception or status policy, thread-safety statement.</td><td>Leaked contexts, double frees, hidden synchronization, and ambiguous buffer lifetime.</td></tr>
+            <tr><th scope="row">Python tools</th><td>Model inspection, compilation orchestration, reports, reproducible config, clear native-error propagation.</td><td>Python becoming an undocumented second runtime or hiding target failures.</td></tr>
+            <tr><th scope="row">CLI</th><td>Machine-readable output, deterministic exit codes, config files, artifact hashes, quiet and verbose modes.</td><td>CI scripts scraping human prose and silently accepting partial success.</td></tr>
+            <tr><th scope="row">Examples</th><td>Minimal sync, async, zero-copy, dynamic-shape, multi-model, profiling, custom-op, and recovery paths.</td><td>A sample that works only on a golden model and teaches unsafe lifetime patterns.</td></tr>
+            <tr><th scope="row">Compatibility</th><td>Documented support matrix across SDK, artifact, driver, firmware, hardware revision, and model opset.</td><td>Field failures that appear only after independent component upgrades.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="section" id="runtime">
+      <div class="section-heading">
+        <p class="eyebrow">NPU runtime software</p>
+        <h2>The runtime owns object lifetime and asynchronous truth</h2>
+      </div>
+      <div class="card-grid">
+        <article class="learning-card">
+          <span class="card-label">Session state</span>
+          <h3>Create, load, bind, submit, retire, destroy</h3>
+          <p>Each transition has preconditions. Destroy waits for or cancels in-flight work by policy; a failed device transitions the session to a terminal state instead of pretending later calls can succeed.</p>
+        </article>
+        <article class="learning-card">
+          <span class="card-label">Queue semantics</span>
+          <h3>Ordering must be named</h3>
+          <p>Define in-order versus out-of-order execution, cross-queue dependencies, host visibility, event reuse, callback context, timeout behavior, and whether cancellation is best effort or guaranteed.</p>
+        </article>
+        <article class="learning-card">
+          <span class="card-label">Memory objects</span>
+          <h3>Ownership is separate from visibility</h3>
+          <p>A buffer can be alive but not coherent, mapped but not device-visible, or device-visible but not writable. State transitions should name mapping, cache maintenance, import/export, and fence ownership.</p>
+        </article>
+      </div>
+      <div class="table-wrap" style="margin-top:12px">
+        <table>
+          <thead>
+            <tr><th scope="col">Concern</th><th scope="col">C++ production path</th><th scope="col">Python engineering path</th></tr>
+          </thead>
+          <tbody>
+            <tr><th scope="row">Hot execution</th><td>Queue submission, buffer management, synchronization, callbacks, low-overhead tracing.</td><td>Usually wraps native code; avoid per-layer Python dispatch in latency-sensitive paths.</td></tr>
+            <tr><th scope="row">Compiler control</th><td>Pass implementations, IR ownership, serializers, target backends, runtime ABI.</td><td>Experiment orchestration, pass configuration, model analysis, test generation, reports.</td></tr>
+            <tr><th scope="row">Hardware models</th><td>Bit/cycle models, SystemC/TLM, Verilator harnesses, deterministic simulation.</td><td>Stimulus generation, differential comparison, sweep automation, visualization.</td></tr>
+            <tr><th scope="row">Tests</th><td>Unit, concurrency, sanitizers, ABI, fault injection, performance microbenchmarks.</td><td>Model corpus, property tests, tolerance analysis, CI summaries, triage automation.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="section" id="scheduling">
+      <div class="section-heading">
+        <p class="eyebrow">Compiler architecture beyond basic rewrites</p>
+        <h2>Scheduling and memory planning solve one coupled resource problem</h2>
+        <p class="section-note">
+          Graph fusion, tiling, layouts, and quantization are already covered in <a href="npu-practice.html#graph">NPU Practice</a>.
+          Here the focus is pass contracts, constrained scheduling, and offset assignment for a real target.
+        </p>
+      </div>
+      <div class="engineering-flow six" aria-label="Contract-driven NPU compiler pipeline">
+        <article class="flow-step"><b>Import</b><strong>Prove semantics</strong><span>Validate versions, infer types/shapes, preserve source map</span></article>
+        <article class="flow-step"><b>Legalize</b><strong>Expose target forms</strong><span>Normalize ops without losing quantization intent</span></article>
+        <article class="flow-step"><b>Partition</b><strong>Choose ownership</strong><span>Price fallback boundaries and transfer cost</span></article>
+        <article class="flow-step"><b>Schedule</b><strong>Order resources</strong><span>Engines, DMA, dependencies, buffers, deadlines</span></article>
+        <article class="flow-step"><b>Allocate</b><strong>Assign storage</strong><span>Lifetimes, banks, alignment, aliasing, spill</span></article>
+        <article class="flow-step"><b>Package</b><strong>Freeze contract</strong><span>Code, commands, constants, manifest, debug map</span></article>
+      </div>
+      <div class="card-grid" style="margin-top:12px">
+        <article class="learning-card">
+          <span class="card-label">Critical-path list scheduling</span>
+          <h3>Prioritize ready work by downstream urgency</h3>
+          <p>Compute an earliest/latest schedule or remaining critical-path length. At each decision, choose a ready operation whose engine and buffers are available. Add transfer and bank-conflict cost to avoid a compute-only optimum.</p>
+        </article>
+        <article class="learning-card">
+          <span class="card-label">Modulo or pipeline scheduling</span>
+          <h3>Overlap repeated tiles and frames</h3>
+          <p>Pick an initiation interval constrained by engine occupancy, DMA throughput, dependencies, and buffer reuse. Prologue, steady state, and epilogue schedules need separate validation.</p>
+        </article>
+        <article class="learning-card">
+          <span class="card-label">Search and exact methods</span>
+          <h3>Use costlier solvers on bounded regions</h3>
+          <p>Dynamic programming, beam search, ILP, or constraint programming can optimize small fused regions. Production compilers usually combine exact local decisions with scalable heuristics and measured cost models.</p>
+        </article>
+      </div>
+
+      <div class="card-grid two" style="margin-top:12px">
+        <article class="code-panel">
+          <header><strong>Static arena planning</strong><span>Lifetime and alignment aware</span></header>
+          <pre><code>buffers = sort_by(size_descending, temporary_buffers)
+active  = interval_index(buffers.live_range)
+arena   = empty_free_list()
+
+for buffer in buffers:
+    legal = gaps_not_overlapping(active, buffer.live_range)
+    legal = enforce_alignment_bank_and_address_class(legal, buffer)
+    offset = best_fit_with_fragmentation_cost(legal, buffer.size)
+
+    if offset is NONE:
+        offset = grow_arena_or_spill(buffer)
+
+    assign(buffer, offset)
+    reserve_for_lifetime(arena, buffer.live_range, offset, buffer.size)
+
+verify_no_illegal_aliases(arena)
+emit_offsets_and_peak_usage(arena)</code></pre>
+        </article>
+        <article class="panel">
+          <h3>Allocator proof obligations</h3>
+          <ul class="note-list">
+            <li>Buffers overlap in address only when lifetimes do not overlap or an in-place alias is explicitly legal.</li>
+            <li>Sub-byte and packed formats still satisfy engine and DMA alignment requirements.</li>
+            <li>Bank selection respects concurrent access patterns, not only total capacity.</li>
+            <li>Dynamic dimensions have bounded arenas, shape classes, or a runtime allocation path.</li>
+            <li>Spills include transfer commands, synchronization, and performance cost in the schedule.</li>
+            <li>The emitted peak is independently recomputed by a verifier before packaging.</li>
+          </ul>
+        </article>
+      </div>
+    </section>
+
+    <section class="section" id="modeling">
+      <div class="section-heading">
+        <p class="eyebrow">Hardware C++ modeling and integration</p>
+        <h2>One model cannot be fast, bit-exact, cycle-exact, and easy to change at once</h2>
+        <p class="section-note">
+          Use a model ladder with named fidelity. SystemC/TLM supports architectural exploration and virtual platforms;
+          Verilator compiles SystemVerilog into executable C++ or SystemC models for closer RTL correlation.
+        </p>
+      </div>
+      <div class="level-grid">
+        <article class="level-card"><b>L0</b><strong>Functional</strong><span>Tensor semantics and shapes; fastest reference for graph tests</span></article>
+        <article class="level-card"><b>L1</b><strong>Bit accurate</strong><span>Integer widths, rounding, saturation, special values, deterministic parity</span></article>
+        <article class="level-card"><b>L2</b><strong>Transaction level</strong><span>DMA, NoC, memory contention, command latency, approximate timing</span></article>
+        <article class="level-card"><b>L3</b><strong>Cycle model</strong><span>Pipelines, queues, hazards, stalls, counters, firmware-visible behavior</span></article>
+        <article class="level-card"><b>L4</b><strong>RTL / silicon</strong><span>Waveforms, exact protocols, measured counters, final correlation authority</span></article>
+      </div>
+      <div class="table-wrap" style="margin-top:12px">
+        <table>
+          <thead>
+            <tr><th scope="col">Model contract</th><th scope="col">Required definition</th><th scope="col">Correlation evidence</th></tr>
+          </thead>
+          <tbody>
+            <tr><th scope="row">Functional</th><td>Supported op or micro-op semantics, tensor layout, numeric mode, exception behavior.</td><td>Golden vectors and randomized differential tests against framework/reference kernels.</td></tr>
+            <tr><th scope="row">Temporal</th><td>Cycle start/end convention, pipeline occupancy, queue depth, arbitration, backpressure.</td><td>Cycle-by-cycle event comparison for directed traces plus aggregate error on model corpus.</td></tr>
+            <tr><th scope="row">Memory</th><td>Address spaces, transaction size, burst, alignment, banks, cache/coherency assumptions.</td><td>Bytes and transactions by engine, bank conflicts, peak occupancy, RTL counter parity.</td></tr>
+            <tr><th scope="row">Integration</th><td>Register map, descriptors, interrupts, reset, power states, version and feature discovery.</td><td>Same driver/firmware tests run against model, FPGA/emulation, and silicon where possible.</td></tr>
+            <tr><th scope="row">Known gaps</th><td>Deliberately omitted behavior and the expected direction/magnitude of resulting error.</td><td>Versioned correlation report; no unexplained tuning constant is accepted as architecture.</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="callout caution" style="margin-top:12px">
+        <p><strong>Integration rule:</strong> do not let the performance model become a second undocumented ISA. Reuse the same generated register, descriptor, opcode, and trace definitions across compiler, runtime, firmware, model, and debugger whenever the build system permits it.</p>
+      </div>
+    </section>
+
+    <section class="section" id="profiling">
+      <div class="section-heading">
+        <p class="eyebrow">Hardware metric profiling</p>
+        <h2>Power, cycles, latency, and bandwidth need a shared measurement frame</h2>
+        <p class="section-note">
+          "Clock latency" is ambiguous. Report device cycles, clock frequency, queue delay, execution duration, and
+          end-to-end wall time separately. Correlate each value to shape, batch, precision, power mode, and temperature.
+        </p>
+      </div>
+      <div class="formula-grid">
+        <article class="formula-card"><strong>End-to-end latency</strong><code>T = Tqueue + Thost + Tdma + Texec + Tsync</code><span>Expose overlap; do not add mutually concurrent intervals twice.</span></article>
+        <article class="formula-card"><strong>Engine utilization</strong><code>U = busy cycles / available cycles</code><span>Define available cycles after clock and power gating.</span></article>
+        <article class="formula-card"><strong>Memory bandwidth</strong><code>BW = transferred bytes / measured time</code><span>State payload versus fabric bytes and read/write direction.</span></article>
+        <article class="formula-card"><strong>Energy per inference</strong><code>E = integral(P(t) dt) / completed runs</code><span>Subtract or report idle baseline and include steady thermal state.</span></article>
+      </div>
+      <div class="trace-view" style="margin-top:12px" aria-label="Example correlated NPU trace">
+        <div class="trace-row"><span class="trace-label">Host queue</span><div class="trace-track"><span class="trace-segment blue" style="grid-column:1 / 3">submit</span><span class="trace-segment blue" style="grid-column:10 / 13">wait</span></div></div>
+        <div class="trace-row"><span class="trace-label">DMA read</span><div class="trace-track"><span class="trace-segment amber" style="grid-column:2 / 6">weights</span><span class="trace-segment amber" style="grid-column:7 / 9">input</span></div></div>
+        <div class="trace-row"><span class="trace-label">Matrix engine</span><div class="trace-track"><span class="trace-segment" style="grid-column:5 / 9">conv 12</span><span class="trace-segment" style="grid-column:9 / 12">conv 13</span></div></div>
+        <div class="trace-row"><span class="trace-label">Vector engine</span><div class="trace-track"><span class="trace-segment blue" style="grid-column:8 / 10">activation</span><span class="trace-segment blue" style="grid-column:11 / 13">requant</span></div></div>
+        <div class="trace-row"><span class="trace-label">Fault / stall</span><div class="trace-track"><span class="trace-segment red" style="grid-column:6 / 8">bank stall</span></div></div>
+      </div>
+      <div class="table-wrap compact-table" style="margin-top:12px">
+        <table>
+          <thead>
+            <tr><th scope="col">Metric</th><th scope="col">Collect</th><th scope="col">Control variables</th><th scope="col">Common mistake</th></tr>
+          </thead>
+          <tbody>
+            <tr><th scope="row">Latency</th><td>Host monotonic timestamps, device start/end cycles, queue events.</td><td>Warm/cold, batch, shape, frequency, thermal state, concurrent load.</td><td>Mixing compile/setup time with steady execution or reporting only an average.</td></tr>
+            <tr><th scope="row">Power</th><td>Board rail samples, on-chip monitors, PMIC telemetry, state transitions.</td><td>Sample rate, rails included, idle baseline, DVFS, temperature, workload duty cycle.</td><td>Dividing a slow power average by a short burst without time alignment.</td></tr>
+            <tr><th scope="row">Memory BW</th><td>Controller/NoC counters, DMA descriptors, trace bytes, duration.</td><td>Read/write, compression, cache hits, payload/overhead, all traffic generators.</td><td>Comparing payload bandwidth directly with a raw peak bus figure.</td></tr>
+            <tr><th scope="row">Clock and cycles</th><td>Cycle counters plus frequency-change events and clock-domain IDs.</td><td>DVFS epochs, gating, counter wrap, asynchronous domains, timestamp uncertainty.</td><td>Converting all cycles using one nominal frequency.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="section" id="debugger">
+      <div class="section-heading">
+        <p class="eyebrow">Network layer step debugger</p>
+        <h2>"Next layer" is a mapping problem, not a hardware primitive</h2>
+        <p class="section-note">
+          Compilers fuse, split, reorder, tile, and overlap graph operations. A debugger should expose several step
+          granularities and preserve the many-to-many map between source nodes, compiled regions, commands, and engines.
+        </p>
+      </div>
+      <div class="card-grid">
+        <article class="learning-card"><span class="card-label">Logical step</span><h3>Framework or ONNX node</h3><p>Best for model authors. The debugger materializes a semantically meaningful output even when the implementation fused it away, which may require an instrumented recompile.</p></article>
+        <article class="learning-card"><span class="card-label">Compiled step</span><h3>Partition or fused region</h3><p>Best for compiler triage. It compares region inputs/outputs, target support, layouts, precision, and reference execution without exposing every tile.</p></article>
+        <article class="learning-card"><span class="card-label">Device step</span><h3>Command, kernel, or micro-op</h3><p>Best for runtime, firmware, and hardware work. It exposes queue dependencies, addresses, cycles, engine state, counters, and fault snapshots.</p></article>
+      </div>
+      <div class="engineering-flow" style="margin-top:12px" aria-label="Layer debugger data path">
+        <article class="flow-step"><b>Map</b><strong>Source map</strong><span>Node to region to command identities</span></article>
+        <article class="flow-step"><b>Replay</b><strong>Deterministic run</strong><span>Inputs, artifact, state, seeds, clocks</span></article>
+        <article class="flow-step"><b>Capture</b><strong>Checkpoints</strong><span>Tensor, layout, quantization, memory view</span></article>
+        <article class="flow-step"><b>Compare</b><strong>Reference diff</strong><span>Abs/rel/ULP, saturation, first divergence</span></article>
+        <article class="flow-step"><b>Correlate</b><strong>Timeline</strong><span>Commands, DMA, engines, counters, faults</span></article>
+      </div>
+      <div class="table-wrap" style="margin-top:12px">
+        <table>
+          <thead><tr><th scope="col">Debugger pane</th><th scope="col">Data model</th><th scope="col">Engineering question</th></tr></thead>
+          <tbody>
+            <tr><th scope="row">Graph map</th><td>Source node, fused region, target/fallback assignment, command IDs.</td><td>Where did this operation go, and which boundary added conversion cost?</td></tr>
+            <tr><th scope="row">Tensor diff</th><td>Shape, dtype, layout, quantization parameters, reference/target values, error histogram.</td><td>Where is the first numerical divergence, and does it match the declared tolerance?</td></tr>
+            <tr><th scope="row">Memory map</th><td>Buffer lifetime, offset, bank, producer/consumer, alias set, residency.</td><td>Was data overwritten, misaligned, stale, or transferred unnecessarily?</td></tr>
+            <tr><th scope="row">Timeline</th><td>Host, driver, firmware, DMA, engine, power, and fault tracks with flows.</td><td>Is latency caused by dispatch, dependencies, memory, compute, or recovery?</td></tr>
+            <tr><th scope="row">Replay package</th><td>Inputs, model/artifact hashes, component versions, device state, trace and logs.</td><td>Can another engineer reproduce the same failure without the original machine?</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="section" id="cicd">
+      <div class="section-heading">
+        <p class="eyebrow">Git and CI/CD for NPU stacks</p>
+        <h2>Gate contracts at the cheapest level that can disprove them</h2>
+        <p class="section-note">
+          Git fundamentals already exist in <a href="git-practice.html">Git Practice</a>. This section focuses on the
+          compiler/runtime/model/hardware release system built on top of version control.
+        </p>
+      </div>
+      <div class="level-grid">
+        <article class="level-card"><b>Gate 1</b><strong>Static</strong><span>Format, lint, schema, generated-file drift, ABI checks</span></article>
+        <article class="level-card"><b>Gate 2</b><strong>Host unit</strong><span>Passes, allocator, queue state machine, fault injection, sanitizers</span></article>
+        <article class="level-card"><b>Gate 3</b><strong>Model</strong><span>Differential vectors, bit parity, cycle bounds, trace schema</span></article>
+        <article class="level-card"><b>Gate 4</b><strong>RTL / device</strong><span>Co-simulation, hardware-in-loop, resets, concurrency, compatibility</span></article>
+        <article class="level-card"><b>Gate 5</b><strong>Qualification</strong><span>Model corpus, performance, power, thermal, endurance, release matrix</span></article>
+      </div>
+      <div class="table-wrap" style="margin-top:12px">
+        <table>
+          <thead><tr><th scope="col">Pipeline dimension</th><th scope="col">Fast pull request lane</th><th scope="col">Scheduled / release lane</th></tr></thead>
+          <tbody>
+            <tr><th scope="row">Toolchains</th><td>Primary supported compiler and one sanitizer build.</td><td>Supported host OS, compiler, architecture, and packaging matrix.</td></tr>
+            <tr><th scope="row">Targets</th><td>Functional model and one representative hardware revision.</td><td>All supported firmware/hardware revisions and compatibility edges.</td></tr>
+            <tr><th scope="row">Models</th><td>Small operator set plus compact end-to-end smoke models.</td><td>Versioned model zoo across shapes, precision modes, dynamic behavior, and fallbacks.</td></tr>
+            <tr><th scope="row">Performance</th><td>Microbenchmark guardrails with noise budget; fail only on clear regressions.</td><td>Dedicated quiet devices, repeated distributions, thermal steady state, baseline approval.</td></tr>
+            <tr><th scope="row">Artifacts</th><td>Failed traces, diffs, logs, executable manifest, exact command line.</td><td>Signed packages, SBOM/provenance, qualification report, dashboards, retained baselines.</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="callout" style="margin-top:12px">
+        <p>
+          GitHub Actions distinguishes dependency caches from workflow artifacts: caches accelerate reproducible work,
+          while artifacts retain outputs such as binaries, logs, traces, coverage, and reports. A failed NPU test should
+          upload the replay package as an artifact, not hide it inside an ephemeral runner log.
+        </p>
+      </div>
+    </section>
+
+    <section class="section" id="labs" data-progress="soc-software-labs">
+      <div class="section-heading">
+        <p class="eyebrow">Portfolio build</p>
+        <h2>Six artifacts that demonstrate the architecture</h2>
+      </div>
+      <div class="progress-panel" aria-live="polite">
+        <div class="progress-track"><div class="progress-bar" data-progress-bar role="progressbar" aria-label="SoC software lab progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"></div></div>
+        <span class="progress-value" data-progress-value>0 / 6 complete</span>
+      </div>
+      <div class="lab-list">
+        <label class="lab-item"><input type="checkbox" data-step="artifact"><span><strong>Versioned executable manifest</strong><span>Define sections, ABI fields, target features, hashes, debug map, and a strict validator.</span></span></label>
+        <label class="lab-item"><input type="checkbox" data-step="allocator"><span><strong>Static memory planner</strong><span>Allocate interval lifetimes with alignment and bank constraints; verify aliases and report peak use.</span></span></label>
+        <label class="lab-item"><input type="checkbox" data-step="runtime"><span><strong>Asynchronous runtime simulator</strong><span>Implement contexts, queues, buffers, events, dependency ordering, timeout, and device-loss tests.</span></span></label>
+        <label class="lab-item"><input type="checkbox" data-step="model"><span><strong>C++ hardware model ladder</strong><span>Correlate a bit-accurate kernel and a queued cycle model against shared golden vectors.</span></span></label>
+        <label class="lab-item"><input type="checkbox" data-step="trace"><span><strong>Correlated trace and layer debugger</strong><span>Emit model/region/command IDs, device cycles, flows, counters, tensor checkpoints, and first-divergence reports.</span></span></label>
+        <label class="lab-item"><input type="checkbox" data-step="ci"><span><strong>CI qualification lanes</strong><span>Run unit, differential, simulator, performance, compatibility, and artifact-retention jobs.</span></span></label>
+      </div>
+    </section>
+
+    <section class="section" id="sources">
+      <div class="section-heading">
+        <p class="eyebrow">Primary documentation</p>
+        <h2>Architecture and tooling sources</h2>
+      </div>
+      <div class="source-grid">
+        <article class="source-card"><a href="https://onnxruntime.ai/docs/reference/high-level-design.html">ONNX Runtime architecture</a><span>Execution-provider partitioning, allocators, graph transforms, heterogeneous execution</span></article>
+        <article class="source-card"><a href="https://onnxruntime.ai/docs/execution-providers/">ONNX Runtime execution providers</a><span>Capability-based subgraph assignment and common runtime API</span></article>
+        <article class="source-card"><a href="https://tvm.apache.org/docs/arch/relax_vm.html">TVM Relax VM architecture</a><span>Executable, bytecode, compiled kernels, devices, allocators, and runtime flow</span></article>
+        <article class="source-card"><a href="https://docs.kernel.org/core-api/dma-api-howto.html">Linux dynamic DMA mapping guide</a><span>CPU virtual, physical, and device-visible DMA address distinctions</span></article>
+        <article class="source-card"><a href="https://docs.kernel.org/power/runtime_pm.html">Linux runtime power management</a><span>Device runtime suspend, resume, idle, usage counters, and autosuspend</span></article>
+        <article class="source-card"><a href="https://docs.kernel.org/driver-api/devfreq.html">Linux device frequency scaling</a><span>DVFS interface, utilization status, governors, and device profiles</span></article>
+        <article class="source-card"><a href="https://www.accellera.org/activities/working-groups/systemc-tlm">Accellera SystemC TLM</a><span>Transaction-level modeling for architecture exploration, performance, and virtual platforms</span></article>
+        <article class="source-card"><a href="https://www.accellera.org/downloads/standards/systemc">Accellera SystemC downloads and standards</a><span>Current SystemC, TLM, and IEEE language reference material</span></article>
+        <article class="source-card"><a href="https://verilator.org/guide/latest/overview.html">Verilator overview</a><span>SystemVerilog to executable C++/SystemC models, tracing, and coverage</span></article>
+        <article class="source-card"><a href="https://perfetto.dev/docs/instrumentation/track-events">Perfetto track events</a><span>Slices, counters, flows, process/thread/device timelines, and metadata</span></article>
+        <article class="source-card"><a href="https://docs.github.com/en/actions/get-started/understand-github-actions">GitHub Actions concepts</a><span>Workflow jobs, matrices, runners, and CI/CD automation</span></article>
+        <article class="source-card"><a href="https://docs.github.com/en/actions/concepts/workflows-and-actions/workflow-artifacts">GitHub workflow artifacts</a><span>Artifacts versus caches, logs, binaries, reports, and provenance</span></article>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <p>English-only NPU/SoC engineering study. Existing fundamentals are linked, not duplicated.</p>
+    <div class="footer-links">
+      <a href="npu-framework-compiler-skills.html">Next: framework, compiler, and ISA skills</a>
+      <a href="https://github.com/buicongnguyen/NPU">Source</a>
+    </div>
+  </footer>
+</body>
+</html>

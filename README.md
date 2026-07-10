@@ -17,3 +17,10 @@ The Analog CIM learning path adds a source-critical Mythic case study:
 
 Reusable learning data lives in `data/analog-cim-architecture.json`,
 `data/analog-cim-evidence.json`, and `data/analog-cim-mcq.json`.
+
+The NPU platform engineering path adds two English-only references without
+duplicating the existing accelerator, LLVM/MLIR, graph, C, Git, or Analog CIM
+material:
+
+- NPU and SoC software architecture: https://buicongnguyen.github.io/NPU/npu-soc-software-architecture.html
+- Framework, compiler, ISA, and tooling skills: https://buicongnguyen.github.io/NPU/npu-framework-compiler-skills.html

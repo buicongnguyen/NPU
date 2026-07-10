@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="A self-study guide to AI accelerators, Mythic analog compute-in-memory, deployment, LLVM and MLIR, Tenstorrent, and technical interview practice.">
+  <meta name="description" content="A self-study guide to AI accelerators, Mythic analog compute-in-memory, NPU/SoC software architecture, frameworks, compiler and ISA integration, deployment, LLVM/MLIR, and interview practice.">
   <title>NPU, VPU &amp; LPU — AI Accelerator &amp; Compiler Study Guide | Bui Cong Nguyen</title>
   <link rel="stylesheet" href="styles.css">
 </head>
@@ -17,6 +17,7 @@
       <a href="index.html">Home</a>
       <a href="#processors">Processors</a>
       <a href="#analog-cim">Analog CIM</a>
+      <a href="#engineering">Engineering</a>
       <a href="#deploy">Deploy</a>
       <a href="#llvm-mlir">LLVM &amp; MLIR</a>
       <a href="#tenstorrent">Tenstorrent</a>
@@ -34,11 +35,13 @@
         <p class="lede">
           A self-study reference for AI-accelerator and ML-compiler engineering. It compares NPUs, VPUs, LPUs,
           GPUs, and TPUs, shows how models are deployed to each, walks the LLVM and MLIR compiler path, uses
-          Tenstorrent and Mythic analog compute-in-memory as concrete case studies, and ends with technical interview practice.
+          Tenstorrent and Mythic analog compute-in-memory as concrete case studies, adds production NPU/SoC software,
+          framework, ISA, and tooling studies, and ends with technical interview practice.
         </p>
         <div class="hero-actions">
           <a class="button" href="#processors">Compare accelerators</a>
           <a class="button secondary" href="analog-cim-architecture.html">Mythic analog CIM</a>
+          <a class="button secondary" href="#engineering">NPU engineering</a>
           <a class="button secondary" href="#qa">Interview Q&amp;A</a>
           <a class="button secondary" href="#llvm-mlir">LLVM &amp; MLIR</a>
         </div>
@@ -171,6 +174,40 @@
           <h3>Thirty source-linked questions</h3>
           <p>Filter by topic and level, score answers interactively, and reuse the JSON datasets for architecture, evidence, and question-bank study tools.</p>
           <a href="analog-cim-quiz.html">Open MCQ lab</a>
+        </article>
+      </div>
+    </section>
+
+    <section id="engineering" class="section">
+      <div class="section-heading">
+        <p class="eyebrow">NPU platform engineering</p>
+        <h2>SoC Software, Framework Internals, Compiler Integration, and Tooling</h2>
+        <p class="section-note">
+          Two English-only references extend the existing NPU lessons without repeating accelerator comparisons,
+          LLVM/MLIR foundations, graph/tiling basics, C, Git, or Analog CIM. They focus on the contracts and evidence
+          expected in production edge-NPU work.
+        </p>
+      </div>
+      <div class="learning-map">
+        <article>
+          <h3>NPU and SoC software architecture</h3>
+          <p>Follow the executable artifact through SDK, user runtime, kernel driver, firmware, SoC services, and NPU engines.</p>
+          <ul>
+            <li>Interface and ABI contracts, queues, synchronization, memory, and recovery</li>
+            <li>Scheduling, static arena planning, C++/SystemC/RTL model correlation</li>
+            <li>Power/cycle/bandwidth profiling, layer debugger, CI/CD, and portfolio labs</li>
+          </ul>
+          <a href="npu-soc-software-architecture.html">Open SoC software architecture</a>
+        </article>
+        <article>
+          <h3>Framework, compiler, ISA, and tooling skills</h3>
+          <p>Connect PyTorch/TensorFlow execution semantics and ONNX analysis to TVM, an NPU backend, and RISC-V/device interfaces.</p>
+          <ul>
+            <li>Dispatcher, autograd, graph capture/export, retracing, and fallback</li>
+            <li>ONNX forensics, verified pass ordering, TVM extension points, ISA/ABI</li>
+            <li>Low-power optimization, SDK examples, Qt debugger GUI, and soft skills</li>
+          </ul>
+          <a href="npu-framework-compiler-skills.html">Open framework and ISA skills</a>
         </article>
       </div>
     </section>

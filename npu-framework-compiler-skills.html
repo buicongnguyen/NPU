@@ -1,0 +1,552 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="An applied NPU engineering guide to PyTorch and TensorFlow internals, ONNX analysis, TVM, RISC-V accelerator ISA integration, low-power optimization, SDK examples, GUI tooling, and technical collaboration.">
+  <title>NPU Framework, Compiler, ISA &amp; Tooling Skills | NPU Study Guide</title>
+  <link rel="stylesheet" href="analog-cim.css">
+  <link rel="stylesheet" href="npu-engineering.css">
+  <script src="npu-engineering.js" defer></script>
+</head>
+<body>
+  <header class="site-header">
+    <a class="brand" href="index.html" aria-label="NPU Study Guide home">
+      <img src="https://avatars.githubusercontent.com/u/72680210?v=4" alt="Bui Cong Nguyen avatar">
+      <span>NPU Study Guide</span>
+    </a>
+    <nav class="site-nav" aria-label="NPU engineering studies">
+      <a href="npu-soc-software-architecture.html">SoC Software</a>
+      <a href="npu-framework-compiler-skills.html" aria-current="page">Framework &amp; ISA</a>
+      <a href="analog-cim-architecture.html">Analog CIM</a>
+      <a href="npu-practice.html">Practice</a>
+      <a href="index.html">NPU Home</a>
+    </nav>
+  </header>
+
+  <main>
+    <section class="hero">
+      <div class="hero-copy">
+        <p class="eyebrow">Applied competency reference | updated 2026-07-11</p>
+        <h1>NPU Framework, Compiler, ISA, and Tooling Skills</h1>
+        <p class="lede">
+          An engineering path from framework execution semantics to an edge accelerator backend. It concentrates on
+          PyTorch and TensorFlow internals, forensic ONNX analysis, current TVM architecture, RISC-V and NPU ISA
+          integration, measured power/performance work, executable SDK examples, debugger GUI design, and cross-team practice.
+        </p>
+        <div class="hero-actions">
+          <a class="button" href="#frameworks">Trace framework internals</a>
+          <a class="button secondary" href="#onnx">Analyze an ONNX graph</a>
+          <a class="button secondary" href="#competencies">Open the evidence matrix</a>
+        </div>
+        <div class="summary-strip" aria-label="NPU engineering competency summary">
+          <div><strong>Capture</strong><span>Know what framework behavior becomes a graph</span></div>
+          <div><strong>Prove</strong><span>Preserve semantics through analysis and transformation</span></div>
+          <div><strong>Lower</strong><span>Connect graph IR to ISA, descriptors, and runtime</span></div>
+          <div><strong>Demonstrate</strong><span>Ship examples, tools, tests, and decision records</span></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="scope">
+      <div class="section-heading">
+        <p class="eyebrow">Coverage boundary</p>
+        <h2>Existing foundations stay in their original pages</h2>
+        <p class="section-note">
+          This document does not repeat neural-network basics, accelerator comparisons, LLVM/MLIR introductions,
+          generic graph optimization, quantization, C, Git, or the Analog CIM study. It uses those pages as prerequisites.
+        </p>
+      </div>
+      <div class="scope-ledger">
+        <article class="scope-item"><strong>Deep-learning foundations</strong><span>Training, architectures, transformers, deployment parity, and basic profiling already exist.</span><a href="deep-learning-practice.html">Use Deep Learning Practice</a></article>
+        <article class="scope-item"><strong>Accelerator taxonomy</strong><span>NPU, GPU, TPU, VPU, and LPU architecture tradeoffs already exist.</span><a href="index.html#processors">Use processor comparison</a></article>
+        <article class="scope-item"><strong>LLVM and MLIR</strong><span>IR, SSA, dialects, bufferization, and progressive lowering already exist.</span><a href="index.html#llvm-mlir">Use LLVM/MLIR study</a></article>
+        <article class="scope-item"><strong>Compiler practice</strong><span>Fusion, tiling, layout, memory hierarchy, TVM basics, quantization, and interview questions already exist.</span><a href="npu-practice.html#graph">Use NPU Practice</a></article>
+        <article class="scope-item new"><strong>New: framework-to-backend reasoning</strong><span>Dispatcher, autograd, graph capture, export constraints, retracing, and backend obligations.</span><a href="#frameworks">Study framework internals</a></article>
+        <article class="scope-item new"><strong>New: integration evidence</strong><span>ONNX forensics, applied TVM, ISA/ABI, low-power decisions, examples, GUI, and collaboration artifacts.</span><a href="#competencies">Study the evidence matrix</a></article>
+      </div>
+    </section>
+
+    <section class="section" id="frameworks">
+      <div class="section-heading">
+        <p class="eyebrow">Deep-learning framework internals</p>
+        <h2>Backend engineers must know which semantics survive capture</h2>
+        <p class="section-note">
+          Eager execution, automatic differentiation, graph capture, ahead-of-time export, and backend lowering are
+          different mechanisms. A graph compiler receives only the behavior that the selected capture path represents.
+        </p>
+      </div>
+      <div class="tabbed-explorer" data-tabset>
+        <div class="tab-list" role="tablist" aria-label="Framework internals">
+          <button class="tab-button" type="button" id="framework-tab-eager" role="tab" aria-selected="true" aria-controls="framework-eager">
+            <span class="tab-index">1</span><span><strong>PyTorch eager</strong><span>Dispatcher and autograd</span></span>
+          </button>
+          <button class="tab-button" type="button" id="framework-tab-compile" role="tab" aria-selected="false" aria-controls="framework-compile" tabindex="-1">
+            <span class="tab-index">2</span><span><strong>PyTorch compile/export</strong><span>Dynamo, AOTAutograd, Inductor</span></span>
+          </button>
+          <button class="tab-button" type="button" id="framework-tab-tf" role="tab" aria-selected="false" aria-controls="framework-tf" tabindex="-1">
+            <span class="tab-index">3</span><span><strong>TensorFlow graph path</strong><span>Eager, tf.function, AutoGraph</span></span>
+          </button>
+          <button class="tab-button" type="button" id="framework-tab-backend" role="tab" aria-selected="false" aria-controls="framework-backend" tabindex="-1">
+            <span class="tab-index">4</span><span><strong>NPU backend contract</strong><span>What capture must hand off</span></span>
+          </button>
+        </div>
+
+        <article class="panel tab-panel" id="framework-eager" role="tabpanel" aria-labelledby="framework-tab-eager">
+          <span class="status-pill status-partial">Dynamic execution</span>
+          <h3>PyTorch eager: Python call to dispatched kernel</h3>
+          <p>A tensor operation reaches the dispatcher, which selects behavior for backend and cross-cutting features such as autograd, autocast, or functionalization. Autograd records a reverse-mode graph of <code>Function</code> objects as the forward computation executes.</p>
+          <div class="contract-grid">
+            <div class="contract-cell"><strong>Reason about</strong><span>Dispatch keys, ATen operator schema, tensor metadata, views/aliasing, mutation, saved tensors, grad mode.</span></div>
+            <div class="contract-cell"><strong>Backend implication</strong><span>An NPU kernel registration is not enough if autograd, fake/meta, autocast, serialization, or profiling paths are missing.</span></div>
+            <div class="contract-cell"><strong>Failure signature</strong><span>Wrong dispatch key, missing kernel, device mismatch, alias violation, unsupported layout, or backward error.</span></div>
+            <div class="contract-cell"><strong>Evidence</strong><span>Operator registration tests, gradcheck where applicable, fake-tensor shape tests, profiler events, CPU differential vectors.</span></div>
+          </div>
+        </article>
+
+        <article class="panel tab-panel" id="framework-compile" role="tabpanel" aria-labelledby="framework-tab-compile" hidden>
+          <span class="status-pill status-conditional">Captured execution</span>
+          <h3>PyTorch compile and export are related but not interchangeable</h3>
+          <p><code>torch.compile</code> uses TorchDynamo to capture Python frames, AOTAutograd to capture forward/backward work, and a backend such as TorchInductor to generate code. Guards and graph breaks preserve dynamic Python behavior. <code>torch.export</code> targets an ahead-of-time, full-graph <code>ExportedProgram</code> with explicit input constraints.</p>
+          <div class="contract-grid">
+            <div class="contract-cell"><strong>Dynamo</strong><span>Captures traceable regions and guards assumptions; unsupported behavior can create graph breaks or recompilation.</span></div>
+            <div class="contract-cell"><strong>AOTAutograd</strong><span>Functionalizes and captures forward/backward graphs so compilers can optimize beyond eager autograd execution.</span></div>
+            <div class="contract-cell"><strong>Inductor / backend</strong><span>Consumes captured graphs, performs fusion/scheduling, and generates target code or delegates to another backend.</span></div>
+            <div class="contract-cell"><strong>Export</strong><span>Represents an AOT program plus constraints; deployment must validate shapes and unsupported Python side effects.</span></div>
+          </div>
+        </article>
+
+        <article class="panel tab-panel" id="framework-tf" role="tabpanel" aria-labelledby="framework-tab-tf" hidden>
+          <span class="status-pill status-conditional">Trace and cache</span>
+          <h3>TensorFlow: eager code becomes one or more concrete graphs</h3>
+          <p><code>tf.function</code> traces TensorFlow operations into graphs and caches concrete functions for compatible inputs. AutoGraph converts supported Python control flow into graph-building code. Python side effects happen during tracing, not as ordinary work on every graph execution.</p>
+          <div class="contract-grid">
+            <div class="contract-cell"><strong>Reason about</strong><span>Trace keys, TensorSpec signatures, polymorphic shapes, retracing, captured variables, resources, control flow.</span></div>
+            <div class="contract-cell"><strong>Optimization path</strong><span>Graph optimizers and optional XLA compilation operate after capture; target clusters must preserve resource and control dependencies.</span></div>
+            <div class="contract-cell"><strong>Failure signature</strong><span>Excess retracing, Python value frozen at trace time, unsupported op, resource placement, shape specialization, graph/eager mismatch.</span></div>
+            <div class="contract-cell"><strong>Evidence</strong><span>Concrete-function inventory, GraphDef inspection, signature tests, eager/graph parity, target cluster and fallback report.</span></div>
+          </div>
+        </article>
+
+        <article class="panel tab-panel" id="framework-backend" role="tabpanel" aria-labelledby="framework-tab-backend" hidden>
+          <span class="status-pill status-measured">Compiler boundary</span>
+          <h3>The NPU backend must publish a semantic acceptance contract</h3>
+          <p>Supported operator names are insufficient. Support depends on rank, shape bounds, dtype, layout, quantization scheme, attributes, aliasing, mutation, dynamic control flow, memory limit, and target revision.</p>
+          <div class="contract-grid">
+            <div class="contract-cell"><strong>Capability</strong><span>Machine-readable predicates plus a human diagnostic for every rejection or fallback.</span></div>
+            <div class="contract-cell"><strong>Partition</strong><span>Maximize useful offload while accounting for boundary copies, conversions, synchronization, and cold-start cost.</span></div>
+            <div class="contract-cell"><strong>Correctness</strong><span>Reference outputs, tolerance policy, deterministic modes, shape guards, and state/resource behavior.</span></div>
+            <div class="contract-cell"><strong>Observability</strong><span>Graph-break or fallback reason, compile report, source map, target counters, and first-divergence capture.</span></div>
+          </div>
+        </article>
+      </div>
+
+      <div class="table-wrap" style="margin-top:12px">
+        <table>
+          <thead><tr><th scope="col">Question</th><th scope="col">PyTorch</th><th scope="col">TensorFlow</th><th scope="col">NPU engineering consequence</th></tr></thead>
+          <tbody>
+            <tr><th scope="row">Eager path</th><td>Dispatcher selects ATen kernels and cross-cutting behavior.</td><td>Eager runtime executes TensorFlow ops immediately.</td><td>Device integration needs operator, memory, error, profiler, and lifecycle support, not only a compiler.</td></tr>
+            <tr><th scope="row">Autodiff</th><td>Dynamic reverse graph of autograd Function objects.</td><td>GradientTape records operations for differentiation.</td><td>Inference-only backends must reject training paths clearly; training backends need backward and state semantics.</td></tr>
+            <tr><th scope="row">Capture</th><td>Dynamo regions with guards and graph breaks; export offers AOT full-graph capture.</td><td><code>tf.function</code> traces and caches concrete graphs.</td><td>Compile cache keys must include all specialization assumptions that affect generated code.</td></tr>
+            <tr><th scope="row">Dynamic shapes</th><td>Guards, symbolic dimensions, specialization, possible recompilation.</td><td>Input signatures and trace compatibility control concrete-function reuse.</td><td>Choose bounded dynamic kernels, shape classes, or compile-on-demand with visible cache behavior.</td></tr>
+            <tr><th scope="row">Debug unit</th><td>Python frame, FX/ATen graph, compiled region, generated kernel.</td><td>Python function, ConcreteFunction/GraphDef, cluster, executable.</td><td>Preserve IDs through each level so a device fault maps back to source behavior.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="section" id="onnx">
+      <div class="section-heading">
+        <p class="eyebrow">ONNX network analysis</p>
+        <h2>Inspect the graph before optimizing it</h2>
+        <p class="section-note">
+          ONNX separately versions the IR, operator sets, and model. Shape inference is useful but intentionally
+          incomplete for some dynamic behavior. A production analyzer records unknowns instead of inventing shapes.
+        </p>
+      </div>
+      <div class="engineering-flow six" aria-label="ONNX analysis workflow">
+        <article class="flow-step"><b>1</b><strong>Validate</strong><span>IR, opsets, schemas, topology, external data</span></article>
+        <article class="flow-step"><b>2</b><strong>Infer</strong><span>Types, ranks, static and symbolic dimensions</span></article>
+        <article class="flow-step"><b>3</b><strong>Inventory</strong><span>Ops, attributes, constants, subgraphs, state</span></article>
+        <article class="flow-step"><b>4</b><strong>Diagnose</strong><span>Target predicates, dynamic regions, fallback islands</span></article>
+        <article class="flow-step"><b>5</b><strong>Transform</strong><span>Ordered passes with local proof obligations</span></article>
+        <article class="flow-step"><b>6</b><strong>Verify</strong><span>Structural checks, numerical parity, performance delta</span></article>
+      </div>
+
+      <div class="card-grid two" style="margin-top:12px">
+        <article class="code-panel">
+          <header><strong>ONNX forensic inventory</strong><span>Python</span></header>
+          <pre><code>from collections import Counter
+import math
+import numpy as np
+import onnx
+from onnx import checker, helper, shape_inference
+
+model = onnx.load("model.onnx", load_external_data=True)
+checker.check_model(model, full_check=True)
+typed = shape_inference.infer_shapes(model, strict_mode=False)
+graph = typed.graph
+
+def shape_of(value):
+    tensor = value.type.tensor_type
+    if not tensor.HasField("shape"):
+        return "unknown-rank"
+    dims = []
+    for dim in tensor.shape.dim:
+        dims.append(dim.dim_value or dim.dim_param or "?")
+    return dims
+
+print("IR:", typed.ir_version)
+print("Opsets:", [(item.domain or "ai.onnx", item.version)
+                  for item in typed.opset_import])
+print("Operators:", Counter(node.op_type for node in graph.node))
+print("Inputs:", [(value.name, shape_of(value)) for value in graph.input])
+print("Outputs:", [(value.name, shape_of(value)) for value in graph.output])
+
+def logical_bytes(tensor):
+    if tensor.data_type == onnx.TensorProto.STRING:
+        return sum(len(value) for value in tensor.string_data)
+    dtype = np.dtype(helper.tensor_dtype_to_np_dtype(tensor.data_type))
+    return math.prod(tensor.dims) * dtype.itemsize
+
+weight_bytes = sum(logical_bytes(item) for item in graph.initializer)
+print("Initializers:", len(graph.initializer), weight_bytes, "logical bytes")
+
+for index, node in enumerate(graph.node):
+    domain = node.domain or "ai.onnx"
+    print(index, domain, node.op_type, list(node.input), list(node.output))</code></pre>
+        </article>
+        <article class="panel">
+          <h3>Analyzer outputs worth keeping in CI</h3>
+          <ul class="note-list">
+            <li>IR and opset versions, model and external-data digests, producer metadata.</li>
+            <li>Input/output signatures with symbolic dimensions and bounded-shape policy.</li>
+            <li>Operator, domain, attribute, initializer, sparse tensor, function, and subgraph inventory.</li>
+            <li>Target support result for every node, with reason and estimated boundary transfer cost.</li>
+            <li>Quantization representation: QDQ, integer operators, scales, zero points, granularity, axis.</li>
+            <li>Reference vectors and per-output tolerances tied to preprocessing and postprocessing versions.</li>
+            <li>Peak live tensor estimate, constant bytes, dynamic allocation sites, and fallback memory.</li>
+          </ul>
+        </article>
+      </div>
+
+      <div class="table-wrap" style="margin-top:12px">
+        <table>
+          <thead><tr><th scope="col">Pass order</th><th scope="col">Transformation</th><th scope="col">Proof obligation before the next stage</th></tr></thead>
+          <tbody>
+            <tr><th scope="row">1. Validate/version</th><td>Reject malformed graphs; convert opsets only with defined adapters.</td><td>Every node resolves to known semantics for its imported domain and version.</td></tr>
+            <tr><th scope="row">2. Type/shape analysis</th><td>Propagate known facts and record unresolved symbols.</td><td>No pass assumes a static dimension that analysis has not proved or guarded.</td></tr>
+            <tr><th scope="row">3. Normalize</th><td>Canonicalize equivalent forms and make implicit broadcasts/layouts explicit where needed.</td><td>Reference output remains equal; source and quantization metadata survive.</td></tr>
+            <tr><th scope="row">4. Simplify</th><td>Constant fold, eliminate dead/identity work, simplify control and shape subgraphs.</td><td>Folding respects dtype, overflow, NaN, rounding, and external-data policy.</td></tr>
+            <tr><th scope="row">5. Capability/partition</th><td>Assign maximal legal regions to NPU or fallback providers.</td><td>Each region satisfies target predicates; boundary conversions are explicit and costed.</td></tr>
+            <tr><th scope="row">6. Target transforms</th><td>Fuse, choose layouts, quantize/lower, schedule, and plan memory inside owned regions.</td><td>Numerical, memory, and resource constraints pass independent verifiers.</td></tr>
+            <tr><th scope="row">7. Package/compare</th><td>Emit executable and run framework/ONNX/target parity plus performance measurements.</td><td>Artifact provenance, tolerances, target versions, and regression result are retained.</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="callout caution" style="margin-top:12px">
+        <p>
+          <strong>Partition timing matters.</strong> ONNX Runtime performs provider-independent optimizations before
+          partitioning and provider-specific work afterward. Its current documentation recommends a plugin execution
+          provider for new integrations starting with ONNX Runtime 1.23. A vendor backend should verify which layer owns
+          each rewrite so two optimizers do not erase one another's patterns or apply incompatible layouts.
+        </p>
+      </div>
+    </section>
+
+    <section class="section" id="tvm">
+      <div class="section-heading">
+        <p class="eyebrow">Applied TVM architecture</p>
+        <h2>Use TVM as two connected optimization levels plus a runtime</h2>
+        <p class="section-note">
+          The site already introduces TVM beside MLIR. This section focuses on the current practical mapping: Relax for
+          graph/dataflow structure, TensorIR for primitive tensor programs, scheduling for implementation choices, and
+          runtime modules for deployment.
+        </p>
+      </div>
+      <div class="engineering-flow six" aria-label="Current Apache TVM compilation flow">
+        <article class="flow-step"><b>Front end</b><strong>Model import</strong><span>Build an IRModule with Relax functions</span></article>
+        <article class="flow-step"><b>Relax</b><strong>Graph transforms</strong><span>Legalize, fuse, plan buffers, preserve shapes</span></article>
+        <article class="flow-step"><b>TensorIR</b><strong>Primitive functions</strong><span>Loop nests, buffers, loads/stores, tensor intrinsics</span></article>
+        <article class="flow-step"><b>Schedule</b><strong>Implementation</strong><span>Tile, reorder, vectorize, bind, tensorize, search</span></article>
+        <article class="flow-step"><b>Codegen</b><strong>Target module</strong><span>LLVM or source code plus external kernels</span></article>
+        <article class="flow-step"><b>Runtime</b><strong>Execute</strong><span>VM bytecode, compiled functions, PackedFunc, allocators</span></article>
+      </div>
+      <div class="table-wrap" style="margin-top:12px">
+        <table>
+          <thead><tr><th scope="col">Extension point</th><th scope="col">NPU use</th><th scope="col">Acceptance evidence</th></tr></thead>
+          <tbody>
+            <tr><th scope="row">Relax import / rewrite</th><td>Represent target composite patterns, quantized forms, shape constraints, and offload regions.</td><td>Before/after IR, structural matcher tests, numerical parity, rejection diagnostics.</td></tr>
+            <tr><th scope="row">Operator legalization</th><td>Lower high-level ops to target primitives, TIR, or external PackedFunc calls.</td><td>Semantic tests across dtype, shape boundary, attributes, and dynamic dimensions.</td></tr>
+            <tr><th scope="row">TensorIR</th><td>Represent local buffers, data movement, loop structure, and hardware tensor intrinsics.</td><td>Generated access bounds, race analysis, bit parity, resource estimates.</td></tr>
+            <tr><th scope="row">Schedule / MetaSchedule</th><td>Search tile, layout, memory scope, parallelization, and tensorization choices.</td><td>Reproducible workload key, search budget, measured target result, held-out validation.</td></tr>
+            <tr><th scope="row">Codegen / module</th><td>Emit NPU command binaries, firmware code, target source, or runtime-call wrappers.</td><td>Versioned module metadata, load tests, disassembly/descriptor inspection, compatibility checks.</td></tr>
+            <tr><th scope="row">Runtime / VM</th><td>Load modules, resolve functions, allocate devices, execute graph control, call compiled kernels.</td><td>Lifecycle, concurrency, serialization, allocator, error, and remote-device tests.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="section" id="isa">
+      <div class="section-heading">
+        <p class="eyebrow">RISC-V and NPU accelerator ISA</p>
+        <h2>The key decision is how software submits work, not whether an opcode looks elegant</h2>
+        <p class="section-note">
+          RISC-V reserves custom encoding spaces for vendor-specific extensions. An accelerator may instead use MMIO,
+          memory-resident command queues, a standard device interface, or a combination. Workload granularity and system
+          isolation usually matter more than instruction count.
+        </p>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th scope="col">Integration style</th><th scope="col">Best fit</th><th scope="col">Main cost</th><th scope="col">Compiler/runtime consequence</th></tr></thead>
+          <tbody>
+            <tr><th scope="row">Custom scalar/vector instruction</th><td>Fine-grain tightly coupled operations with registers or local state.</td><td>Toolchain, context state, exceptions, virtualization, and memory-model integration.</td><td>Intrinsic/builtin lowering, assembler/disassembler, ABI and scheduler awareness.</td></tr>
+            <tr><th scope="row">MMIO control</th><td>Simple control/status, boot, reset, capability, and low-rate commands.</td><td>High per-command CPU overhead; ordering and posted writes require care.</td><td>Driver API and register generation; rarely suitable for every tensor tile.</td></tr>
+            <tr><th scope="row">Memory command queue</th><td>Coarse asynchronous kernels, DMA descriptors, multiple in-flight jobs.</td><td>Descriptor validation, coherency, fences, queue wrap, reset and fault recovery.</td><td>Compiler emits command graph; runtime owns buffers, dependencies, submission, events.</td></tr>
+            <tr><th scope="row">Firmware RPC</th><td>Complex scheduling, stable host API across changing hardware internals.</td><td>Firmware latency, version negotiation, watchdogs, diagnosability.</td><td>Artifact carries firmware-facing operations; host remains insulated from microarchitecture.</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="card-grid two" style="margin-top:12px">
+        <article class="code-panel">
+          <header><strong>Illustrative queue descriptor</strong><span>C ABI contract</span></header>
+          <pre><code>#include &lt;stdint.h&gt;
+
+struct npu_command_v1 {
+    uint16_t size_bytes;       /* permits compatible extension */
+    uint16_t opcode;
+    uint32_t flags;
+    uint64_t command_id;
+    uint64_t executable_id;
+    uint64_t input_iova;
+    uint64_t output_iova;
+    uint32_t input_bytes;
+    uint32_t output_bytes;
+    uint32_t dependency_count;
+    uint32_t completion_slot;
+};
+
+/* Producer protocol:
+ * 1. Validate ownership and bounds.
+ * 2. Write descriptor and dependency records.
+ * 3. Publish with the required release ordering.
+ * 4. Update producer index and ring the doorbell.
+ */</code></pre>
+        </article>
+        <article class="panel">
+          <h3>ISA and ABI review checklist</h3>
+          <ul class="note-list">
+            <li>Define architectural state, privilege, context-switch cost, and reset value.</li>
+            <li>Specify operand widths, alignment, endianness, rounding, saturation, and exception behavior.</li>
+            <li>Separate virtual, physical, and I/O virtual addresses; state IOMMU and coherency assumptions.</li>
+            <li>Name memory ordering for descriptors, MMIO, DMA, completion, and CPU visibility.</li>
+            <li>Define malformed command, page fault, watchdog, engine fault, retry, and partial-write behavior.</li>
+            <li>Reserve feature bits and size-versioned messages; test old/new driver and firmware combinations.</li>
+            <li>Generate encoders, decoders, docs, simulator tables, and disassembly from one source of truth.</li>
+            <li>Run differential ISA tests plus whole-command random sequences through model and RTL.</li>
+          </ul>
+        </article>
+      </div>
+      <div class="callout" style="margin-top:12px">
+        <p>
+          RISC-V uses a relaxed memory model and explicit fences for required ordering. A queue protocol must translate
+          that architectural rule into concrete producer/consumer barriers and device coherency operations. "Write the
+          descriptor, then ring the doorbell" is incomplete until visibility and ordering are specified for every agent.
+        </p>
+      </div>
+    </section>
+
+    <section class="section" id="optimization">
+      <div class="section-heading">
+        <p class="eyebrow">Low-power and high-performance optimization</p>
+        <h2>Optimize energy under a latency and correctness constraint</h2>
+        <p class="section-note">
+          Measurement formulas and trace correlation live in <a href="npu-soc-software-architecture.html#profiling">SoC Software Architecture</a>.
+          This section focuses on choosing and validating optimization levers across the stack.
+        </p>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th scope="col">Layer</th><th scope="col">High-value levers</th><th scope="col">Hidden tradeoff</th><th scope="col">Required experiment</th></tr></thead>
+          <tbody>
+            <tr><th scope="row">Model / graph</th><td>Architecture choice, sequence/image size, sparsity, precision, fusion, partition boundaries.</td><td>Accuracy recovery, unsupported operators, fallback copies, compile specialization.</td><td>Task metric plus per-layer sensitivity and end-to-end target execution.</td></tr>
+            <tr><th scope="row">Kernel / schedule</th><td>Tiling, locality, double buffering, tensorization, parallelism, layout, recompute versus spill.</td><td>SRAM pressure, bank conflicts, tail inefficiency, code size, synchronization.</td><td>Counter-backed roofline classification across representative shapes.</td></tr>
+            <tr><th scope="row">Runtime</th><td>Async queues, zero-copy, buffer pools, compile cache, batching, overlap, reduced wakeups.</td><td>Tail latency, memory residency, fairness, cancellation, cold-start behavior.</td><td>Latency distribution and energy across arrival patterns, not only saturated throughput.</td></tr>
+            <tr><th scope="row">SoC / power</th><td>DVFS, clock/power gating, autosuspend, race-to-idle, memory frequency, thermal policy.</td><td>Wake latency, leakage, droop, thermal throttling, deadline misses, shared-rail effects.</td><td>Steady-state power and latency sweep by operating point and duty cycle.</td></tr>
+            <tr><th scope="row">Product</th><td>Workload admission, quality modes, telemetry, field calibration, graceful fallback.</td><td>User-visible quality, battery life, contention, privacy, fleet variability.</td><td>Scenario-level acceptance criteria and canary/rollback evidence.</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="card-grid" style="margin-top:12px">
+        <article class="learning-card"><span class="card-label">Classify</span><h3>Find the limiting resource</h3><p>Separate host dispatch, queue wait, DMA, memory bandwidth, engine occupancy, synchronization, power-state transition, and thermal throttling before selecting a lever.</p></article>
+        <article class="learning-card"><span class="card-label">Hypothesize</span><h3>Predict two metrics</h3><p>State the expected primary benefit and at least one regression risk. For example, a lower frequency may improve power but increase leakage energy and miss a latency deadline.</p></article>
+        <article class="learning-card"><span class="card-label">Validate</span><h3>Use distributions and controls</h3><p>Pin model, inputs, software versions, operating point, temperature, and concurrent load; compare repeated latency and energy distributions with accuracy unchanged.</p></article>
+      </div>
+    </section>
+
+    <section class="section" id="sdk-examples">
+      <div class="section-heading">
+        <p class="eyebrow">SDK and application examples</p>
+        <h2>Examples are executable compatibility contracts</h2>
+        <p class="section-note">
+          SDK architecture and API ownership are covered in <a href="npu-soc-software-architecture.html#sdk">SoC Software Architecture</a>.
+          The missing skill is designing examples that remain small, realistic, testable, and safe to imitate.
+        </p>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th scope="col">Example</th><th scope="col">Contract demonstrated</th><th scope="col">Automated acceptance</th></tr></thead>
+          <tbody>
+            <tr><th scope="row">Minimal inference</th><td>Discovery, artifact load, input/output binding, synchronous run, cleanup.</td><td>Known output, leak-free lifecycle, clear unsupported-target error.</td></tr>
+            <tr><th scope="row">Asynchronous pipeline</th><td>Multiple buffers, events, dependency ordering, overlap, callback/thread policy.</td><td>Random completion timing, no early reuse, timeout and cancellation tests.</td></tr>
+            <tr><th scope="row">Camera zero-copy</th><td>Imported buffer, format/layout, cache/coherency, fence ownership, lifetime.</td><td>Correct frames under producer/consumer stress and fallback path.</td></tr>
+            <tr><th scope="row">Dynamic inputs</th><td>Shape constraints, compile-cache key, bounded allocation, rejection behavior.</td><td>Supported shape classes, cache hit/miss telemetry, out-of-bound diagnostic.</td></tr>
+            <tr><th scope="row">Multi-model service</th><td>Contexts, memory budget, queue fairness, priority, device loss and reload.</td><td>Tail latency, isolation, bounded residency, fault containment.</td></tr>
+            <tr><th scope="row">Profiler/debugger</th><td>Trace session, layer/source map, counters, tensor checkpoint, replay package.</td><td>Schema validation, timestamp correlation, first-divergence golden test.</td></tr>
+            <tr><th scope="row">Custom operator</th><td>Registration, shape/type inference, fallback, compiler lowering, target kernel.</td><td>Positive/negative shapes, reference parity, package and version compatibility.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="section" id="gui">
+      <div class="section-heading">
+        <p class="eyebrow">GUI programming for NPU tools</p>
+        <h2>A debugger GUI should be a view over stable analysis data</h2>
+        <p class="section-note">
+          Qt's model/view architecture separates data from presentation. Keep trace decoding and tensor analysis off the
+          UI thread, publish immutable or versioned result models, and make every visual selection addressable by stable IDs.
+        </p>
+      </div>
+      <div class="engineering-flow" aria-label="NPU debugger GUI architecture">
+        <article class="flow-step"><b>Ingest</b><strong>Readers</strong><span>Model, artifact, trace, counters, tensors</span></article>
+        <article class="flow-step"><b>Normalize</b><strong>Analysis model</strong><span>Stable IDs, time domains, layouts, errors</span></article>
+        <article class="flow-step"><b>Index</b><strong>Query layer</strong><span>Graph, timeline, memory, tensor, search</span></article>
+        <article class="flow-step"><b>Present</b><strong>Qt model/view</strong><span>Tables, tree, timeline, plots, inspectors</span></article>
+        <article class="flow-step"><b>Act</b><strong>Commands</strong><span>Filter, compare, checkpoint, replay, export</span></article>
+      </div>
+      <div class="card-grid" style="margin-top:12px">
+        <article class="learning-card"><span class="card-label">Data architecture</span><h3>One selection identity across panes</h3><p>Selecting a graph node should highlight its fused region, commands, timeline slices, buffers, counters, and tensor diffs through stable IDs rather than text-name matching.</p></article>
+        <article class="learning-card"><span class="card-label">Responsiveness</span><h3>Stream and aggregate outside the UI thread</h3><p>Workers parse traces and tensors, cancellation stops stale work, and views request bounded windows. Million-event traces should not become a million GUI objects.</p></article>
+        <article class="learning-card"><span class="card-label">Testability</span><h3>Test models before pixels</h3><p>Unit-test sorting, filtering, time conversion, diff thresholds, selection propagation, and empty/error states. Add screenshot tests only after the underlying data contracts are stable.</p></article>
+      </div>
+      <div class="table-wrap" style="margin-top:12px">
+        <table>
+          <thead><tr><th scope="col">View</th><th scope="col">Primary model</th><th scope="col">Performance rule</th><th scope="col">Failure state</th></tr></thead>
+          <tbody>
+            <tr><th scope="row">Graph tree</th><td>Source node, region, command hierarchy with support/fallback status.</td><td>Lazy children and indexed search; do not rebuild the entire tree per selection.</td><td>Missing source map remains explicit; never guess by operator name.</td></tr>
+            <tr><th scope="row">Timeline</th><td>Time-windowed slices, counters, and cross-track flows.</td><td>Level-of-detail aggregation and virtualized drawing.</td><td>Clock uncertainty and dropped events are visible annotations.</td></tr>
+            <tr><th scope="row">Tensor inspector</th><td>Typed tensor view, layout transform, quantization, statistics, sampled values.</td><td>Chunked reads and sampling before full materialization.</td><td>Unavailable checkpoints explain compile mode and capture policy.</td></tr>
+            <tr><th scope="row">Memory map</th><td>Lifetime intervals, address ranges, banks, aliases, residency.</td><td>Interval indexes and viewport filtering.</td><td>Overlaps distinguish legal alias from verifier error.</td></tr>
+            <tr><th scope="row">Comparison</th><td>Aligned runs by graph/command ID, metric, software, and target version.</td><td>Precompute summaries; load raw traces on demand.</td><td>Incompatible artifacts or shape profiles block misleading comparison.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="section" id="soft-skills">
+      <div class="section-heading">
+        <p class="eyebrow">Technical soft skills</p>
+        <h2>Cross-functional work becomes visible in engineering artifacts</h2>
+      </div>
+      <div class="card-grid two">
+        <article class="learning-card"><span class="card-label">Interface writing</span><h3>Turn assumptions into contracts</h3><p>Write version, ownership, state, ordering, units, error, timeout, and compatibility rules. A short executable schema plus adversarial examples is stronger than a long ambiguous design note.</p></article>
+        <article class="learning-card"><span class="card-label">Evidence discipline</span><h3>Separate observation, inference, and decision</h3><p>Attach traces, counters, inputs, versions, and uncertainty to claims. State what the evidence rules out, what remains possible, and the next cheapest discriminating experiment.</p></article>
+        <article class="learning-card"><span class="card-label">Cross-team debugging</span><h3>Build a shared reproduction boundary</h3><p>Reduce the failure to an artifact, input, expected output, component matrix, and first divergent layer/command. Assign investigation by evidence, not organizational blame.</p></article>
+        <article class="learning-card"><span class="card-label">Design review</span><h3>Expose tradeoffs early</h3><p>Present workload, constraints, alternatives, cost model, failure modes, observability, rollout, and rollback. Record the decision and the evidence that would cause it to change.</p></article>
+        <article class="learning-card"><span class="card-label">Code review</span><h3>Review behavior at boundaries</h3><p>Look for silent fallback, unchecked dimensions, lifetime races, nondeterministic pass order, ABI drift, missing negative tests, and metric changes before style details.</p></article>
+        <article class="learning-card"><span class="card-label">Incident learning</span><h3>Repair the detection system</h3><p>A useful postmortem adds a contract, assertion, counter, replay test, compatibility gate, or deployment safeguard so the same class of failure becomes cheaper to detect.</p></article>
+      </div>
+    </section>
+
+    <section class="section" id="competencies">
+      <div class="section-heading">
+        <p class="eyebrow">Evidence matrix</p>
+        <h2>Competence is a result another engineer can inspect</h2>
+      </div>
+      <div class="segmented" data-filter-group="skill-matrix" role="group" aria-label="Competency domain filter">
+        <button class="segment-button" type="button" data-filter="all" aria-pressed="true">All</button>
+        <button class="segment-button" type="button" data-filter="framework" aria-pressed="false">Framework</button>
+        <button class="segment-button" type="button" data-filter="onnx" aria-pressed="false">ONNX</button>
+        <button class="segment-button" type="button" data-filter="compiler" aria-pressed="false">Compiler</button>
+        <button class="segment-button" type="button" data-filter="isa" aria-pressed="false">ISA</button>
+        <button class="segment-button" type="button" data-filter="product" aria-pressed="false">Product tools</button>
+        <button class="segment-button" type="button" data-filter="collaboration" aria-pressed="false">Collaboration</button>
+      </div>
+      <div class="skill-grid" id="skill-matrix">
+        <article class="skill-card" data-domain="framework"><span class="card-label">Framework</span><h3>Trace semantics</h3><p>Explain eager dispatch, autograd, graph capture, guards/retracing, export, and backend boundaries.</p><p class="skill-evidence"><strong>Evidence:</strong> one model traced through PyTorch and TensorFlow with graph-break/retrace report and parity tests.</p></article>
+        <article class="skill-card" data-domain="framework compiler"><span class="card-label">Framework</span><h3>Custom backend surface</h3><p>Define capability predicates, fallback, shape policy, compile cache, error propagation, and profiling integration.</p><p class="skill-evidence"><strong>Evidence:</strong> small backend or mock execution provider with negative tests and diagnostics.</p></article>
+        <article class="skill-card" data-domain="onnx"><span class="card-label">ONNX</span><h3>Graph forensics</h3><p>Validate versions, infer known shapes, inventory nodes/constants/subgraphs, and find unsupported islands.</p><p class="skill-evidence"><strong>Evidence:</strong> reproducible analyzer output checked into CI for a model corpus.</p></article>
+        <article class="skill-card" data-domain="onnx compiler"><span class="card-label">ONNX</span><h3>Verified transformations</h3><p>Order normalization, simplification, partitioning, target transforms, and numerical comparison.</p><p class="skill-evidence"><strong>Evidence:</strong> three graph passes with structural, randomized, and framework/runtime parity tests.</p></article>
+        <article class="skill-card" data-domain="compiler"><span class="card-label">Compiler</span><h3>TVM extension</h3><p>Connect Relax graph work to TensorIR, scheduling, codegen/module packaging, and runtime execution.</p><p class="skill-evidence"><strong>Evidence:</strong> custom legalization plus schedule experiment measured on a real or modeled target.</p></article>
+        <article class="skill-card" data-domain="compiler isa"><span class="card-label">Compiler</span><h3>Lowering to device work</h3><p>Lower an operator through intrinsic or target IR into commands, descriptors, relocations, and debug maps.</p><p class="skill-evidence"><strong>Evidence:</strong> inspectable artifact with disassembly/descriptor dump and model parity.</p></article>
+        <article class="skill-card" data-domain="isa"><span class="card-label">ISA</span><h3>RISC-V/NPU integration</h3><p>Reason about custom instructions versus queues, ordering, coherency, privilege, faults, and versioning.</p><p class="skill-evidence"><strong>Evidence:</strong> ISA/ABI specification, generated encoder/decoder, simulator, and randomized differential tests.</p></article>
+        <article class="skill-card" data-domain="isa product"><span class="card-label">Performance</span><h3>Power/performance decision</h3><p>Classify a bottleneck, predict tradeoffs, control variables, and validate latency, energy, and correctness.</p><p class="skill-evidence"><strong>Evidence:</strong> trace-backed optimization memo with raw data, uncertainty, and regression guard.</p></article>
+        <article class="skill-card" data-domain="product"><span class="card-label">SDK</span><h3>Executable examples</h3><p>Cover sync, async, zero-copy, dynamic shape, multi-model, profiling, custom op, and recovery paths.</p><p class="skill-evidence"><strong>Evidence:</strong> examples run in CI and assert outputs, errors, lifetime, and compatibility.</p></article>
+        <article class="skill-card" data-domain="product"><span class="card-label">GUI</span><h3>Debugger/profiler application</h3><p>Build indexed data models, worker pipelines, linked selections, scalable views, and explicit error states.</p><p class="skill-evidence"><strong>Evidence:</strong> Qt/PySide tool loading a replay package with graph, timeline, tensor diff, and memory views.</p></article>
+        <article class="skill-card" data-domain="collaboration"><span class="card-label">Collaboration</span><h3>Boundary design</h3><p>Write a reviewable interface with ownership, state, errors, ordering, observability, and compatibility.</p><p class="skill-evidence"><strong>Evidence:</strong> accepted design record plus schema, adversarial examples, and integration tests.</p></article>
+        <article class="skill-card" data-domain="collaboration"><span class="card-label">Collaboration</span><h3>Cross-team debug</h3><p>Reduce a failure, separate observations from hypotheses, choose discriminating experiments, and prevent recurrence.</p><p class="skill-evidence"><strong>Evidence:</strong> replay package, first-divergence report, decision log, and new regression gate.</p></article>
+      </div>
+    </section>
+
+    <section class="section" id="capstone" data-progress="framework-compiler-capstone">
+      <div class="section-heading">
+        <p class="eyebrow">Capstone</p>
+        <h2>Build a miniature edge NPU platform</h2>
+        <p class="section-note">Each increment produces an inspectable artifact and reuses the architecture contracts from the companion SoC software page.</p>
+      </div>
+      <div class="progress-panel" aria-live="polite">
+        <div class="progress-track"><div class="progress-bar" data-progress-bar role="progressbar" aria-label="Framework and compiler capstone progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"></div></div>
+        <span class="progress-value" data-progress-value>0 / 8 complete</span>
+      </div>
+      <div class="lab-list">
+        <label class="lab-item"><input type="checkbox" data-step="capture"><span><strong>Framework capture report</strong><span>Compare eager, compiled/traced, and exported execution for one dynamic model.</span></span></label>
+        <label class="lab-item"><input type="checkbox" data-step="analyzer"><span><strong>ONNX analyzer</strong><span>Emit version, shape, operator, constant, support, partition, and memory reports.</span></span></label>
+        <label class="lab-item"><input type="checkbox" data-step="passes"><span><strong>Verified graph passes</strong><span>Implement normalization, simplification, and target fusion with negative and differential tests.</span></span></label>
+        <label class="lab-item"><input type="checkbox" data-step="tvm"><span><strong>TVM target experiment</strong><span>Legalize one composite pattern, schedule its primitive work, and retain measured results.</span></span></label>
+        <label class="lab-item"><input type="checkbox" data-step="isa"><span><strong>Queue ISA and simulator</strong><span>Specify descriptors, ordering, faults, versions, encoder/decoder, and randomized execution.</span></span></label>
+        <label class="lab-item"><input type="checkbox" data-step="sdk"><span><strong>SDK example suite</strong><span>Ship sync, async, dynamic-shape, profiling, and failure-recovery examples in CI.</span></span></label>
+        <label class="lab-item"><input type="checkbox" data-step="gui"><span><strong>Qt/PySide debugger</strong><span>Link graph, command timeline, tensor diff, and memory lifetime views by stable IDs.</span></span></label>
+        <label class="lab-item"><input type="checkbox" data-step="review"><span><strong>Engineering review package</strong><span>Publish architecture, tradeoff experiment, compatibility matrix, known limits, and next decision.</span></span></label>
+      </div>
+    </section>
+
+    <section class="section" id="sources">
+      <div class="section-heading">
+        <p class="eyebrow">Primary documentation</p>
+        <h2>Framework, compiler, ISA, and GUI sources</h2>
+      </div>
+      <div class="source-grid">
+        <article class="source-card"><a href="https://docs.pytorch.org/docs/stable/notes/autograd.html">PyTorch autograd mechanics</a><span>Reverse automatic differentiation graph, saved tensors, and grad modes</span></article>
+        <article class="source-card"><a href="https://docs.pytorch.org/docs/stable/notes/extending.html">Extending PyTorch</a><span>Dispatcher, native API extension, custom functions, and backend behavior</span></article>
+        <article class="source-card"><a href="https://docs.pytorch.org/docs/stable/user_guide/torch_compiler/torch.compiler.html">PyTorch compiler architecture</a><span>TorchDynamo, AOTAutograd, TorchInductor, and backend selection</span></article>
+        <article class="source-card"><a href="https://docs.pytorch.org/docs/stable/export.html">PyTorch export</a><span>Ahead-of-time ExportedProgram capture, constraints, and deployment representation</span></article>
+        <article class="source-card"><a href="https://www.tensorflow.org/guide/intro_to_graphs">TensorFlow graphs and tf.function</a><span>Eager-to-graph transition, Graph representation, and AutoGraph</span></article>
+        <article class="source-card"><a href="https://www.tensorflow.org/guide/function">TensorFlow tf.function guide</a><span>Tracing, cached concrete functions, input signatures, and retracing</span></article>
+        <article class="source-card"><a href="https://onnx.ai/onnx/repo-docs/IR.html">ONNX IR specification</a><span>Model, graph, values, operators, functions, types, and runtime-agnostic semantics</span></article>
+        <article class="source-card"><a href="https://onnx.ai/onnx/repo-docs/Versioning.html">ONNX versioning</a><span>Independent IR, operator-set, and model version rules</span></article>
+        <article class="source-card"><a href="https://onnx.ai/onnx/repo-docs/ShapeInference.html">ONNX shape inference</a><span>Static and symbolic dimensions, extensibility, and documented limitations</span></article>
+        <article class="source-card"><a href="https://onnxruntime.ai/docs/performance/model-optimizations/graph-optimizations.html">ONNX Runtime graph optimizations</a><span>Basic, extended, layout, online, and offline optimization ordering</span></article>
+        <article class="source-card"><a href="https://onnxruntime.ai/docs/execution-providers/add-execution-provider.html">ONNX Runtime provider integration</a><span>Current plugin execution-provider recommendation and integration path</span></article>
+        <article class="source-card"><a href="https://tvm.apache.org/docs/arch/index.html">Apache TVM design and architecture</a><span>IRModule, Relax, TensorIR, transformations, codegen, and runtime modules</span></article>
+        <article class="source-card"><a href="https://tvm.apache.org/docs/arch/relax_vm.html">TVM Relax VM</a><span>Compilation, bytecode, executable, compiled kernels, allocators, and execution</span></article>
+        <article class="source-card"><a href="https://openxla.org/xla/architecture">OpenXLA architecture</a><span>Framework compilation perspective, HLO pipeline, backends, and executable flow</span></article>
+        <article class="source-card"><a href="https://docs.riscv.org/reference/isa/unpriv/unpriv-index.html">RISC-V unprivileged ISA</a><span>Current ratified specification library, base ISA, extensions, memory model, and fences</span></article>
+        <article class="source-card"><a href="https://docs.riscv.org/reference/isa/v20250508/unpriv/intro.html">RISC-V ISA overview</a><span>Standard, reserved, and custom encoding spaces for extensions</span></article>
+        <article class="source-card"><a href="https://doc.qt.io/qt-6/model-view-programming.html">Qt model/view programming</a><span>Separation of data models, views, delegates, and selection</span></article>
+        <article class="source-card"><a href="https://doc.qt.io/qt-6/threads.html">Qt multithreading</a><span>Worker execution, queued events, thread-safe communication, and responsive UI design</span></article>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <p>English-only applied NPU engineering study. Existing fundamentals are linked, not duplicated.</p>
+    <div class="footer-links">
+      <a href="npu-soc-software-architecture.html">Companion: SoC software architecture</a>
+      <a href="https://github.com/buicongnguyen/NPU">Source</a>
+    </div>
+  </footer>
+</body>
+</html>
