@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="A self-study guide to AI accelerators, Mythic analog compute-in-memory, NPU/SoC software architecture, frameworks, compiler and ISA integration, deployment, LLVM/MLIR, and interview practice.">
+  <meta name="description" content="A self-study guide to AI accelerators, Mythic analog compute-in-memory, Tenstorrent reuse decisions, NPU/SoC software architecture, frameworks, compiler and ISA integration, deployment, LLVM/MLIR, and interview practice.">
   <title>NPU, VPU &amp; LPU — AI Accelerator &amp; Compiler Study Guide | Bui Cong Nguyen</title>
   <link rel="stylesheet" href="styles.css">
 </head>
@@ -143,7 +143,7 @@
     <section id="analog-cim" class="section">
       <div class="section-heading">
         <p class="eyebrow">Analog compute-in-memory case study</p>
-        <h2>Mythic Architecture, Accuracy Evidence, and Interview Study</h2>
+        <h2>Mythic Architecture, Accuracy Evidence, Reuse Decisions, and Interview Study</h2>
         <p class="section-note">
           A separate learning path traces Mythic's flash-based matrix engine from device physics through ADCs,
           tile dataflow, quantization, and graph compilation. It also audits Nature-family accuracy claims and keeps
@@ -162,6 +162,12 @@
           <h3>Is analog accuracy solved?</h3>
           <p>No as a universal claim. Compare measured NeuRRAM, IBM PCM, mixed-CIM, ALBERT, adaptive-ADC, and 2026 fault-tolerance results with their real boundaries.</p>
           <a href="analog-cim-evidence.html">Open evidence and issues</a>
+        </article>
+        <article>
+          <span>Reuse decision</span>
+          <h3>Can Tenstorrent accelerate an ACiM stack?</h3>
+          <p>Separate portable infrastructure from Tensix-specific code, audit the target contract and licenses, score components, and gate a measured proof of concept.</p>
+          <a href="analog-cim-tenstorrent-reuse.html">Open Tenstorrent reuse guide</a>
         </article>
         <article>
           <span>Interview</span>

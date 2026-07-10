@@ -1,0 +1,305 @@
+.reuse-mode-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.reuse-mode {
+  min-width: 0;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-top: 4px solid var(--blue);
+  border-radius: 6px;
+  background: var(--surface);
+}
+
+.reuse-mode.reuse {
+  border-top-color: var(--teal);
+}
+
+.reuse-mode.adapt {
+  border-top-color: var(--amber);
+}
+
+.reuse-mode.replace {
+  border-top-color: var(--red);
+}
+
+.reuse-mode b,
+.reuse-mode h3 {
+  display: block;
+}
+
+.reuse-mode b {
+  color: var(--muted);
+  font-size: 12px;
+  text-transform: uppercase;
+}
+
+.reuse-mode h3 {
+  margin: 4px 0 6px;
+}
+
+.reuse-mode p {
+  margin-bottom: 0;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.decision-reuse {
+  color: var(--teal-strong);
+  background: var(--soft-teal);
+}
+
+.decision-adapt {
+  color: var(--amber);
+  background: var(--soft-amber);
+}
+
+.decision-study {
+  color: var(--blue);
+  background: var(--soft-blue);
+}
+
+.decision-replace {
+  color: var(--red);
+  background: var(--soft-red);
+}
+
+.reuse-table th:first-child {
+  min-width: 180px;
+}
+
+.reuse-table td:nth-child(2) {
+  min-width: 140px;
+}
+
+.reuse-table tbody tr[hidden] {
+  display: none;
+}
+
+.reuse-flow {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 9px;
+}
+
+.reuse-flow .flow-step {
+  min-height: 142px;
+}
+
+.subsection-heading {
+  margin-top: 28px;
+}
+
+.validation-ladder {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.validation-ladder .level-card {
+  border-top: 3px solid var(--blue);
+}
+
+.validation-ladder .level-card:nth-child(n+4) {
+  border-top-color: var(--amber);
+}
+
+.validation-ladder .level-card:last-child {
+  border-top-color: var(--red);
+}
+
+.scorecard {
+  display: grid;
+  grid-template-columns: minmax(0, 1.65fr) minmax(250px, 0.7fr);
+  gap: 14px;
+  align-items: stretch;
+}
+
+.score-fields {
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+}
+
+.score-field {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: minmax(210px, 1fr) minmax(150px, 0.7fr) 28px;
+  gap: 12px;
+  align-items: center;
+  padding: 13px 14px;
+  border-bottom: 1px solid var(--line);
+}
+
+.score-field:last-child {
+  border-bottom: 0;
+}
+
+.score-field span,
+.score-field strong,
+.score-field small {
+  display: block;
+}
+
+.score-field small {
+  margin-top: 2px;
+  color: var(--muted);
+}
+
+.score-field input[type="range"] {
+  width: 100%;
+  accent-color: var(--teal);
+}
+
+.score-field output {
+  color: var(--teal);
+  font-weight: 800;
+  text-align: right;
+}
+
+.score-result {
+  min-width: 0;
+  display: grid;
+  align-content: center;
+  justify-items: start;
+  padding: 20px;
+  border: 1px solid var(--line);
+  border-left: 5px solid var(--teal);
+  border-radius: 8px;
+  background: var(--surface-2);
+}
+
+.score-kicker {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.score-result > strong {
+  margin: 5px 0 10px;
+  color: var(--teal);
+  font-size: 32px;
+  line-height: 1;
+}
+
+.score-result p {
+  color: var(--muted);
+}
+
+.phase-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.phase-item {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr);
+  gap: 10px;
+  align-items: start;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--surface);
+}
+
+.phase-item input {
+  width: 17px;
+  height: 17px;
+  margin: 3px 0 0;
+  accent-color: var(--teal);
+}
+
+.phase-item b,
+.phase-item strong,
+.phase-item span,
+.phase-item em {
+  display: block;
+}
+
+.phase-item b {
+  color: var(--teal);
+  font-size: 12px;
+  text-transform: uppercase;
+}
+
+.phase-item strong {
+  margin: 3px 0;
+}
+
+.phase-item span span {
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.phase-item em {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--line);
+  color: var(--red);
+  font-size: 13px;
+  font-style: normal;
+  font-weight: 700;
+}
+
+@media (max-width: 1120px) {
+  .reuse-mode-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .reuse-flow,
+  .validation-ladder {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .reuse-flow .flow-step::after {
+    display: none;
+  }
+}
+
+@media (max-width: 760px) {
+  .scorecard,
+  .phase-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .score-field {
+    grid-template-columns: minmax(0, 1fr) 32px;
+  }
+
+  .score-field > span {
+    grid-column: 1 / -1;
+  }
+
+  .reuse-flow,
+  .validation-ladder {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 480px) {
+  .hero .summary-strip {
+    display: none;
+  }
+
+  .reuse-mode-grid,
+  .reuse-flow,
+  .validation-ladder {
+    grid-template-columns: 1fr;
+  }
+
+  .reuse-flow .flow-step {
+    min-height: 88px;
+  }
+}
+
+@media print {
+  .score-result button {
+    display: none;
+  }
+}
