@@ -1,0 +1,139 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="An interactive 30-question MCQ lab for Mythic and analog compute-in-memory architecture, reliability, evidence, compilers, and interview design.">
+  <title>Mythic &amp; Analog CIM MCQ Lab | NPU Study Guide</title>
+  <link rel="stylesheet" href="analog-cim.css">
+  <script src="analog-cim-quiz.js" defer></script>
+</head>
+<body>
+  <header class="site-header">
+    <a class="brand" href="index.html" aria-label="NPU Study Guide home">
+      <img src="https://avatars.githubusercontent.com/u/72680210?v=4" alt="Bui Cong Nguyen avatar">
+      <span>NPU Study Guide</span>
+    </a>
+    <nav class="site-nav" aria-label="Analog CIM learning path">
+      <a href="analog-cim-architecture.html">Architecture</a>
+      <a href="analog-cim-evidence.html">Evidence</a>
+      <a href="analog-cim-interview.html">Interview</a>
+      <a href="analog-cim-quiz.html" aria-current="page">MCQ Lab</a>
+      <a href="index.html">NPU Home</a>
+    </nav>
+  </header>
+
+  <main>
+    <section class="hero">
+      <div class="hero-copy">
+        <p class="eyebrow">30 source-linked questions | updated 2026-07-11</p>
+        <h1>Mythic and Analog CIM MCQ Lab</h1>
+        <p class="lede">
+          Test the physics, Mythic architecture, reliability stack, measured accuracy evidence, compiler mapping,
+          and interview judgment. Every answer includes a technical explanation and links back to primary material.
+        </p>
+        <div class="hero-actions">
+          <a class="button" href="#quiz">Start the quiz</a>
+          <a class="button secondary" href="analog-cim-architecture.html">Review architecture</a>
+          <a class="button secondary" href="analog-cim-evidence.html">Review evidence</a>
+        </div>
+        <div class="summary-strip" aria-label="Quiz coverage">
+          <div><strong>6 topics</strong><span>From array physics to interview design</span></div>
+          <div><strong>3 levels</strong><span>Foundation, intermediate, and advanced</span></div>
+          <div><strong>30 MCQs</strong><span>Original questions in structured JSON</span></div>
+          <div><strong>Primary links</strong><span>Trace each explanation to evidence</span></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="quiz">
+      <div class="section-heading">
+        <p class="eyebrow">Practice set</p>
+        <h2>Filter, answer, and explain the tradeoff</h2>
+        <p class="section-note">A correct choice is the start. Before moving on, say why each distractor is wrong and name the cost of the proposed mitigation.</p>
+      </div>
+      <div class="quiz-shell">
+        <div class="quiz-toolbar">
+          <div class="filter-row">
+            <div class="field">
+              <label for="topic-filter">Topic</label>
+              <select id="topic-filter" disabled>
+                <option>All topics</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="difficulty-filter">Difficulty</label>
+              <select id="difficulty-filter" disabled>
+                <option>All levels</option>
+              </select>
+            </div>
+          </div>
+          <button id="shuffle-quiz" class="button secondary" type="button" disabled>Shuffle set</button>
+          <button id="reset-quiz" class="button secondary" type="button" disabled>Reset</button>
+        </div>
+        <div class="quiz-progress">
+          <div class="progress-track" aria-hidden="true"><div id="progress-bar" class="progress-bar"></div></div>
+          <div><strong id="progress-label">0 / 0</strong> <span id="score-label" class="muted">Score 0 / 0</span></div>
+        </div>
+        <div id="quiz-body" class="quiz-body" aria-live="polite">
+          <div class="empty-state">Loading question data...</div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="dataset">
+      <div class="section-heading">
+        <p class="eyebrow">Reusable learning data</p>
+        <h2>The content is structured for study tools</h2>
+      </div>
+      <div class="card-grid">
+        <article class="learning-card">
+          <span class="card-label">Architecture data</span>
+          <h3>Eight signal-path stages</h3>
+          <p>Responsibilities, failure modes, mitigations, interview prompts, product metrics, technology comparisons, and source IDs.</p>
+          <a href="data/analog-cim-architecture.json">Open architecture JSON</a>
+        </article>
+        <article class="learning-card">
+          <span class="card-label">Evidence data</span>
+          <h3>Paper and issue ledger</h3>
+          <p>Measured results, system boundaries, correct interpretations, unresolved issues, mitigation costs, and claim-review questions.</p>
+          <a href="data/analog-cim-evidence.json">Open evidence JSON</a>
+        </article>
+        <article class="learning-card">
+          <span class="card-label">Question data</span>
+          <h3>Thirty traceable MCQs</h3>
+          <p>Topic, difficulty, choices, zero-based answer, explanation, and primary-source IDs for each item.</p>
+          <a href="data/analog-cim-mcq.json">Open MCQ JSON</a>
+        </article>
+      </div>
+    </section>
+
+    <section class="section" id="mastery">
+      <div class="section-heading">
+        <p class="eyebrow">Mastery check</p>
+        <h2>Move beyond recognition</h2>
+      </div>
+      <div class="card-grid two">
+        <article class="learning-card">
+          <span class="card-label">Ready for a design interview</span>
+          <h3>You can reconstruct the answer</h3>
+          <p>Derive the MVM, map a large projection, build an error budget, choose an analog-digital boundary, and define an end-to-end validation plan without relying on answer choices.</p>
+        </article>
+        <article class="learning-card">
+          <span class="card-label">Ready for a paper discussion</span>
+          <h3>You can bound the claim</h3>
+          <p>Name the baseline, workload, measured hardware, off-chip work, mitigation, overhead, corners, time horizon, and one experiment needed before generalizing the result.</p>
+        </article>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <p>Original MCQ bank with source traceability. No private interview questions are claimed.</p>
+    <div class="footer-links">
+      <a href="analog-cim-interview.html">Interview study</a>
+      <a href="https://github.com/buicongnguyen/NPU">Source</a>
+    </div>
+  </footer>
+</body>
+</html>

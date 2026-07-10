@@ -1,0 +1,333 @@
+{
+  "meta": {
+    "title": "Mythic and analog compute-in-memory MCQ bank",
+    "updated": "2026-07-11",
+    "questionCount": 30,
+    "answerIndexing": "zero-based",
+    "choiceOrder": "Canonical source order; the interactive quiz shuffles displayed choices.",
+    "license": "Original study questions. Source IDs point to the primary material used for each explanation."
+  },
+  "questions": [
+    {
+      "id": "foundations-01",
+      "topic": "Foundations",
+      "difficulty": "Foundation",
+      "prompt": "In an ideal current-mode analog CIM array, which relationship performs the multiplication inside one memory cell?",
+      "choices": ["I = V times G", "V = I plus G", "P = V divided by G", "Q = C times frequency"],
+      "answer": 0,
+      "explanation": "The input is represented by voltage V and the programmed weight by conductance G. Ohm's law gives cell current I = V times G; column-current summation supplies the accumulation.",
+      "sourceIds": ["mythic-hotchips", "neurram"]
+    },
+    {
+      "id": "foundations-02",
+      "topic": "Foundations",
+      "difficulty": "Foundation",
+      "prompt": "What is the primary architectural energy advantage of compute-in-memory for neural inference?",
+      "choices": ["It avoids repeatedly moving matrix weights to a separate arithmetic unit", "It eliminates all activation movement", "It makes every operation exact FP64", "It removes the need for any digital logic"],
+      "answer": 0,
+      "explanation": "Weights remain where the MVM occurs, reducing the dominant weight-fetch traffic. Activations, outputs, control, and unsupported operations still move and often remain digital.",
+      "sourceIds": ["mythic-analog", "mythic-dataflow"]
+    },
+    {
+      "id": "foundations-04",
+      "topic": "Foundations",
+      "difficulty": "Foundation",
+      "prompt": "Why is an ADC needed after a typical analog CIM column operation?",
+      "choices": ["To convert the analog accumulated result into a digital code", "To program the model weights during training only", "To route PCIe packets", "To refresh SRAM bits"],
+      "answer": 0,
+      "explanation": "The array produces current, charge, voltage, or duration. The ADC digitizes that result so local digital logic can accumulate, activate, route, and continue execution.",
+      "sourceIds": ["mythic-hotchips", "ibm-hermes"]
+    },
+    {
+      "id": "foundations-05",
+      "topic": "Foundations",
+      "difficulty": "Intermediate",
+      "prompt": "A conductance cannot be negative. What is a common way to encode signed weights?",
+      "choices": ["Represent a weight as the difference between positive and negative conductances", "Reverse the chip clock for negative values", "Store negative values only in DRAM", "Ignore every negative weight"],
+      "answer": 0,
+      "explanation": "Differential mapping uses G+ minus G-. Offset coding and other mappings also exist, but differential pairs are a common direct solution and cost extra cells or read paths.",
+      "sourceIds": ["neurram", "mythic-mapping-patent"]
+    },
+    {
+      "id": "foundations-06",
+      "topic": "Foundations",
+      "difficulty": "Intermediate",
+      "prompt": "What is the main tradeoff of bit-serial activation input?",
+      "choices": ["Simpler input circuitry at the cost of additional cycles and accumulation", "No converter or timing logic is required", "It guarantees FP32 accuracy", "It stores activations permanently"],
+      "answer": 0,
+      "explanation": "Bit-serial or phased inputs reduce analog driver complexity and headroom requirements, but higher precision requires more cycles and digital shift-and-add work.",
+      "sourceIds": ["neurram", "mythic-hotchips"]
+    },
+    {
+      "id": "mythic-01",
+      "topic": "Mythic",
+      "difficulty": "Foundation",
+      "prompt": "Which memory technology is central to Mythic's publicly disclosed analog compute engine?",
+      "choices": ["Embedded flash", "HBM3E", "Magnetic tape", "Optical disk"],
+      "answer": 0,
+      "explanation": "Mythic's disclosed architecture performs analog matrix multiplication in embedded flash arrays that also retain the model weights.",
+      "sourceIds": ["mythic-hotchips", "mythic-m1076"]
+    },
+    {
+      "id": "mythic-02",
+      "topic": "Mythic",
+      "difficulty": "Foundation",
+      "prompt": "Which set of blocks appears beside the analog compute engine in the disclosed M1076 tile?",
+      "choices": ["SRAM, 16-bit SIMD, 32-bit RISC-V nano-processor, and NoC router", "Only an x86 core and HBM controller", "A GPU shader cluster and ray-tracing core", "Only flash cells with no digital support"],
+      "answer": 0,
+      "explanation": "The tile is deliberately hybrid. Local SRAM, SIMD, control, and routing handle operations and orchestration that do not belong in the analog matrix array.",
+      "sourceIds": ["mythic-m1076", "mythic-technology"]
+    },
+    {
+      "id": "mythic-03",
+      "topic": "Mythic",
+      "difficulty": "Intermediate",
+      "prompt": "What does Mythic's public software workflow call its analog representation of 8-bit deployment values?",
+      "choices": ["ANA8", "FP64X", "CUDA-A", "RRAM-BF16"],
+      "answer": 0,
+      "explanation": "Mythic describes converting trained FP32 models into an integer 8-bit analog representation called ANA8, with retraining paths for stricter accuracy targets.",
+      "sourceIds": ["mythic-workflow"]
+    },
+    {
+      "id": "mythic-04",
+      "topic": "Mythic",
+      "difficulty": "Intermediate",
+      "prompt": "Why does Mythic use a graph compiler in addition to model quantization?",
+      "choices": ["To map, pack, schedule, and generate code for fixed arrays and digital tile resources", "To replace all weight cells with CPU instructions", "To manufacture the flash devices", "To eliminate every unsupported operator mathematically"],
+      "answer": 0,
+      "explanation": "Quantization changes representation. Compilation must still partition matrices, allocate buffers, schedule dataflow, route activations, and generate control code.",
+      "sourceIds": ["mythic-workflow", "mythic-mapping-patent"]
+    },
+    {
+      "id": "mythic-05",
+      "topic": "Mythic",
+      "difficulty": "Advanced",
+      "prompt": "What did Mythic's 2018 Hot Chips presentation say about the input DAC in that implementation?",
+      "choices": ["It used digital approximation instead of a full input DAC", "It used one 16-bit DAC per flash cell", "It had no ADC or DAC boundary", "It accepted only analog camera voltages"],
+      "answer": 0,
+      "explanation": "The presentation explicitly described leaving the input DAC for a future implementation and achieving the result through digital approximation.",
+      "sourceIds": ["mythic-hotchips"]
+    },
+    {
+      "id": "mythic-06",
+      "topic": "Mythic",
+      "difficulty": "Intermediate",
+      "prompt": "How should Mythic's December 2025 claim of 120 TOPS/W and roughly 100x system energy advantage be classified in a research ledger?",
+      "choices": ["A vendor roadmap and internal benchmark claim pending public independent reproduction", "A universally reproduced scientific constant", "A measured result from the 2022 NeuRRAM paper", "A guaranteed value for every model and batch size"],
+      "answer": 0,
+      "explanation": "The announcement is useful for current direction but does not publish enough method and independent model-level evidence to treat it as a generally verified result.",
+      "sourceIds": ["mythic-funding"]
+    },
+    {
+      "id": "architecture-01",
+      "topic": "Architecture and compilers",
+      "difficulty": "Intermediate",
+      "prompt": "A matrix dimension exceeds one physical array. What must the system usually do?",
+      "choices": ["Partition it across arrays and combine partial results", "Drop the extra rows and columns", "Increase the physical array at runtime", "Run only the bias vector"],
+      "answer": 0,
+      "explanation": "Large projections are tiled spatially or temporally. This creates partial sums, additional routing, and scheduling work that an end-to-end cost model must include.",
+      "sourceIds": ["mythic-mapping-patent", "neurram"]
+    },
+    {
+      "id": "architecture-02",
+      "topic": "Architecture and compilers",
+      "difficulty": "Intermediate",
+      "prompt": "Why can low array utilization damage real TOPS/W?",
+      "choices": ["Converters and peripheral circuits still consume energy while many cells do no useful work", "Unused cells automatically become FP64 cores", "The model gains extra accuracy for free", "NoC traffic always falls to zero"],
+      "answer": 0,
+      "explanation": "Peak metrics assume dense, well-utilized arrays. Irregular shapes can leave cells idle while ADC, driver, routing, and control costs remain.",
+      "sourceIds": ["neurram", "mythic-dataflow"]
+    },
+    {
+      "id": "architecture-03",
+      "topic": "Architecture and compilers",
+      "difficulty": "Advanced",
+      "prompt": "Which transformer operation is the strongest default candidate for analog CIM?",
+      "choices": ["Large dense linear projections with reused weights", "Softmax normalization with dynamic exponentials", "Tokenizer string parsing", "Control-flow-dependent beam search bookkeeping"],
+      "answer": 0,
+      "explanation": "Dense weight-stationary matrix-vector products fit analog arrays. Softmax, normalization, dynamic control, and indexing generally need flexible digital execution.",
+      "sourceIds": ["albert-2025", "mythic-hybrid"]
+    },
+    {
+      "id": "architecture-04",
+      "topic": "Architecture and compilers",
+      "difficulty": "Advanced",
+      "prompt": "What should a compiler cost model include beyond the number of MAC operations?",
+      "choices": ["Array utilization, ADC phases, partial sums, buffers, routing, digital fallback, and off-chip traffic", "Only source-code line count", "Only the model's final accuracy", "Only the flash programming voltage"],
+      "answer": 0,
+      "explanation": "End-to-end efficiency depends on all work surrounding MVM. Counting ideal MACs alone hides the effects that often dominate a deployed graph.",
+      "sourceIds": ["mythic-workflow", "ibm-speech", "neurram"]
+    },
+    {
+      "id": "reliability-01",
+      "topic": "Reliability",
+      "difficulty": "Foundation",
+      "prompt": "What does iterative write-verify address most directly?",
+      "choices": ["Programming a memory cell closer to its target conductance", "Routing activations between chips", "Choosing a tokenizer vocabulary", "Compiling C++ templates"],
+      "answer": 0,
+      "explanation": "Write-verify alternates programming pulses with reads until the cell approaches its target. It reduces static weight error but costs programming time and device cycles.",
+      "sourceIds": ["neurram", "ibm-speech"]
+    },
+    {
+      "id": "reliability-02",
+      "topic": "Reliability",
+      "difficulty": "Intermediate",
+      "prompt": "Which non-ideality causes a correctly programmed PCM weight to change over time?",
+      "choices": ["Conductance drift", "Instruction-cache associativity", "Tensor rank", "PCIe lane reversal"],
+      "answer": 0,
+      "explanation": "PCM resistance or conductance drifts as its physical state relaxes. Drift-aware training and recalibration can limit model-level impact but do not remove the underlying physics.",
+      "sourceIds": ["ibm-speech", "albert-2025"]
+    },
+    {
+      "id": "reliability-03",
+      "topic": "Reliability",
+      "difficulty": "Advanced",
+      "prompt": "Why does increasing ADC resolution not guarantee the same increase in effective MVM precision?",
+      "choices": ["Device variation, array noise, parasitics, and input error may already dominate", "An ADC cannot output digital values", "Higher resolution always decreases signal range to zero", "Weights stop being non-volatile"],
+      "answer": 0,
+      "explanation": "The effective number of bits is limited by the entire analog signal chain. A finer quantizer cannot recover information already lost to noise, distortion, or programming error.",
+      "sourceIds": ["adaptive-adc", "neurram"]
+    },
+    {
+      "id": "reliability-04",
+      "topic": "Reliability",
+      "difficulty": "Intermediate",
+      "prompt": "Why is analog in-memory training generally harder on device endurance than inference?",
+      "choices": ["Training updates weights repeatedly, whereas inference can keep weights mostly static", "Inference always writes every weight for every sample", "Training never uses matrix operations", "Inference requires perfectly symmetric updates"],
+      "answer": 0,
+      "explanation": "Static inference programs weights infrequently. Training performs many incremental updates, exposing endurance, update linearity, asymmetry, and high-precision accumulation problems.",
+      "sourceIds": ["nature-training-2018", "albert-2025"]
+    },
+    {
+      "id": "reliability-05",
+      "topic": "Reliability",
+      "difficulty": "Advanced",
+      "prompt": "Which mitigation most directly addresses large activation or weight outliers consuming analog dynamic range?",
+      "choices": ["Channel scaling, clipping, outlier splitting, or selective mixed precision", "Increasing package pin count only", "Disabling every residual connection", "Replacing the NoC with UART"],
+      "answer": 0,
+      "explanation": "Outlier-aware scaling and mixed precision keep typical values above the noise floor while routing sensitive values through a larger range or more precise path.",
+      "sourceIds": ["mixed-cim-2025", "ibm-speech"]
+    },
+    {
+      "id": "evidence-01",
+      "topic": "Accuracy evidence",
+      "difficulty": "Intermediate",
+      "prompt": "What software baseline did NeuRRAM use for its software-comparable accuracy claim?",
+      "choices": ["Software models quantized to 4-bit weights", "An unlimited FP64 supercomputer with no quantization", "A random untrained model", "Only a binary neural network"],
+      "answer": 0,
+      "explanation": "NeuRRAM reported fully hardware-measured results comparable to software models quantized to 4-bit weights. Naming the baseline is essential when interpreting parity.",
+      "sourceIds": ["neurram"]
+    },
+    {
+      "id": "evidence-02",
+      "topic": "Accuracy evidence",
+      "difficulty": "Advanced",
+      "prompt": "In the 2023 IBM RNNT demonstration, how did the best reported hardware WER compare with the FP software baseline?",
+      "choices": ["9.258% hardware WER versus 7.452% FP baseline", "0% hardware WER versus 100% FP baseline", "Both were exactly 1.000%", "The paper reported no software baseline"],
+      "answer": 0,
+      "explanation": "The five-chip result with weight expansion reached 9.258% WER, 1.81 percentage points above the 7.452% FP baseline and within the paper's software-equivalent threshold.",
+      "sourceIds": ["ibm-speech"]
+    },
+    {
+      "id": "evidence-03",
+      "topic": "Accuracy evidence",
+      "difficulty": "Advanced",
+      "prompt": "What did weight expansion do in the 2023 RNNT study?",
+      "choices": ["Used extra rows and digital preprocessing to increase signal-to-noise ratio for a sensitive matrix", "Compressed every weight into one unreliable bit", "Removed all LSTM layers", "Converted speech into images"],
+      "answer": 0,
+      "explanation": "The method factored a sensitive matrix through an expanded representation. Signal grew faster than independent noise, but the method used more rows and digital preprocessing.",
+      "sourceIds": ["ibm-speech"]
+    },
+    {
+      "id": "evidence-04",
+      "topic": "Accuracy evidence",
+      "difficulty": "Intermediate",
+      "prompt": "Why does the 2025 mixed memristor/SRAM result not prove that pure analog accuracy is solved?",
+      "choices": ["Its central method sends sensitive layers or kernels to SRAM CIM or digital precision", "It contains no memory at all", "It evaluates only sorting algorithms", "It forbids mixed precision"],
+      "answer": 0,
+      "explanation": "The less-than-0.45% degradation result is impressive precisely because the architecture is heterogeneous. Selective precise execution is part of the solution.",
+      "sourceIds": ["mixed-cim-2025"]
+    },
+    {
+      "id": "evidence-05",
+      "topic": "Accuracy evidence",
+      "difficulty": "Advanced",
+      "prompt": "Which part of the 2025 ALBERT study remained outside the analog MVM hardware path?",
+      "choices": ["Attention computation and several activation, pooling, and classifier operations ran in software", "All fully connected weights", "Every model parameter", "The seven GLUE tasks themselves"],
+      "answer": 0,
+      "explanation": "More than 99% of model weights were represented in hardware, but attention and nonlinear/vector operations were implemented in software, so the demonstration was not end to end.",
+      "sourceIds": ["albert-2025"]
+    },
+    {
+      "id": "evidence-06",
+      "topic": "Accuracy evidence",
+      "difficulty": "Advanced",
+      "prompt": "What problem does the 2026 fault-free matrix representation solve most directly?",
+      "choices": ["Static stuck-device faults through a product of two adjustable submatrices", "Every source of temporal random noise without overhead", "All transformer software compilation", "The physical endurance of every memory technology"],
+      "answer": 0,
+      "explanation": "Adaptive matrix factorization can route around many faulty devices and achieved very high DFT matrix similarity. It does not eliminate every noise, drift, converter, or system issue.",
+      "sourceIds": ["fault-free-2026"]
+    },
+    {
+      "id": "evidence-07",
+      "topic": "Accuracy evidence",
+      "difficulty": "Intermediate",
+      "prompt": "What is the most defensible conclusion from the combined Nature-family evidence through July 2026?",
+      "choices": ["Software-comparable accuracy is real for scoped workloads with co-design, but no universal analog accuracy solution has been demonstrated", "Analog CIM can never run any useful neural network", "Every analog chip is now exact for every model", "Only simulation results exist"],
+      "answer": 0,
+      "explanation": "Measured chips have crossed important accuracy and scale thresholds. The results remain conditional on workload, baseline, calibration, retraining, redundancy, mixed precision, and system boundaries.",
+      "sourceIds": ["accuracy-review-2026", "synapse-review-2026", "neurram", "ibm-speech"]
+    },
+    {
+      "id": "interview-01",
+      "topic": "Interview design",
+      "difficulty": "Intermediate",
+      "prompt": "When evaluating an analog-CIM accuracy claim in an interview, what should you ask first?",
+      "choices": ["Was it measured on fabricated silicon, simulated, or inferred from device traces?", "What color was the evaluation board?", "How many slides were in the presentation?", "Did the model name contain a vowel?"],
+      "answer": 0,
+      "explanation": "Evidence type controls how strongly a result can be generalized. Full-chip measurement includes non-idealities that device-trace simulation often misses.",
+      "sourceIds": ["neurram", "accuracy-review-2026"]
+    },
+    {
+      "id": "interview-02",
+      "topic": "Interview design",
+      "difficulty": "Advanced",
+      "prompt": "What is the best first benchmark plan for a new AIMC accelerator?",
+      "choices": ["Define workload and baseline, measure end-to-end accuracy, latency, energy, utilization, corners, and drift, then report mitigation cost", "Report ideal array TOPS only", "Use one hand-selected sample", "Ignore digital and communication energy"],
+      "answer": 0,
+      "explanation": "A credible plan fixes the model, dataset, baseline, system boundary, operating conditions, and time horizon before comparing efficiency and accuracy.",
+      "sourceIds": ["neurram", "ibm-speech", "accuracy-review-2026"]
+    },
+    {
+      "id": "interview-03",
+      "topic": "Interview design",
+      "difficulty": "Advanced",
+      "prompt": "A chip is accurate at room temperature immediately after calibration but fails after a week at high temperature. What is the best next investigation?",
+      "choices": ["Separate temperature-dependent gain/offset from device drift using references, repeated measurements, and selective recalibration", "Increase the marketing TOPS number", "Delete all validation data", "Assume the compiler changed itself"],
+      "answer": 0,
+      "explanation": "The experiment should isolate reversible PVT effects from time-dependent state drift, then test whether reference-based calibration or reprogramming restores accuracy.",
+      "sourceIds": ["albert-2025", "ibm-speech", "synapse-review-2026"]
+    }
+  ],
+  "sources": {
+    "mythic-analog": {"title": "Mythic Analog Computing", "url": "https://mythic.ai/technology/analog-computing/"},
+    "mythic-dataflow": {"title": "Mythic Dataflow Architecture", "url": "https://mythic.ai/technology/dataflow-architecture/"},
+    "mythic-technology": {"title": "Mythic Technology", "url": "https://mythic.ai/technology/"},
+    "mythic-workflow": {"title": "Mythic AI Workflow", "url": "https://mythic.ai/technology/mythic-ai-workflow/"},
+    "mythic-m1076": {"title": "M1076 Product Brief", "url": "https://mythic.ai/wp-content/uploads/2022/03/M1076-AMP-Product-Brief-v1.0-1.pdf"},
+    "mythic-hotchips": {"title": "Mythic Hot Chips 2018", "url": "https://old.hotchips.org/hc30/2conf/2.05_Mythic_Mythic_Hot_Chips_2018_V5.pdf"},
+    "mythic-mapping-patent": {"title": "Mythic Matrix Mapping Patent", "url": "https://patents.google.com/patent/US12406021B2/en"},
+    "mythic-funding": {"title": "Mythic December 2025 Announcement", "url": "https://mythic.ai/whats-new/mythic-to-challenge-ais-gpu-pantheon-with-100x-energy-advantage-and-oversubscribed-125m-raise/"},
+    "mythic-hybrid": {"title": "Mythic and Videantis Hybrid Platform", "url": "https://mythic.ai/whats-new/mythic-acquires-videantis-one-of-europes-leading-digital-processor-ip-companies-to-build-the-worlds-most-energy-efficient-ai-compute-platform/"},
+    "nature-training-2018": {"title": "Equivalent-accuracy Analogue Training", "url": "https://doi.org/10.1038/s41586-018-0180-5"},
+    "neurram": {"title": "NeuRRAM", "url": "https://doi.org/10.1038/s41586-022-04992-8"},
+    "ibm-hermes": {"title": "IBM 64-core PCM Chip", "url": "https://doi.org/10.1038/s41928-023-01010-1"},
+    "ibm-speech": {"title": "IBM Speech and RNNT Analog AI", "url": "https://doi.org/10.1038/s41586-023-06337-5"},
+    "mixed-cim-2025": {"title": "Mixed-precision Memristor and SRAM CIM", "url": "https://doi.org/10.1038/s41586-025-08639-2"},
+    "albert-2025": {"title": "ALBERT on a 14-nm Analog AI Chip", "url": "https://doi.org/10.1038/s41467-025-63794-4"},
+    "adaptive-adc": {"title": "Adaptive Memristor ADC", "url": "https://doi.org/10.1038/s41467-025-65233-w"},
+    "fault-free-2026": {"title": "Fault-free Analogue Computing", "url": "https://doi.org/10.1038/s41928-026-01638-9"},
+    "accuracy-review-2026": {"title": "High-accuracy Memristor AIMC Review", "url": "https://doi.org/10.1038/s41563-026-02600-y"},
+    "synapse-review-2026": {"title": "Non-idealities in Artificial Synapses", "url": "https://doi.org/10.1038/s42254-026-00957-2"}
+  }
+}

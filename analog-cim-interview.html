@@ -1,0 +1,324 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Interview preparation for Mythic and analog compute-in-memory companies, with role tracks, a six-week study plan, design exercises, paper critique, and mock questions.">
+  <title>Mythic &amp; Analog CIM Interview Study | NPU Study Guide</title>
+  <link rel="stylesheet" href="analog-cim.css">
+</head>
+<body>
+  <header class="site-header">
+    <a class="brand" href="index.html" aria-label="NPU Study Guide home">
+      <img src="https://avatars.githubusercontent.com/u/72680210?v=4" alt="Bui Cong Nguyen avatar">
+      <span>NPU Study Guide</span>
+    </a>
+    <nav class="site-nav" aria-label="Analog CIM learning path">
+      <a href="analog-cim-architecture.html">Architecture</a>
+      <a href="analog-cim-evidence.html">Evidence</a>
+      <a href="analog-cim-interview.html" aria-current="page">Interview</a>
+      <a href="analog-cim-quiz.html">MCQ Lab</a>
+      <a href="index.html">NPU Home</a>
+    </nav>
+  </header>
+
+  <main>
+    <section class="hero">
+      <div class="hero-copy">
+        <p class="eyebrow">Role-focused preparation | updated 2026-07-11</p>
+        <h1>Interview Study for Mythic and Analog CIM Teams</h1>
+        <p class="lede">
+          Prepare for the boundary work: device physics meets mixed-signal circuits, arrays meet dataflow hardware,
+          compiler mapping meets quantized models, and lab measurements meet production reliability. The strongest
+          candidate can reason across those boundaries without pretending every block is their specialty.
+        </p>
+        <div class="hero-actions">
+          <a class="button" href="#study-plan">Start the study plan</a>
+          <a class="button secondary" href="#mock-questions">Practice design questions</a>
+          <a class="button secondary" href="analog-cim-quiz.html">Take the MCQ lab</a>
+        </div>
+        <div class="summary-strip" aria-label="Interview preparation summary">
+          <div><strong>Explain</strong><span>Derive the MVM and expose its assumptions</span></div>
+          <div><strong>Design</strong><span>Partition analog and digital responsibilities</span></div>
+          <div><strong>Measure</strong><span>Define accuracy, power, corners, yield, and drift</span></div>
+          <div><strong>Challenge</strong><span>Separate a measured result from a broad claim</span></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="scope">
+      <div class="callout caution">
+        <h2>What this study can and cannot claim</h2>
+        <p>
+          Mythic's exact interview loop is not public and can vary by role. This guide does not invent one. It derives
+          preparation areas from Mythic's public architecture, papers, and current role descriptions for analog design,
+          mixed-signal verification, architecture modeling, RTL, compiler, AI software, product, test, and systems work.
+        </p>
+      </div>
+    </section>
+
+    <section class="section" id="company-brief">
+      <div class="section-heading">
+        <p class="eyebrow">Company brief</p>
+        <h2>Know which facts are established and which are roadmap</h2>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th scope="col">Topic</th><th scope="col">Interview-ready statement</th><th scope="col">Evidence discipline</th></tr>
+          </thead>
+          <tbody>
+            <tr>
+              <th scope="row">Core technique</th>
+              <td>Mythic stores inference weights as analog states in embedded flash and performs dense matrix operations in or through that array.</td>
+              <td>Documented in Mythic technical material and the M1076/ISSCC disclosures.</td>
+            </tr>
+            <tr>
+              <th scope="row">First-generation system</th>
+              <td>The M1076 product brief describes 76 tiles, up to 80M weights, up to 25 TOPS, and 3-4 W for typical complex models.</td>
+              <td>Vendor product figures; quote the source and do not generalize to every workload.</td>
+            </tr>
+            <tr>
+              <th scope="row">Software</th>
+              <td>The public workflow converts FP32 to ANA8, offers analog-aware retraining, and compiles graph mapping, packing, scheduling, and code generation.</td>
+              <td>Documented workflow; implementation details remain proprietary.</td>
+            </tr>
+            <tr>
+              <th scope="row">Current direction</th>
+              <td>Mythic now describes an analog-plus-digital platform, reinforced by its May 2026 acquisition of Videantis for unified digital compute and software.</td>
+              <td>Current company announcement and strategy.</td>
+            </tr>
+            <tr>
+              <th scope="row">Next-generation metrics</th>
+              <td>The company claims roughly 100x energy advantage and 120 TOPS/W for its current architecture, with edge-to-datacenter ambitions.</td>
+              <td>Roadmap/internal benchmark claim; public independent reproduction was not found in this review.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="section" id="role-tracks">
+      <div class="section-heading">
+        <p class="eyebrow">Choose a primary lane</p>
+        <h2>Four interview tracks with a shared architecture core</h2>
+        <p class="section-note">Master your role deeply, then learn enough of the adjacent layers to make clean interfaces and credible tradeoffs.</p>
+      </div>
+      <div class="card-grid two">
+        <article class="learning-card">
+          <span class="card-label">Analog and mixed signal</span>
+          <h3>Signal integrity becomes numerical accuracy</h3>
+          <p><strong>Prepare:</strong> MOS operation, noise, mismatch, PVT, current mirrors, integrators, comparators, ADC/DAC architectures, references, calibration, layout effects, Monte Carlo, and Verilog real-number models.</p>
+          <p><strong>Be ready to design:</strong> a column readout with a stated range, ENOB, settling time, power budget, calibration path, and corner plan.</p>
+        </article>
+        <article class="learning-card">
+          <span class="card-label">Architecture, RTL, and verification</span>
+          <h3>Make a probabilistic primitive behave like a system block</h3>
+          <p><strong>Prepare:</strong> pipelines, SRAM, NoCs, dataflow, fixed-point arithmetic, power and clock domains, RISC-V/SIMD roles, performance modeling, SystemVerilog, UVM, RNM, assertions, and coverage.</p>
+          <p><strong>Be ready to design:</strong> a tile scheduler and verification plan that covers analog latency, backpressure, saturation, faults, reset, and power transitions.</p>
+        </article>
+        <article class="learning-card">
+          <span class="card-label">Compiler and ML systems</span>
+          <h3>Turn graph semantics into fixed physical resources</h3>
+          <p><strong>Prepare:</strong> modern C++ and Python, SSA/graph IR, ONNX, MLIR/LLVM, TVM/XLA/IREE concepts, lowering, fusion, tiling, scheduling, memory allocation, quantization, error injection, and heterogeneous partitioning.</p>
+          <p><strong>Be ready to design:</strong> an IR and cost model for array shapes, ADC phases, partial sums, local SRAM, digital fallback, and route pressure.</p>
+        </article>
+        <article class="learning-card">
+          <span class="card-label">Silicon, product, and test</span>
+          <h3>Prove the chip across units, corners, and time</h3>
+          <p><strong>Prepare:</strong> bring-up, characterization, ATE, wafer sort, yield analysis, correlation, guardbands, binning, screening, DFT/MBIST, failure analysis, reliability, automation, and statistical data analysis.</p>
+          <p><strong>Be ready to design:</strong> a test flow that separates device defects, analog variation, digital logic faults, package effects, and model-level escapes.</p>
+        </article>
+      </div>
+    </section>
+
+    <section class="section" id="study-plan">
+      <div class="section-heading">
+        <p class="eyebrow">Six-week plan</p>
+        <h2>Build from equations to a defensible system review</h2>
+      </div>
+      <div class="study-flow" aria-label="Six-week analog CIM interview study plan">
+        <article class="study-step"><b>Week 1</b><strong>Math and precision</strong><span>GEMV/GEMM, convolution lowering, fixed point, quantization, SNR, ENOB</span></article>
+        <article class="study-step"><b>Week 2</b><strong>Memory devices</strong><span>Flash, PCM, RRAM, SRAM; program/read, drift, endurance, variation</span></article>
+        <article class="study-step"><b>Week 3</b><strong>Circuits and arrays</strong><span>Drivers, Ohm/Kirchhoff MVM, ADC/DAC, IR drop, references, calibration</span></article>
+        <article class="study-step"><b>Week 4</b><strong>Tiles and compiler</strong><span>Mapping, dataflow, SRAM, NoC, partial sums, digital fallback, utilization</span></article>
+        <article class="study-step"><b>Week 5</b><strong>Accuracy evidence</strong><span>NeuRRAM, IBM PCM, mixed CIM, ALBERT, fault-free matrix review</span></article>
+        <article class="study-step"><b>Week 6</b><strong>Mock loop</strong><span>Derivation, coding, design review, debug scenario, paper critique, questions</span></article>
+      </div>
+      <div class="card-grid" style="margin-top:12px">
+        <article class="learning-card">
+          <span class="card-label">Daily 45 minutes</span>
+          <h3>Recall before reading</h3>
+          <p>Write the MVM equation, one non-ideality per layer, and one mitigation with its cost. Then check the source.</p>
+        </article>
+        <article class="learning-card">
+          <span class="card-label">Twice each week</span>
+          <h3>Explain on a whiteboard</h3>
+          <p>Give a two-minute architecture explanation, then a ten-minute version that includes precision and data movement.</p>
+        </article>
+        <article class="learning-card">
+          <span class="card-label">End of each week</span>
+          <h3>Produce evidence</h3>
+          <p>Complete one calculation, one plot or table, one design decision, and one written critique that can enter a portfolio.</p>
+        </article>
+      </div>
+    </section>
+
+    <section class="section" id="portfolio-lab">
+      <div class="section-heading">
+        <p class="eyebrow">Portfolio lab</p>
+        <h2>Build a noisy MVM study that exposes tradeoffs</h2>
+        <p class="section-note">A small, honest experiment is more persuasive than a broad slide deck with ideal TOPS.</p>
+      </div>
+      <div class="card-grid two">
+        <article class="learning-card">
+          <span class="card-label">Experiment</span>
+          <h3>Model the signal chain</h3>
+          <ol class="question-list">
+            <li>Start with an FP32 matrix-vector reference.</li>
+            <li>Quantize weights and activations with explicit scales.</li>
+            <li>Map signed weights to differential conductances.</li>
+            <li>Add programming error, drift, read noise, IR drop, clipping, and ADC quantization one at a time.</li>
+            <li>Measure MVM error and model accuracy across random seeds and time.</li>
+          </ol>
+        </article>
+        <article class="learning-card">
+          <span class="card-label">Mitigation study</span>
+          <h3>Pay for every recovery</h3>
+          <ol class="question-list">
+            <li>Compare per-tensor and per-channel scaling.</li>
+            <li>Add write-verify or measured-error calibration.</li>
+            <li>Try noise-aware fine-tuning.</li>
+            <li>Route one sensitive layer to a precise digital path.</li>
+            <li>Report extra cells, cycles, conversions, digital operations, and calibration frequency.</li>
+          </ol>
+        </article>
+      </div>
+      <div class="callout" style="margin-top:12px">
+        <p>
+          <strong>Deliverables:</strong> a reproducible notebook or test program, one error-budget plot, one
+          accuracy-versus-energy proxy curve, a short design memo, and a limitations section that distinguishes
+          measured assumptions from guessed ones.
+        </p>
+      </div>
+    </section>
+
+    <section class="section" id="mock-questions">
+      <div class="section-heading">
+        <p class="eyebrow">Mock technical loop</p>
+        <h2>Questions and the signal a strong answer should contain</h2>
+      </div>
+      <div class="card-grid two">
+        <article class="learning-card">
+          <span class="card-label">Architecture</span>
+          <h3>Derive analog MVM from first principles.</h3>
+          <p>State V-to-input and G-to-weight mappings, derive cell current and column sum, then list the linearity, independence, range, and readout assumptions.</p>
+        </article>
+        <article class="learning-card">
+          <span class="card-label">Numerical design</span>
+          <h3>Why is ANA8 not simply ordinary INT8?</h3>
+          <p>Separate quantization error from analog programming/read error, explain calibration and analog-aware retraining, and define the digital reference.</p>
+        </article>
+        <article class="learning-card">
+          <span class="card-label">Mapping</span>
+          <h3>Map a 4096 by 4096 projection onto 1024 by 1024 arrays.</h3>
+          <p>Find the 4 by 4 partition, explain broadcast and partial-sum reduction, account for signed and bit-sliced representation, then identify bottlenecks.</p>
+        </article>
+        <article class="learning-card">
+          <span class="card-label">Converters</span>
+          <h3>Choose ADC precision for a layer.</h3>
+          <p>Use output distribution, signal range, noise floor, clipping budget, ENOB, area/energy, conversion phases, and model sensitivity rather than naming a bit count.</p>
+        </article>
+        <article class="learning-card">
+          <span class="card-label">Debug</span>
+          <h3>Accuracy drops after one week in the field.</h3>
+          <p>Reproduce by chip and temperature, compare reference paths, separate common gain drift from per-cell drift, test recalibration, and check whether model margins changed.</p>
+        </article>
+        <article class="learning-card">
+          <span class="card-label">Verification</span>
+          <h3>Verify a digital controller around an analog array.</h3>
+          <p>Define a real-number model, bounded error contract, saturation and latency behavior, randomized PVT/error distributions, assertions, coverage, and transistor-level correlation.</p>
+        </article>
+        <article class="learning-card">
+          <span class="card-label">Compiler</span>
+          <h3>Partition a transformer between analog and digital compute.</h3>
+          <p>Favor dense projections for analog; evaluate outlier-sensitive early/output layers; leave softmax, normalization, dynamic indexing, and control on flexible digital units.</p>
+        </article>
+        <article class="learning-card">
+          <span class="card-label">Evidence review</span>
+          <h3>Did Nature prove accuracy is solved?</h3>
+          <p>Say no as a universal claim, then cite one measured success, its baseline and mitigation, one open issue, and the end-to-end experiment needed to generalize it.</p>
+        </article>
+      </div>
+    </section>
+
+    <section class="section" id="answer-frameworks">
+      <div class="section-heading">
+        <p class="eyebrow">Answer frameworks</p>
+        <h2>Keep technical answers structured under pressure</h2>
+      </div>
+      <div class="card-grid">
+        <article class="learning-card">
+          <span class="card-label">Explain a block</span>
+          <h3>Purpose, equation, boundary, error, metric</h3>
+          <p>What work does it own? What relation implements it? What enters and exits? How does it fail? Which measurement proves it works?</p>
+        </article>
+        <article class="learning-card">
+          <span class="card-label">Design a system</span>
+          <h3>Workload, mapping, budget, mitigation, validation</h3>
+          <p>Fix tensor shapes and targets, place work, allocate precision/error/energy, price each mitigation, then define end-to-end tests and corners.</p>
+        </article>
+        <article class="learning-card">
+          <span class="card-label">Debug silicon</span>
+          <h3>Reproduce, localize, separate, correlate, prevent</h3>
+          <p>Control variables, narrow the layer, split analog/digital and static/dynamic causes, correlate models to measurements, then add coverage or monitoring.</p>
+        </article>
+      </div>
+    </section>
+
+    <section class="section" id="questions-to-ask">
+      <div class="section-heading">
+        <p class="eyebrow">Questions for the team</p>
+        <h2>Ask about the real engineering boundary</h2>
+      </div>
+      <div class="panel">
+        <ul class="question-list">
+          <li>Which workload and system boundary define the current performance-per-watt target?</li>
+          <li>How does the compiler decide between analog arrays and digital execution for a sensitive operator or channel?</li>
+          <li>Which non-ideality currently consumes the largest accuracy, area, or calibration budget?</li>
+          <li>How are array models correlated from transistor simulation to post-silicon and model-level accuracy?</li>
+          <li>What calibration is factory-only, boot-time, periodic, temperature-triggered, or workload-specific?</li>
+          <li>How does the team measure yield and guardband model accuracy across chips rather than on a golden unit?</li>
+          <li>What changed most between the M1076 generation and the current hybrid analog-digital architecture?</li>
+          <li>What would a strong first 90 days look like for this role?</li>
+        </ul>
+      </div>
+    </section>
+
+    <section class="section" id="sources">
+      <div class="section-heading">
+        <p class="eyebrow">Role and preparation sources</p>
+        <h2>Public material behind this interview map</h2>
+      </div>
+      <div class="source-grid">
+        <article class="source-card"><a href="https://jobs.lever.co/mythic-ai.com/827b2948-5e3c-45c2-a320-4cb82ebc071e">Senior Analog Mixed-Signal Design Engineer</a><span>Mythic role description | analog and mixed-signal scope</span></article>
+        <article class="source-card"><a href="https://jobs.lever.co/mythic-ai.com/f9faeb06-60f1-4b04-9775-cd6854eca636">Senior Digital &amp; Mixed-Signal Verification Engineer</a><span>Mythic role description | RNM, UVM, controllers, interfaces</span></article>
+        <article class="source-card"><a href="https://jobs.lever.co/mythic-ai.com/28b62290-688c-44f4-b4db-008af6607533">Architecture Modeling Engineer</a><span>Mythic role description | processors, memory, interconnect, modeling</span></article>
+        <article class="source-card"><a href="https://jobs.lever.co/mythic-ai.com/e820511b-5aeb-462c-92ac-ee71afe24d56">Compiler Engineer - Machine Learning Compiler</a><span>Mythic role description | C++, Python, graph IR, MLIR, scheduling</span></article>
+        <article class="source-card"><a href="https://jobs.lever.co/mythic-ai.com/258a68ce-d5c1-46c3-a901-75217b3b0958">Senior Product Engineer</a><span>Mythic role description | bring-up, yield, correlation, manufacturing</span></article>
+        <article class="source-card"><a href="https://mythic.ai/join-us/">Mythic open roles</a><span>Current role families; listings can change</span></article>
+        <article class="source-card"><a href="analog-cim-architecture.html#sources">Architecture primary-source ledger</a><span>Mythic, Hot Chips, patent, Nature comparison sources</span></article>
+        <article class="source-card"><a href="analog-cim-evidence.html#paper-ledger">Accuracy paper ledger</a><span>Measured silicon, hybrid studies, and 2026 reviews</span></article>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <p>Preparation map based on public role requirements, not a claimed private interview loop.</p>
+    <div class="footer-links">
+      <a href="analog-cim-quiz.html">Next: MCQ lab</a>
+      <a href="https://github.com/buicongnguyen/NPU">Source</a>
+    </div>
+  </footer>
+</body>
+</html>

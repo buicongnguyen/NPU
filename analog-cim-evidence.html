@@ -1,0 +1,240 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="A source-critical review of analog compute-in-memory accuracy claims, including Nature papers, measured silicon, remaining issues, mitigation costs, and a verdict on whether accuracy is solved.">
+  <title>Is Analog CIM Accuracy Solved? Evidence &amp; Issues | NPU Study Guide</title>
+  <link rel="stylesheet" href="analog-cim.css">
+  <script src="analog-cim-evidence.js" defer></script>
+</head>
+<body>
+  <header class="site-header">
+    <a class="brand" href="index.html" aria-label="NPU Study Guide home">
+      <img src="https://avatars.githubusercontent.com/u/72680210?v=4" alt="Bui Cong Nguyen avatar">
+      <span>NPU Study Guide</span>
+    </a>
+    <nav class="site-nav" aria-label="Analog CIM learning path">
+      <a href="analog-cim-architecture.html">Architecture</a>
+      <a href="analog-cim-evidence.html" aria-current="page">Evidence</a>
+      <a href="analog-cim-interview.html">Interview</a>
+      <a href="analog-cim-quiz.html">MCQ Lab</a>
+      <a href="index.html">NPU Home</a>
+    </nav>
+  </header>
+
+  <main>
+    <section class="hero">
+      <div class="hero-copy">
+        <p class="eyebrow">Evidence review <span data-research-date>2026-07-11</span></p>
+        <h1>Is the Analog CIM Accuracy Problem Solved?</h1>
+        <p class="lede">
+          <strong>No, not as a universal claim.</strong> Measured chips now reach software-comparable accuracy on
+          meaningful workloads. They do so through cross-layer co-design, and each result has a defined baseline,
+          hardware boundary, model scale, mitigation cost, and time horizon.
+        </p>
+        <div class="hero-actions">
+          <a class="button" href="#paper-ledger">Inspect the papers</a>
+          <a class="button secondary" href="#issues">Study failure modes</a>
+          <a class="button secondary" href="analog-cim-interview.html">Prepare for interviews</a>
+        </div>
+        <div class="summary-strip" aria-label="Accuracy verdict summary">
+          <div><strong>Demonstrated</strong><span>Scoped inference accuracy on fabricated chips</span></div>
+          <div><strong>Conditional</strong><span>Calibration, retraining, expansion, or mixed precision</span></div>
+          <div><strong>Not universal</strong><span>Results do not cover every model, chip, time, or corner</span></div>
+          <div><strong>Still active</strong><span>2026 reviews retain accuracy and reliability roadmaps</span></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="verdict">
+      <div class="section-heading">
+        <p class="eyebrow">Verdict</p>
+        <h2>The precise answer has three parts</h2>
+      </div>
+      <div class="callout verdict">
+        <h3>1. The demonstrations are real</h3>
+        <p>
+          NeuRRAM, IBM's PCM chips, and the 2025 mixed memristor/SRAM processor report measured results close to
+          low-precision or floating-point software references on complete named tasks. This is much stronger evidence
+          than early device-characterization simulations.
+        </p>
+      </div>
+      <div class="card-grid" style="margin-top:12px">
+        <article class="learning-card">
+          <span class="card-label">2. Accuracy moved up the stack</span>
+          <h3>Co-design contains the error</h3>
+          <p>Write-verify, calibration, hardware-aware training, weight expansion, mixed precision, and digital execution turn imperfect MVMs into accurate applications.</p>
+        </article>
+        <article class="learning-card">
+          <span class="card-label">3. The cost remains</span>
+          <h3>Correction consumes something</h3>
+          <p>Extra devices, rows, phases, ADC bits, retraining, refresh, digital work, test time, or reduced signal range can give back part of the density or energy advantage.</p>
+        </article>
+        <article class="learning-card">
+          <span class="card-label">Therefore</span>
+          <h3>Ask a scoped question</h3>
+          <p>Can this chip run this model at this baseline accuracy, power, latency, temperature, yield, and lifetime after counting every mitigation?</p>
+        </article>
+      </div>
+    </section>
+
+    <section class="section" id="paper-ledger">
+      <div class="section-heading">
+        <p class="eyebrow">Paper ledger</p>
+        <h2>What the strongest papers establish</h2>
+        <p class="section-note">
+          Every title links to the primary source. "Partial / hybrid" means some evaluated work remained in software,
+          on a host, or in a different compute domain; it is not a criticism, but it changes the claim boundary.
+        </p>
+      </div>
+      <div class="legend" aria-label="Evidence level legend">
+        <span class="status-pill status-measured">Measured silicon</span>
+        <span class="status-pill status-partial">Partial / hybrid</span>
+        <span class="status-pill status-open">Open problem review</span>
+        <span class="status-pill status-vendor">Vendor claim</span>
+      </div>
+      <div class="table-wrap" style="margin-top:12px">
+        <table>
+          <thead>
+            <tr>
+              <th scope="col">Study</th>
+              <th scope="col">Evidence</th>
+              <th scope="col">Technology and scope</th>
+              <th scope="col">Reported result</th>
+              <th scope="col">Correct reading</th>
+            </tr>
+          </thead>
+          <tbody id="evidence-body"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="section" id="recent-nature">
+      <div class="section-heading">
+        <p class="eyebrow">The recent Nature result</p>
+        <h2>"Fault-free" solves static matrix representation, not every analog error</h2>
+      </div>
+      <div class="card-grid two">
+        <div class="callout">
+          <h3>What is new and important</h3>
+          <p>
+            The June 2026 Nature Electronics paper factors a target matrix into two adjustable submatrices. Their
+            product can represent the target even when many physical cells are stuck, because optimization steers
+            the factors around those defects. The paper reports more than 99.999% cosine similarity for a DFT matrix
+            despite a 39% device fault rate and a large wireless bit-error-rate improvement.
+          </p>
+        </div>
+        <div class="callout caution">
+          <h3>What the title does not mean</h3>
+          <p>
+            It does not make analog hardware physically fault-free. Random read noise, ADC and driver error,
+            nonlinear I-V behavior, parasitic resistance, drift, endurance, and full DNN system accuracy remain
+            separate questions. The method also uses two matrix stages and may add compensation layers or refresh.
+          </p>
+        </div>
+      </div>
+      <p class="section-note" style="margin-top:12px">
+        The most accurate interpretation is: <strong>a general and impressive representation method for bypassing
+        static device faults</strong>, with demonstrated signal-processing applications. It is one major component of
+        an accuracy stack, not proof that the complete field is finished.
+      </p>
+    </section>
+
+    <section class="section" id="issues">
+      <div class="section-heading">
+        <p class="eyebrow">Failure modes and mitigations</p>
+        <h2>Where error enters and what it costs to contain</h2>
+        <p class="section-note">A strong design review follows error from the device, through the array and converters, into the compiler, system, and field lifetime.</p>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th scope="col">Layer</th>
+              <th scope="col">Symptom</th>
+              <th scope="col">Root cause</th>
+              <th scope="col">Mitigation</th>
+              <th scope="col">Cost / tradeoff</th>
+            </tr>
+          </thead>
+          <tbody id="issues-body"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="section" id="why-accuracy-works">
+      <div class="section-heading">
+        <p class="eyebrow">How teams overcome it</p>
+        <h2>The practical accuracy stack</h2>
+      </div>
+      <div class="card-grid">
+        <article class="learning-card">
+          <span class="card-label">Device</span>
+          <h3>Make conductance predictable</h3>
+          <p>High-yield cells, linear read regions, iterative write-verify, defect maps, and retention characterization reduce the raw error distribution.</p>
+        </article>
+        <article class="learning-card">
+          <span class="card-label">Circuit</span>
+          <h3>Measure the array well</h3>
+          <p>Reference paths, differential readout, calibrated gain and offset, adaptive ADC thresholds, suitable integration time, and thermal monitoring protect signal quality.</p>
+        </article>
+        <article class="learning-card">
+          <span class="card-label">Architecture</span>
+          <h3>Spend precision selectively</h3>
+          <p>Bit slicing, extra phases, weight expansion, spare capacity, local SRAM, and heterogeneous analog-digital execution keep sensitive operations out of weak regimes.</p>
+        </article>
+        <article class="learning-card">
+          <span class="card-label">Algorithm</span>
+          <h3>Train for the measured hardware</h3>
+          <p>Noise-aware and hardware-aware training, clipping, per-channel scaling, chip-in-loop tuning, and distillation build tolerance into the model.</p>
+        </article>
+        <article class="learning-card">
+          <span class="card-label">Compiler</span>
+          <h3>Map around sensitivity</h3>
+          <p>Shape-aware packing, layer sensitivity analysis, IR-drop-aware placement, digital fallback, and dataflow scheduling preserve both accuracy and utilization.</p>
+        </article>
+        <article class="learning-card">
+          <span class="card-label">Operations</span>
+          <h3>Maintain accuracy in the field</h3>
+          <p>Per-chip calibration, reference checks, drift telemetry, selective refresh, guardbands, screening, and safe fallback turn a lab result into a reliable service.</p>
+        </article>
+      </div>
+    </section>
+
+    <section class="section" id="claim-checklist">
+      <div class="section-heading">
+        <p class="eyebrow">Paper review checklist</p>
+        <h2>Ten questions that prevent an overclaim</h2>
+      </div>
+      <div class="panel">
+        <ol id="claim-tests" class="question-list"></ol>
+      </div>
+    </section>
+
+    <section class="section" id="bottom-line">
+      <div class="section-heading">
+        <p class="eyebrow">Bottom line</p>
+        <h2>Accuracy is becoming an engineering budget</h2>
+      </div>
+      <div class="callout verdict">
+        <p>
+          The field has progressed from "can an array classify MNIST?" to measured multicore speech, ImageNet,
+          transformer, and mixed-precision systems. That is a real change. The winning pattern is not a perfect analog
+          cell; it is a <strong>measured error model plus co-designed device, circuit, architecture, compiler, algorithm,
+          and calibration policy</strong>. The unresolved question is whether that complete stack keeps its density,
+          energy, cost, yield, and lifetime advantages at production and frontier-model scale.
+        </p>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <p>Original source-critical synthesis. Research snapshot: <span data-research-date>2026-07-11</span>.</p>
+    <div class="footer-links">
+      <a href="analog-cim-interview.html">Next: interview study</a>
+      <a href="https://github.com/buicongnguyen/NPU">Source</a>
+    </div>
+  </footer>
+</body>
+</html>

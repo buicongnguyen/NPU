@@ -1,0 +1,269 @@
+{
+  "meta": {
+    "title": "Analog CIM accuracy evidence ledger",
+    "updated": "2026-07-11",
+    "verdict": "Scoped software-comparable accuracy has been demonstrated on measured chips. The general analog accuracy problem is not solved.",
+    "reason": "Successful demonstrations depend on a defined workload and a stack of mitigations such as write-verify, calibration, hardware-aware training, redundancy, weight expansion, mixed precision, digital execution, or periodic recalibration. Recent 2026 reviews still identify device, circuit, array, architecture, and lifetime non-idealities as barriers to large-scale deployment."
+  },
+  "studies": [
+    {
+      "id": "mythic-2025-roadmap",
+      "year": 2025,
+      "title": "Mythic current architecture and efficiency announcement",
+      "venue": "Mythic company announcement",
+      "technology": "Flash analog compute-in-memory",
+      "scope": "Next-generation roadmap and internal benchmark claims",
+      "evidenceLevel": "vendor",
+      "reportedResult": "Claims 120 TOPS/W for the current APU architecture and roughly 100x system energy advantage versus top GPUs.",
+      "whatItShows": "Mythic's current product direction and the metrics the company considers central.",
+      "whatItDoesNotShow": "A public test method, model-by-model accuracy table, independently reproduced end-to-end measurement, or production-yield distribution for the next-generation claim.",
+      "verdict": "Treat as a roadmap claim, not as independent proof.",
+      "sourceUrl": "https://mythic.ai/whats-new/mythic-to-challenge-ais-gpu-pantheon-with-100x-energy-advantage-and-oversubscribed-125m-raise/"
+    },
+    {
+      "id": "nature-training-2018",
+      "year": 2018,
+      "title": "Equivalent-accuracy accelerated neural-network training using analogue memory",
+      "venue": "Nature",
+      "technology": "Phase-change memory plus volatile capacitors",
+      "scope": "Mixed hardware-software training demonstrations up to 204,900 synapses",
+      "evidenceLevel": "partial",
+      "reportedResult": "Generalization accuracy equivalent to software training on MNIST, MNIST-backrand, CIFAR-10, and CIFAR-100 in the reported mixed implementation.",
+      "whatItShows": "Update asymmetry and device variation can be countered with a carefully designed mixed memory unit and polarity inversion.",
+      "whatItDoesNotShow": "A monolithic production training accelerator; the headline throughput and efficiency were calculated for the proposed implementation.",
+      "verdict": "A major algorithm-device result, not a universal end-to-end training solution.",
+      "sourceUrl": "https://doi.org/10.1038/s41586-018-0180-5"
+    },
+    {
+      "id": "nature-mcnn-2020",
+      "year": 2020,
+      "title": "Fully hardware-implemented memristor convolutional neural network",
+      "venue": "Nature",
+      "technology": "Eight 2,048-cell memristor arrays",
+      "scope": "Five-layer CNN on MNIST",
+      "evidenceLevel": "measured",
+      "reportedResult": "More than 96% MNIST accuracy with hybrid training adapted to device imperfections.",
+      "whatItShows": "A complete small CNN can run on fabricated memristor hardware with useful accuracy.",
+      "whatItDoesNotShow": "Software parity on large modern datasets or models, long-term drift behavior, or general production scalability.",
+      "verdict": "Strong proof of concept at small task scale.",
+      "sourceUrl": "https://doi.org/10.1038/s41586-020-1942-4"
+    },
+    {
+      "id": "neurram-2022",
+      "year": 2022,
+      "title": "A compute-in-memory chip based on resistive random-access memory",
+      "venue": "Nature",
+      "technology": "48-core RRAM NeuRRAM chip",
+      "scope": "CNN, LSTM, and probabilistic models on complete datasets",
+      "evidenceLevel": "measured",
+      "reportedResult": "Fully hardware-measured 99.0% MNIST, 85.7% CIFAR-10, and 84.7% Google speech-command accuracy, comparable to software models quantized to 4-bit weights.",
+      "whatItShows": "Cross-layer co-design, calibration, measured-noise training, and chip-in-loop tuning can preserve low-bit software-level accuracy across several edge tasks.",
+      "whatItDoesNotShow": "A fully self-contained product system; the reported board used an FPGA for intermediate buffers and partial sums, and larger modern workloads were not demonstrated.",
+      "verdict": "One of the clearest measured demonstrations, with a defined 4-bit baseline and system boundary.",
+      "sourceUrl": "https://doi.org/10.1038/s41586-022-04992-8"
+    },
+    {
+      "id": "hermes-2023",
+      "year": 2023,
+      "title": "A 64-core mixed-signal in-memory compute chip based on phase-change memory",
+      "venue": "Nature Electronics",
+      "technology": "14-nm CMOS with backend PCM",
+      "scope": "ResNet and LSTM inference with on-chip activation and communication",
+      "evidenceLevel": "measured",
+      "reportedResult": "Near-software-equivalent accuracy, with up to 16.1 TOPS and 2.48 TOPS/W in high-precision mode or 63.1 TOPS and 9.76 TOPS/W in low-precision mode.",
+      "whatItShows": "A multicore AIMC chip can integrate analog MVM, digital activation, and on-chip communication rather than reporting an isolated macro.",
+      "whatItDoesNotShow": "Universal parity across model families, large language models, all operating modes, or long deployment lifetimes.",
+      "verdict": "Strong integrated-chip evidence with an explicit precision-efficiency tradeoff.",
+      "sourceUrl": "https://doi.org/10.1038/s41928-023-01010-1"
+    },
+    {
+      "id": "speech-2023",
+      "year": 2023,
+      "title": "An analog-AI chip for energy-efficient speech recognition and transcription",
+      "venue": "Nature",
+      "technology": "34-tile 14-nm PCM chip; five chips for RNNT",
+      "scope": "Keyword spotting and a 45-million-weight MLPerf RNNT",
+      "evidenceLevel": "measured",
+      "reportedResult": "KWS measured 86.14% versus an 86.75% software target. RNNT measured 9.258% word error rate versus a 7.452% FP software baseline after weight expansion; the paper classifies this as near software-equivalent.",
+      "whatItShows": "Commercially relevant speech workloads can tolerate analog error across many tiles and chips using hardware-aware training, differential mapping, and weight expansion.",
+      "whatItDoesNotShow": "Exact FP parity. Some preprocessing and summation were digital or host-side, five chips were cascaded through saved outputs, and the full-system digital cost was estimated.",
+      "verdict": "A real scale-up milestone, but the mitigation and system boundary are part of the result.",
+      "sourceUrl": "https://doi.org/10.1038/s41586-023-06337-5"
+    },
+    {
+      "id": "mixed-cim-2025",
+      "year": 2025,
+      "title": "A mixed-precision memristor and SRAM compute-in-memory AI processor",
+      "venue": "Nature",
+      "technology": "Memristor CIM, SRAM CIM, and tiny digital units",
+      "scope": "ResNet-20 on CIFAR-100 and MobileNet-v2 on ImageNet",
+      "evidenceLevel": "measured",
+      "reportedResult": "Less than 0.45% accuracy degradation with measured energy efficiency of 40.91 TFLOPS/W and 28.63 TFLOPS/W for the two reported workloads.",
+      "whatItShows": "Layer- and kernel-level sensitivity mapping can combine analog density with precise SRAM and digital execution to preserve accuracy.",
+      "whatItDoesNotShow": "That a homogeneous pure-analog path is accurate. Moving sensitive work to other compute domains is the central solution.",
+      "verdict": "Accuracy is effectively handled by heterogeneity, which is a practical system answer rather than a device-level cure.",
+      "sourceUrl": "https://doi.org/10.1038/s41586-025-08639-2"
+    },
+    {
+      "id": "albert-2025",
+      "year": 2025,
+      "title": "Demonstration of transformer-based ALBERT model on a 14nm analog AI inference chip",
+      "venue": "Nature Communications",
+      "technology": "35-million-device PCM analog AI chip",
+      "scope": "ALBERT with 7.1 million unique weights shared across 12 layers and seven GLUE tasks",
+      "evidenceLevel": "partial",
+      "reportedResult": "Average hardware accuracy was 1.8% below the floating-point reference; hardware-aware fine-tuning improved average accuracy by 4.4%. Recalibration reduced accuracy loss from roughly 5% conductance drift over 30 days to under 1%.",
+      "whatItShows": "A meaningfully sized transformer's fully connected weights can be mapped to analog hardware with near-iso accuracy and controlled drift.",
+      "whatItDoesNotShow": "End-to-end transformer silicon. Attention calculations, activation functions, pooling, and classification were performed in software, and only subsets of some large GLUE datasets were tested on hardware.",
+      "verdict": "Important transformer feasibility evidence, explicitly not an end-to-end LLM result.",
+      "sourceUrl": "https://doi.org/10.1038/s41467-025-63794-4"
+    },
+    {
+      "id": "adaptive-adc-2025",
+      "year": 2025,
+      "title": "Memristor-based adaptive analog-to-digital conversion for efficient and accurate compute-in-memory",
+      "venue": "Nature Communications",
+      "technology": "Memristor analog CAM adaptive ADC",
+      "scope": "Converter prototype and model evaluation under measured device variation",
+      "evidenceLevel": "partial",
+      "reportedResult": "A 5-bit ADC reached 89.55% on VGG8/CIFAR-10 under experimental variations; a super-resolution strategy reached 65.50% for 6-bit ResNet-18/ImageNet evaluation.",
+      "whatItShows": "Adaptive thresholds and paired-converter variation can reduce the ADC energy-area-accuracy penalty.",
+      "whatItDoesNotShow": "A complete large-model AIMC accelerator with all arrays, routing, storage, and digital operations measured end to end.",
+      "verdict": "A useful converter-level mitigation, not a blanket solution to analog error.",
+      "sourceUrl": "https://doi.org/10.1038/s41467-025-65233-w"
+    },
+    {
+      "id": "fault-free-2026",
+      "year": 2026,
+      "title": "Fault-free analogue computing with imperfect hardware",
+      "venue": "Nature Electronics",
+      "technology": "Memristor matrix decomposition",
+      "scope": "DFT, image processing, and wireless baseband matrix operations",
+      "evidenceLevel": "measured",
+      "reportedResult": "More than 99.999% cosine similarity for a DFT matrix despite a 39% device fault rate, plus a 56-fold bit-error-rate reduction in a wireless prototype.",
+      "whatItShows": "Factoring a target matrix into two adjustable submatrices can route around many stuck devices and avoid conventional differential-pair mapping.",
+      "whatItDoesNotShow": "That random read noise, ADC error, nonlinear arrays, long-term drift, training updates, or large DNN end-to-end accuracy are all solved. Additional compensation layers improve accuracy but consume resources.",
+      "verdict": "A powerful static-fault representation technique, not a universal analog-accuracy theorem.",
+      "sourceUrl": "https://doi.org/10.1038/s41928-026-01638-9"
+    },
+    {
+      "id": "accuracy-review-2026",
+      "year": 2026,
+      "title": "Strategies of high-accuracy memristor-based analogue computing in memory for artificial intelligence",
+      "venue": "Nature Materials",
+      "technology": "Review across memristor AIMC hierarchy",
+      "scope": "Device, array, circuit, architecture, and algorithm mitigation survey",
+      "evidenceLevel": "open",
+      "reportedResult": "The review states that analog CIM still struggles with high accuracy and that many mitigations add hardware or energy overhead.",
+      "whatItShows": "The field now has a rich mitigation toolbox and a clearer cross-layer roadmap.",
+      "whatItDoesNotShow": "A single technique that removes all accuracy-efficiency tradeoffs at deployment scale.",
+      "verdict": "Direct evidence against the broad claim that accuracy is already solved.",
+      "sourceUrl": "https://doi.org/10.1038/s41563-026-02600-y"
+    },
+    {
+      "id": "synapse-review-2026",
+      "year": 2026,
+      "title": "Non-idealities in artificial synapses",
+      "venue": "Nature Reviews Physics",
+      "technology": "Review of non-volatile artificial synapses",
+      "scope": "Nonlinearity, asymmetry, variability, endurance, and retention",
+      "evidenceLevel": "open",
+      "reportedResult": "The review catalogs persistent non-ideal effects that limit reliable accelerator integration and argues for system-aware use of imperfections.",
+      "whatItShows": "Device behavior must be characterized in the context of the target system and workload.",
+      "whatItDoesNotShow": "A universal error-free device or a cost-free correction method.",
+      "verdict": "The most current review evidence says the core reliability questions remain active.",
+      "sourceUrl": "https://doi.org/10.1038/s42254-026-00957-2"
+    }
+  ],
+  "issues": [
+    {
+      "layer": "Device programming",
+      "symptom": "The programmed conductance misses the target weight.",
+      "rootCause": "Finite update granularity, stochastic switching, and cell-to-cell response differences.",
+      "mitigations": "Iterative write-verify, closed-loop programming, better materials, per-device models.",
+      "cost": "Longer programming time, extra read cycles, controller complexity, and possible endurance use."
+    },
+    {
+      "layer": "Static defects",
+      "symptom": "Stuck-on or stuck-off cells create large structured errors.",
+      "rootCause": "Fabrication defects and wear-out.",
+      "mitigations": "Defect maps, spare rows/columns, remapping, matrix factorization, analog ECC, retraining.",
+      "cost": "Redundant devices, extra arrays or MVM stages, and optimization time."
+    },
+    {
+      "layer": "Retention and drift",
+      "symptom": "Accuracy decays over hours, days, temperature changes, or power cycles.",
+      "rootCause": "Physical state relaxation and charge or resistance drift.",
+      "mitigations": "Drift-aware training, reference cells, gain recalibration, selective refresh, periodic reprogramming.",
+      "cost": "Telemetry, calibration data, maintenance energy, downtime, and lifetime management."
+    },
+    {
+      "layer": "Read and circuit noise",
+      "symptom": "Repeated MVMs return a distribution rather than one exact value.",
+      "rootCause": "Thermal, shot, flicker, supply, coupling, sense, and timing noise.",
+      "mitigations": "Hardware-aware noise training, larger signal range, averaging, weight expansion, differential readout.",
+      "cost": "More rows or devices, longer integration, lower throughput, and increased energy."
+    },
+    {
+      "layer": "Array parasitics",
+      "symptom": "Cells far from drivers behave differently and sums become input dependent.",
+      "rootCause": "Word-line and bit-line resistance, source resistance, sneak paths, and capacitive coupling.",
+      "mitigations": "Smaller arrays, access transistors, low read voltage, IR-drop-aware mapping and calibration.",
+      "cost": "Lower density, more tiling, more converters, and more partial-sum traffic."
+    },
+    {
+      "layer": "Nonlinearity and asymmetry",
+      "symptom": "Ohm's-law multiplication or positive/negative weight updates are biased.",
+      "rootCause": "Nonlinear I-V curves and state-dependent programming response.",
+      "mitigations": "Operate in a linear region, differential or offset encoding, pulse shaping, device-aware training.",
+      "cost": "Reduced signal range, doubled cells, or more complex write circuitry."
+    },
+    {
+      "layer": "ADC and DAC",
+      "symptom": "Quantization, offset, gain error, or saturation limits effective precision.",
+      "rootCause": "Finite converter resolution and wide layer-dependent dynamic ranges.",
+      "mitigations": "Per-column calibration, adaptive thresholds, bit slicing, multiple phases, layer-specific ranges.",
+      "cost": "Converter area and energy, extra cycles, metadata, and calibration complexity."
+    },
+    {
+      "layer": "Model outliers",
+      "symptom": "A few large weights or activations consume dynamic range and bury small values in noise.",
+      "rootCause": "Heavy-tailed tensor distributions, especially in transformer projections.",
+      "mitigations": "Clipping, channel scaling, outlier splitting, mixed precision, weight expansion, digital routing.",
+      "cost": "Retraining, duplicated work, extra digital compute, or lower analog utilization."
+    },
+    {
+      "layer": "Mapping and utilization",
+      "symptom": "Peak array TOPS/W collapses at the application level.",
+      "rootCause": "Irregular shapes, partial sums, underfilled arrays, routing, and unsupported operators.",
+      "mitigations": "Graph compilation, packing, fusion, balanced pipelines, local SRAM, heterogeneous execution.",
+      "cost": "Compiler complexity and a larger digital subsystem."
+    },
+    {
+      "layer": "Training endurance",
+      "symptom": "Frequent weight updates wear devices or become too inaccurate.",
+      "rootCause": "Limited write endurance, nonlinear/asymmetric updates, and required high-precision accumulation.",
+      "mitigations": "Inference-only deployment, mixed-precision training, digital accumulators, periodic transfer, robust optimizers.",
+      "cost": "Less in-memory work and reduced theoretical training speed or energy advantage."
+    },
+    {
+      "layer": "PVT and production",
+      "symptom": "Accuracy and latency vary across process, voltage, temperature, age, and chips.",
+      "rootCause": "Analog sensitivity and manufacturing distributions.",
+      "mitigations": "Corner-aware design, on-chip sensors, characterization, guardbands, per-chip calibration, burn-in and binning.",
+      "cost": "Test time, yield loss, field-calibration infrastructure, and conservative operating points."
+    }
+  ],
+  "claimTests": [
+    "Was the result measured on fabricated silicon, derived from device traces, or simulated?",
+    "Did the complete validation dataset run through hardware, or only selected layers and samples?",
+    "Is the baseline FP32, a quantized software model, a software-equivalent threshold, or the authors' own retrained model?",
+    "Which work remained off-chip or in software: attention, activation, normalization, pooling, routing, or partial sums?",
+    "How much retraining, chip-in-loop tuning, calibration, redundancy, expansion, or refresh was required?",
+    "Are the reported energy and latency measured end to end, or only for a full and perfectly utilized array?",
+    "How does accuracy change across chips, temperature, voltage, process corners, defects, and time?",
+    "Does the mitigation preserve density and efficiency, or move the cost into more arrays, converters, digital work, or extra cycles?",
+    "Is the claim for inference, training, or both? Static inference weights avoid the update linearity and endurance burden of training.",
+    "Can the method scale to the target model's parameter count, tensor shapes, context length, and communication pattern?"
+  ]
+}

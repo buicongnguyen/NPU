@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="A self-study guide to AI accelerators (NPU, VPU, LPU, GPU, TPU), how they are deployed, LLVM and MLIR for AI compilers, the Tenstorrent stack, and a searchable 50-question interview Q&A bank.">
+  <meta name="description" content="A self-study guide to AI accelerators, Mythic analog compute-in-memory, deployment, LLVM and MLIR, Tenstorrent, and technical interview practice.">
   <title>NPU, VPU &amp; LPU — AI Accelerator &amp; Compiler Study Guide | Bui Cong Nguyen</title>
   <link rel="stylesheet" href="styles.css">
 </head>
@@ -16,6 +16,7 @@
     <nav aria-label="Primary navigation">
       <a href="index.html">Home</a>
       <a href="#processors">Processors</a>
+      <a href="#analog-cim">Analog CIM</a>
       <a href="#deploy">Deploy</a>
       <a href="#llvm-mlir">LLVM &amp; MLIR</a>
       <a href="#tenstorrent">Tenstorrent</a>
@@ -33,10 +34,11 @@
         <p class="lede">
           A self-study reference for AI-accelerator and ML-compiler engineering. It compares NPUs, VPUs, LPUs,
           GPUs, and TPUs, shows how models are deployed to each, walks the LLVM and MLIR compiler path, uses
-          Tenstorrent as a concrete case study, and ends with a searchable bank of 50 interview questions and answers.
+          Tenstorrent and Mythic analog compute-in-memory as concrete case studies, and ends with technical interview practice.
         </p>
         <div class="hero-actions">
           <a class="button" href="#processors">Compare accelerators</a>
+          <a class="button secondary" href="analog-cim-architecture.html">Mythic analog CIM</a>
           <a class="button secondary" href="#qa">Interview Q&amp;A</a>
           <a class="button secondary" href="#llvm-mlir">LLVM &amp; MLIR</a>
         </div>
@@ -133,6 +135,44 @@
         </table>
       </div>
       <p class="section-note" style="margin-top:10px">These accelerators trade generality for efficiency along a clear axis: GPUs are fully programmable HBM-backed engines that dominate training and batched inference at high power, while NPUs and VPUs sacrifice programmability for extreme performance-per-watt on quantized inference at the edge (VPU being the vision/CNN-specialized subclass increasingly folded into "NPU"). Groq's LPU sits at the opposite extreme from the GPU: a deterministic, compiler-scheduled, SRAM-only design that wins single-stream LLM latency but must shard models across many chips because each holds only ~230 MB. The core trade-offs are memory model (off-chip HBM vs on-chip SRAM/scratchpad), throughput vs latency bias, and programmability vs fixed-function efficiency, with "VPU" and "LPU" being largely vendor-specific labels versus the more established GPU/NPU terms.</p>
+    </section>
+
+    <section id="analog-cim" class="section">
+      <div class="section-heading">
+        <p class="eyebrow">Analog compute-in-memory case study</p>
+        <h2>Mythic Architecture, Accuracy Evidence, and Interview Study</h2>
+        <p class="section-note">
+          A separate learning path traces Mythic's flash-based matrix engine from device physics through ADCs,
+          tile dataflow, quantization, and graph compilation. It also audits Nature-family accuracy claims and keeps
+          measured results distinct from vendor roadmap statements.
+        </p>
+      </div>
+      <div class="evidence-grid compact">
+        <article>
+          <span>Architecture</span>
+          <h3>Flash weight to digital output</h3>
+          <p>Explore the MVM equation, Mythic ACE tile, ANA8 workflow, compiler mapping, analog-digital boundary, and structured architecture data.</p>
+          <a href="analog-cim-architecture.html">Open architecture study</a>
+        </article>
+        <article>
+          <span>Evidence</span>
+          <h3>Is analog accuracy solved?</h3>
+          <p>No as a universal claim. Compare measured NeuRRAM, IBM PCM, mixed-CIM, ALBERT, adaptive-ADC, and 2026 fault-tolerance results with their real boundaries.</p>
+          <a href="analog-cim-evidence.html">Open evidence and issues</a>
+        </article>
+        <article>
+          <span>Interview</span>
+          <h3>Prepare by engineering role</h3>
+          <p>Follow analog, architecture/RTL, compiler/ML, or silicon-product tracks with a six-week plan, portfolio lab, mock design loop, and paper critique.</p>
+          <a href="analog-cim-interview.html">Open interview study</a>
+        </article>
+        <article>
+          <span>MCQ lab</span>
+          <h3>Thirty source-linked questions</h3>
+          <p>Filter by topic and level, score answers interactively, and reuse the JSON datasets for architecture, evidence, and question-bank study tools.</p>
+          <a href="analog-cim-quiz.html">Open MCQ lab</a>
+        </article>
+      </div>
     </section>
 
     <section id="deploy" class="section">
@@ -1089,7 +1129,7 @@
   </main>
 
   <footer>
-    <p>A self-study reference on NPUs, AI accelerators, and ML compilers (LLVM/MLIR), with a searchable interview Q&amp;A bank.</p>
+    <p>A self-study reference on NPUs, analog compute-in-memory, AI accelerators, and ML compilers, with technical interview practice.</p>
     <div class="footer-links">
       <a href="index.html">Home</a>
       <a href="https://github.com/buicongnguyen/NPU">Source</a>

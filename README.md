@@ -7,3 +7,13 @@ Live site: https://buicongnguyen.github.io/NPU/
 The guide covers NPU, VPU, LPU, GPU, and TPU accelerator tradeoffs, AI model
 deployment paths, LLVM/MLIR compiler concepts, Tenstorrent notes, and related
 interview practice pages.
+
+The Analog CIM learning path adds a source-critical Mythic case study:
+
+- Architecture: https://buicongnguyen.github.io/NPU/analog-cim-architecture.html
+- Accuracy evidence and issues: https://buicongnguyen.github.io/NPU/analog-cim-evidence.html
+- Interview study: https://buicongnguyen.github.io/NPU/analog-cim-interview.html
+- Interactive MCQ lab: https://buicongnguyen.github.io/NPU/analog-cim-quiz.html
+
+Reusable learning data lives in `data/analog-cim-architecture.json`,
+`data/analog-cim-evidence.json`, and `data/analog-cim-mcq.json`.

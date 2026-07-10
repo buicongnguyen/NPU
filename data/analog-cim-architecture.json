@@ -1,0 +1,320 @@
+{
+  "meta": {
+    "title": "Analog compute-in-memory architecture learning data",
+    "updated": "2026-07-11",
+    "scope": "Mythic's publicly disclosed flash-based inference architecture, placed beside representative PCM, RRAM, SRAM, and hybrid CIM systems.",
+    "terminology": "The literature most often uses AIMC or AiMC for analog in-memory computing. ACIM and analog CIM are also common. This study treats the user's AiCM term as analog compute-in-memory."
+  },
+  "signalPath": [
+    {
+      "id": "model",
+      "order": 1,
+      "label": "Model preparation",
+      "domain": "Software",
+      "summary": "Convert the trained floating-point graph into a precision and operator set the target can execute.",
+      "detail": "Mythic describes a post-training path from FP32 to an 8-bit analog representation called ANA8, with quantization-aware and analog-aware retraining available for sensitive models. This step decides clipping ranges, scales, supported operators, and where digital fallback is required.",
+      "failureMode": "Naive quantization can amplify outliers or make a sensitive layer lose accuracy before any analog error is added.",
+      "mitigation": "Calibrate on representative data, use per-channel scales where supported, and apply quantization-aware or analog-aware retraining to sensitive layers.",
+      "interviewPrompt": "Explain why analog-aware training is not the same as ordinary INT8 quantization-aware training.",
+      "sourceIds": ["mythic-workflow", "mythic-technology"]
+    },
+    {
+      "id": "mapping",
+      "order": 2,
+      "label": "Graph mapping",
+      "domain": "Compiler",
+      "summary": "Partition matrices across fixed-size arrays, place digital operators, allocate buffers, and schedule data movement.",
+      "detail": "The graph compiler packs coefficients into arrays, partitions matrices that exceed array dimensions, selects parallel or serial execution, and emits code for local control and routing. Array utilization matters because a half-empty array still pays much of its converter and peripheral cost.",
+      "failureMode": "Poor tiling increases unused rows and columns, partial-sum traffic, conversion count, or off-chip communication.",
+      "mitigation": "Use shape-aware packing, operator fusion, layer pipelining, explicit buffer allocation, and an end-to-end cost model that includes converters and the network on chip.",
+      "interviewPrompt": "Map a 3072 by 4096 projection onto 1024 by 1024 arrays and identify the required partial sums and traffic.",
+      "sourceIds": ["mythic-workflow", "mythic-mapping-patent", "mythic-dataflow"]
+    },
+    {
+      "id": "input",
+      "order": 3,
+      "label": "Input encoding",
+      "domain": "Mixed signal",
+      "summary": "Represent each digital activation as a voltage, current, pulse width, or bit-serial sequence.",
+      "detail": "An ideal description uses a DAC for each input row. Mythic's 2018 Hot Chips presentation said its first implementation used digital approximation instead of a full input DAC. Other AIMC chips commonly use bit-serial pulses or duration coding to trade latency for precision and simpler drivers.",
+      "failureMode": "Driver mismatch, limited voltage headroom, timing jitter, and additional input cycles distort the intended activation.",
+      "mitigation": "Calibrate row drivers, segment high-precision inputs, limit simultaneous row activation, and include input encoding in the precision and energy model.",
+      "interviewPrompt": "Compare spatial bit slicing with temporal bit-serial input encoding.",
+      "sourceIds": ["mythic-hotchips", "neurram"]
+    },
+    {
+      "id": "weights",
+      "order": 4,
+      "label": "Weight storage",
+      "domain": "Device",
+      "summary": "Program each neural-network weight into one or more non-volatile memory conductances.",
+      "detail": "Mythic uses embedded flash cells. The cell threshold is programmed so its read current acts like a tunable conductance. PCM and RRAM systems use different physical state variables but expose the same system abstraction: a programmed conductance that represents a weight.",
+      "failureMode": "Programming error, device-to-device variation, stuck cells, finite conductance range, relaxation, drift, and retention change the stored value.",
+      "mitigation": "Use iterative write-verify, defect maps, differential or offset encoding, spare cells, multi-cell weights, recalibration, and selective refresh.",
+      "interviewPrompt": "Why can a device have many measurable conductance levels but still provide fewer reliable weight bits in a full array?",
+      "sourceIds": ["mythic-hotchips", "mythic-analog", "neurram", "ibm-speech"]
+    },
+    {
+      "id": "mvm",
+      "order": 5,
+      "label": "Analog dot product",
+      "domain": "Array",
+      "summary": "Use Ohm's law for multiplication and current or charge summation for accumulation.",
+      "detail": "For an input voltage V_i and cell conductance G_ij, the cell contributes approximately I_ij = V_i G_ij. A column combines those contributions, giving I_j approximately equal to the sum over i of V_i G_ij. One physical array operation therefore evaluates many MACs in parallel.",
+      "failureMode": "Wire resistance, source resistance, sneak paths, nonlinear I-V behavior, limited headroom, coupling, and accumulated noise break the ideal linear equation.",
+      "mitigation": "Use smaller arrays, lower read voltage, access transistors, IR-drop-aware mapping, reference paths, calibrated operating points, and algorithmic error tolerance.",
+      "interviewPrompt": "Derive the ideal matrix-vector multiply, then name every assumption that fails in a large physical array.",
+      "sourceIds": ["mythic-hotchips", "mythic-analog", "neurram"]
+    },
+    {
+      "id": "conversion",
+      "order": 6,
+      "label": "Readout and ADC",
+      "domain": "Mixed signal",
+      "summary": "Convert an analog column result into a bounded digital code for the rest of the system.",
+      "detail": "The ADC sets an important effective-precision ceiling. More ADC bits can reduce quantization error, but converter area and energy can dominate the array. Practical chips use limited-resolution ADCs, range scaling, multiple read phases, or adaptive thresholds.",
+      "failureMode": "Offset, gain error, saturation, quantization, reference noise, and column mismatch create structured output error.",
+      "mitigation": "Apply per-column gain and offset calibration, choose layer-specific ranges, use adaptive quantization, average or expand sensitive weights, and reserve higher precision for sensitive layers.",
+      "interviewPrompt": "Why does adding two ADC bits not automatically add two useful bits to the end-to-end result?",
+      "sourceIds": ["mythic-hotchips", "adaptive-adc", "neurram", "ibm-hermes"]
+    },
+    {
+      "id": "digital",
+      "order": 7,
+      "label": "Local digital work",
+      "domain": "Tile",
+      "summary": "Handle nonlinear, control-heavy, stateful, and precision-sensitive work near the analog array.",
+      "detail": "The disclosed M1076 tile combines the analog compute engine with SRAM, a 16-bit SIMD vector processor, a 32-bit RISC-V nano-processor, and a network-on-chip router. These blocks handle activation functions, data formatting, control, accumulation, and operations that do not map efficiently to the array.",
+      "failureMode": "Amdahl's law appears when digital post-processing, attention, routing, or underused tiles dominate end-to-end time and energy.",
+      "mitigation": "Fuse operations, increase local reuse, route precision-sensitive kernels to efficient digital units, and report sustained system metrics rather than array-only TOPS/W.",
+      "interviewPrompt": "Which transformer operations belong in analog arrays, and which should remain digital? Defend the boundary.",
+      "sourceIds": ["mythic-m1076", "mythic-technology", "mythic-hybrid", "ibm-hermes"]
+    },
+    {
+      "id": "dataflow",
+      "order": 8,
+      "label": "Tile dataflow",
+      "domain": "System",
+      "summary": "Pipeline graph nodes across tiles and move activations instead of repeatedly moving weights.",
+      "detail": "Mythic assigns graph work and stationary weights to tiles, then routes ready activations through a deterministic dataflow schedule. This can make batch-one latency predictable, but model partitioning, tile utilization, intermediate buffers, and network traffic determine sustained performance.",
+      "failureMode": "Imbalanced stages, routing congestion, oversized intermediate tensors, and model shapes that do not fit the tile grid reduce utilization.",
+      "mitigation": "Pipeline layers, overlap communication with compute, balance tile assignments, place communicating stages nearby, and profile the complete graph at batch one.",
+      "interviewPrompt": "Explain when weight-stationary dataflow wins and when activation or partial-sum traffic becomes the new bottleneck.",
+      "sourceIds": ["mythic-dataflow", "mythic-m1076", "mythic-workflow"]
+    }
+  ],
+  "mythicSnapshot": [
+    {
+      "value": "76",
+      "label": "M1076 tiles",
+      "context": "Disclosed first-generation product",
+      "evidence": "Vendor product brief",
+      "sourceId": "mythic-m1076"
+    },
+    {
+      "value": "80M",
+      "label": "Weight capacity",
+      "context": "Up to 80 million DNN parameters",
+      "evidence": "Vendor product brief",
+      "sourceId": "mythic-m1076"
+    },
+    {
+      "value": "25 TOPS",
+      "label": "Peak compute",
+      "context": "Single M1076 chip",
+      "evidence": "Vendor product brief",
+      "sourceId": "mythic-m1076"
+    },
+    {
+      "value": "3-4 W",
+      "label": "Typical model power",
+      "context": "Vendor description for complex models",
+      "evidence": "Vendor product brief",
+      "sourceId": "mythic-m1076"
+    },
+    {
+      "value": "ANA8",
+      "label": "Deployment format",
+      "context": "Analog representation of integer 8-bit",
+      "evidence": "Vendor software workflow",
+      "sourceId": "mythic-workflow"
+    },
+    {
+      "value": "40 nm",
+      "label": "Historical process",
+      "context": "Architecture disclosed at Hot Chips 2018",
+      "evidence": "Vendor conference presentation",
+      "sourceId": "mythic-hotchips"
+    },
+    {
+      "value": "120 TOPS/W",
+      "label": "Current roadmap claim",
+      "context": "December 2025 company announcement",
+      "evidence": "Vendor claim; no public independent reproduction found",
+      "sourceId": "mythic-funding"
+    },
+    {
+      "value": "Hybrid",
+      "label": "2026 direction",
+      "context": "Analog matrix work plus unified digital compute",
+      "evidence": "Company acquisition announcement",
+      "sourceId": "mythic-hybrid"
+    }
+  ],
+  "technologyComparison": [
+    {
+      "system": "Mythic M1076",
+      "memory": "Embedded flash",
+      "weightRole": "Non-volatile analog conductance",
+      "inputOutput": "Historical disclosure uses digital input approximation and ADC readout",
+      "bestFit": "Batch-one edge inference with stationary weights",
+      "mainCaveat": "Public end-to-end accuracy and current roadmap details are mostly vendor disclosed"
+    },
+    {
+      "system": "IBM analog AI",
+      "memory": "Phase-change memory",
+      "weightRole": "One or more PCM devices per weight",
+      "inputOutput": "Duration or phased input, current integration, on-chip ADC and digital auxiliaries",
+      "bestFit": "Research-scale multicore inference, including speech and transformer studies",
+      "mainCaveat": "Drift and noise require hardware-aware training, expansion, and recalibration"
+    },
+    {
+      "system": "NeuRRAM",
+      "memory": "RRAM",
+      "weightRole": "Differential conductance across two cells",
+      "inputOutput": "Bit-serial input and voltage-mode neuron/ADC",
+      "bestFit": "Reconfigurable CNN, LSTM, and probabilistic edge workloads",
+      "mainCaveat": "Board-level FPGA handled buffers and partial sums in the reported prototype"
+    },
+    {
+      "system": "Mixed memristor/SRAM CIM",
+      "memory": "Memristor plus SRAM",
+      "weightRole": "Layer-sensitive split between dense non-volatile and precise volatile paths",
+      "inputOutput": "INT and FP modes with tiny digital units",
+      "bestFit": "High-accuracy edge inference under heterogeneous precision",
+      "mainCaveat": "Accuracy is preserved partly by moving sensitive work away from pure analog compute"
+    },
+    {
+      "system": "SRAM analog/digital CIM",
+      "memory": "CMOS SRAM",
+      "weightRole": "Volatile bits in standard-like memory cells",
+      "inputOutput": "Charge, current, or digital bit-line operations",
+      "bestFit": "Frequently updated weights and easier CMOS integration",
+      "mainCaveat": "Lower density and static leakage; weights must be loaded after power-up"
+    }
+  ],
+  "sources": [
+    {
+      "id": "mythic-analog",
+      "title": "Analog Computing",
+      "publisher": "Mythic",
+      "year": 2026,
+      "type": "Vendor technology page",
+      "url": "https://mythic.ai/technology/analog-computing/"
+    },
+    {
+      "id": "mythic-technology",
+      "title": "A Groundbreaking Architecture Built for AI",
+      "publisher": "Mythic",
+      "year": 2026,
+      "type": "Vendor architecture page",
+      "url": "https://mythic.ai/technology/"
+    },
+    {
+      "id": "mythic-dataflow",
+      "title": "Dataflow Architecture",
+      "publisher": "Mythic",
+      "year": 2026,
+      "type": "Vendor technology page",
+      "url": "https://mythic.ai/technology/dataflow-architecture/"
+    },
+    {
+      "id": "mythic-workflow",
+      "title": "Mythic AI Workflow",
+      "publisher": "Mythic",
+      "year": 2026,
+      "type": "Vendor software page",
+      "url": "https://mythic.ai/technology/mythic-ai-workflow/"
+    },
+    {
+      "id": "mythic-m1076",
+      "title": "M1076 Analog Matrix Processor Product Brief",
+      "publisher": "Mythic",
+      "year": 2021,
+      "type": "Vendor product brief",
+      "url": "https://mythic.ai/wp-content/uploads/2022/03/M1076-AMP-Product-Brief-v1.0-1.pdf"
+    },
+    {
+      "id": "mythic-hotchips",
+      "title": "Analog Computation in Flash Memory for Datacenter-Scale AI Inference in a Small Chip",
+      "publisher": "Hot Chips 30 / Mythic",
+      "year": 2018,
+      "type": "Vendor conference presentation",
+      "url": "https://old.hotchips.org/hc30/2conf/2.05_Mythic_Mythic_Hot_Chips_2018_V5.pdf"
+    },
+    {
+      "id": "mythic-isscc",
+      "title": "Analog Matrix Processor for Edge AI Real-Time Video Analytics",
+      "publisher": "IEEE ISSCC",
+      "year": 2022,
+      "type": "Conference paper",
+      "url": "https://doi.org/10.1109/ISSCC42614.2022.9731773"
+    },
+    {
+      "id": "mythic-mapping-patent",
+      "title": "Systems and methods for mapping matrix calculations to a matrix multiply accelerator",
+      "publisher": "USPTO / Google Patents",
+      "year": 2025,
+      "type": "Patent",
+      "url": "https://patents.google.com/patent/US12406021B2/en"
+    },
+    {
+      "id": "mythic-funding",
+      "title": "Mythic to Challenge AI's GPU Pantheon with 100x Energy Advantage and Oversubscribed $125M Raise",
+      "publisher": "Mythic",
+      "year": 2025,
+      "type": "Vendor announcement",
+      "url": "https://mythic.ai/whats-new/mythic-to-challenge-ais-gpu-pantheon-with-100x-energy-advantage-and-oversubscribed-125m-raise/"
+    },
+    {
+      "id": "mythic-hybrid",
+      "title": "Mythic Acquires Videantis to Build a Hybrid AI Compute Platform",
+      "publisher": "Mythic",
+      "year": 2026,
+      "type": "Vendor announcement",
+      "url": "https://mythic.ai/whats-new/mythic-acquires-videantis-one-of-europes-leading-digital-processor-ip-companies-to-build-the-worlds-most-energy-efficient-ai-compute-platform/"
+    },
+    {
+      "id": "neurram",
+      "title": "A compute-in-memory chip based on resistive random-access memory",
+      "publisher": "Nature",
+      "year": 2022,
+      "type": "Peer-reviewed measured silicon",
+      "url": "https://doi.org/10.1038/s41586-022-04992-8"
+    },
+    {
+      "id": "ibm-hermes",
+      "title": "A 64-core mixed-signal in-memory compute chip based on phase-change memory",
+      "publisher": "Nature Electronics",
+      "year": 2023,
+      "type": "Peer-reviewed measured silicon",
+      "url": "https://doi.org/10.1038/s41928-023-01010-1"
+    },
+    {
+      "id": "ibm-speech",
+      "title": "An analog-AI chip for energy-efficient speech recognition and transcription",
+      "publisher": "Nature",
+      "year": 2023,
+      "type": "Peer-reviewed measured silicon",
+      "url": "https://doi.org/10.1038/s41586-023-06337-5"
+    },
+    {
+      "id": "adaptive-adc",
+      "title": "Memristor-based adaptive analog-to-digital conversion for efficient and accurate compute-in-memory",
+      "publisher": "Nature Communications",
+      "year": 2025,
+      "type": "Peer-reviewed device/circuit study",
+      "url": "https://doi.org/10.1038/s41467-025-65233-w"
+    }
+  ]
+}

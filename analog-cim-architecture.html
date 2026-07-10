@@ -1,0 +1,267 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="A technical study of Mythic's flash-based analog compute-in-memory architecture, from model quantization and array physics to ADCs, tile dataflow, and system tradeoffs.">
+  <title>Mythic &amp; Analog Compute-in-Memory Architecture | NPU Study Guide</title>
+  <link rel="stylesheet" href="analog-cim.css">
+  <script src="analog-cim-architecture.js" defer></script>
+</head>
+<body>
+  <header class="site-header">
+    <a class="brand" href="index.html" aria-label="NPU Study Guide home">
+      <img src="https://avatars.githubusercontent.com/u/72680210?v=4" alt="Bui Cong Nguyen avatar">
+      <span>NPU Study Guide</span>
+    </a>
+    <nav class="site-nav" aria-label="Analog CIM learning path">
+      <a href="analog-cim-architecture.html" aria-current="page">Architecture</a>
+      <a href="analog-cim-evidence.html">Evidence</a>
+      <a href="analog-cim-interview.html">Interview</a>
+      <a href="analog-cim-quiz.html">MCQ Lab</a>
+      <a href="index.html">NPU Home</a>
+    </nav>
+  </header>
+
+  <main>
+    <section class="hero">
+      <div class="hero-copy">
+        <p class="eyebrow">Research snapshot <span data-research-date>2026-07-11</span></p>
+        <h1>Mythic and Analog Compute-in-Memory Architecture</h1>
+        <p class="lede">
+          A device-to-system explanation of how a neural-network weight becomes a memory conductance, how an array
+          evaluates a matrix-vector product, and why converters, calibration, digital compute, compiler mapping,
+          and dataflow determine whether the elegant physics becomes an efficient product.
+        </p>
+        <div class="hero-actions">
+          <a class="button" href="#signal-path">Trace the signal path</a>
+          <a class="button secondary" href="analog-cim-evidence.html">Test the accuracy claim</a>
+          <a class="button secondary" href="analog-cim-quiz.html">Practice MCQs</a>
+        </div>
+        <div class="summary-strip" aria-label="Architecture summary">
+          <div><strong>Weight</strong><span>Flash conductance stores a parameter</span></div>
+          <div><strong>Multiply</strong><span>Voltage times conductance produces current</span></div>
+          <div><strong>Accumulate</strong><span>Column physics combines cell contributions</span></div>
+          <div><strong>Digitize</strong><span>ADC and local logic restore a digital boundary</span></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="terminology">
+      <div class="section-heading">
+        <p class="eyebrow">Terminology</p>
+        <h2>AiCM, AIMC, AiMC, and analog CIM</h2>
+      </div>
+      <div class="callout">
+        <p>
+          The research literature most often says <strong>analog in-memory computing (AIMC or AiMC)</strong>.
+          <strong>Analog compute-in-memory (analog CIM or ACIM)</strong> expresses the same central idea. This study
+          treats <strong>AiCM</strong> as the user's name for that family. It is different from digital CIM, which
+          performs exact bit operations inside or beside a memory array.
+        </p>
+      </div>
+    </section>
+
+    <section class="section" id="physics">
+      <div class="section-heading">
+        <p class="eyebrow">The physical primitive</p>
+        <h2>One matrix-vector multiply in five steps</h2>
+        <p class="section-note">
+          The ideal equation is compact. Every production challenge enters through the assumptions hidden underneath it.
+        </p>
+      </div>
+      <div class="formula-flow" aria-label="Analog compute-in-memory equation flow">
+        <article class="formula-step">
+          <strong>Digital activation</strong>
+          <code>x<sub>i</sub></code>
+          <span>Quantized input value</span>
+        </article>
+        <article class="formula-step">
+          <strong>Input encoding</strong>
+          <code>V<sub>i</sub> &prop; x<sub>i</sub></code>
+          <span>Voltage, pulse, or duration</span>
+        </article>
+        <article class="formula-step">
+          <strong>Cell multiply</strong>
+          <code>I<sub>ij</sub> &asymp; V<sub>i</sub>G<sub>ij</sub></code>
+          <span>Ohm's law in the read region</span>
+        </article>
+        <article class="formula-step">
+          <strong>Column sum</strong>
+          <code>I<sub>j</sub> &asymp; &Sigma;<sub>i</sub>I<sub>ij</sub></code>
+          <span>Current or charge accumulation</span>
+        </article>
+        <article class="formula-step">
+          <strong>Digital output</strong>
+          <code>&ycirc;<sub>j</sub> = ADC(I<sub>j</sub>)</code>
+          <span>Quantized result plus scaling</span>
+        </article>
+      </div>
+      <div class="card-grid" style="margin-top:12px">
+        <article class="learning-card">
+          <span class="card-label">Ideal assumption</span>
+          <h3>Cells are linear and independent</h3>
+          <p>Real I-V curves, source resistance, wire drop, coupling, and sneak paths make a large array input dependent.</p>
+        </article>
+        <article class="learning-card">
+          <span class="card-label">Ideal assumption</span>
+          <h3>Weights stay where programmed</h3>
+          <p>Programming spread, defects, relaxation, drift, temperature, and aging change the effective conductance.</p>
+        </article>
+        <article class="learning-card">
+          <span class="card-label">Ideal assumption</span>
+          <h3>Readout preserves information</h3>
+          <p>ADC range, offset, noise, resolution, and saturation place a ceiling on useful end-to-end precision.</p>
+        </article>
+      </div>
+    </section>
+
+    <section class="section" id="signal-path">
+      <div class="section-heading">
+        <p class="eyebrow">Interactive architecture map</p>
+        <h2>Trace the complete signal path</h2>
+        <p class="section-note">Select a layer to see its responsibility, dominant failure mode, mitigation pattern, evidence, and interview prompt.</p>
+      </div>
+      <div class="architecture-explorer">
+        <div id="stage-list" class="stage-list" role="tablist" aria-label="Architecture stages"></div>
+        <article id="stage-detail" class="panel stage-detail" role="tabpanel" aria-live="polite"></article>
+      </div>
+    </section>
+
+    <section class="section" id="mythic-tile">
+      <div class="section-heading">
+        <p class="eyebrow">Mythic case study</p>
+        <h2>The disclosed M1076 tile is mixed signal, not purely analog</h2>
+        <p class="section-note">
+          The analog compute engine accelerates dense matrix work. A local digital subsystem keeps control, nonlinear,
+          stateful, and unsupported operations close to the weights and activations.
+        </p>
+      </div>
+      <div class="card-grid two">
+        <div class="tile-flow" aria-label="Mythic M1076 tile block diagram">
+          <article class="tile-block ace">
+            <strong>Mythic ACE</strong>
+            <span>Embedded flash weight array</span>
+            <span>Analog matrix multiplication</span>
+            <span>Readout and ADC boundary</span>
+          </article>
+          <article class="tile-block sram"><strong>Local SRAM</strong><span>Activations, buffers, partial state</span></article>
+          <article class="tile-block simd"><strong>16-bit SIMD</strong><span>Vector and post-processing work</span></article>
+          <article class="tile-block risc"><strong>32-bit RISC-V</strong><span>Sequencing and control</span></article>
+          <article class="tile-block router"><strong>NoC router</strong><span>Deterministic activation flow between tiles</span></article>
+        </div>
+        <div>
+          <div class="callout caution">
+            <h3>Known versus current roadmap</h3>
+            <p>
+              The M1076 block structure and first-generation product figures are publicly documented. Mythic's 2025-2026
+              claims for 120 TOPS/W, LLM scale, and roughly 100x system advantages are company roadmap and internal
+              benchmark statements. They should not be presented as independently reproduced measurements.
+            </p>
+          </div>
+          <p class="section-note" style="margin-top:12px">
+            Mythic's May 2026 Videantis acquisition also makes the hybrid boundary explicit: analog for dense AI matrix
+            operations, unified digital compute for attention, signal processing, codecs, SLAM, control, and programmability.
+          </p>
+        </div>
+      </div>
+      <div id="mythic-metrics" class="metric-grid" style="margin-top:14px" aria-label="Mythic disclosed metrics"></div>
+    </section>
+
+    <section class="section" id="workflow">
+      <div class="section-heading">
+        <p class="eyebrow">Hardware-software co-design</p>
+        <h2>The model reaches the array through a compiler pipeline</h2>
+      </div>
+      <div class="study-flow" aria-label="Mythic deployment workflow">
+        <article class="study-step"><b>1</b><strong>Train</strong><span>PyTorch or another standard framework</span></article>
+        <article class="study-step"><b>2</b><strong>Quantize</strong><span>FP32 to ANA8; choose scales and ranges</span></article>
+        <article class="study-step"><b>3</b><strong>Harden</strong><span>QAT or analog-aware retraining where needed</span></article>
+        <article class="study-step"><b>4</b><strong>Partition</strong><span>Map matrices and digital operators to tiles</span></article>
+        <article class="study-step"><b>5</b><strong>Schedule</strong><span>Allocate buffers, routes, and dataflow tasks</span></article>
+        <article class="study-step"><b>6</b><strong>Validate</strong><span>Measure accuracy, latency, power, and corners</span></article>
+      </div>
+      <div class="callout" style="margin-top:14px">
+        <p>
+          The correct mental model is <strong>an analog MVM accelerator inside a digital system</strong>. The compiler and
+          calibration stack determine tensor ranges and placement; the analog array supplies dense parallel arithmetic;
+          digital units preserve generality and precision where the array is a poor fit.
+        </p>
+      </div>
+    </section>
+
+    <section class="section" id="comparison">
+      <div class="section-heading">
+        <p class="eyebrow">Technology comparison</p>
+        <h2>Flash is one member of a broader CIM design space</h2>
+        <p class="section-note">Similar matrix equations hide different density, write, drift, endurance, integration, and readout tradeoffs.</p>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th scope="col">System</th>
+              <th scope="col">Memory</th>
+              <th scope="col">Weight representation</th>
+              <th scope="col">Input / output path</th>
+              <th scope="col">Best fit</th>
+              <th scope="col">Main caveat</th>
+            </tr>
+          </thead>
+          <tbody id="technology-comparison-body"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="section" id="reading-order">
+      <div class="section-heading">
+        <p class="eyebrow">Reading order</p>
+        <h2>Four documents that reveal different layers</h2>
+      </div>
+      <div class="card-grid">
+        <article class="learning-card">
+          <span class="card-label">Product</span>
+          <h3>M1076 product brief</h3>
+          <p>Use it for the tile blocks, capacity, interfaces, peak compute, and product positioning. Treat performance comparisons as vendor claims.</p>
+          <a href="https://mythic.ai/wp-content/uploads/2022/03/M1076-AMP-Product-Brief-v1.0-1.pdf">Open product brief</a>
+        </article>
+        <article class="learning-card">
+          <span class="card-label">Primitive</span>
+          <h3>Hot Chips 2018</h3>
+          <p>Use it for the flash-resistor mental model, ADC boundary, digital input approximation, and weight-memory argument.</p>
+          <a href="https://old.hotchips.org/hc30/2conf/2.05_Mythic_Mythic_Hot_Chips_2018_V5.pdf">Open presentation</a>
+        </article>
+        <article class="learning-card">
+          <span class="card-label">Mapping</span>
+          <h3>Matrix mapping patent</h3>
+          <p>Use it to study positive and negative lines, oversized inputs, serial steps, array regions, and output aggregation.</p>
+          <a href="https://patents.google.com/patent/US12406021B2/en">Open patent</a>
+        </article>
+        <article class="learning-card">
+          <span class="card-label">Independent comparison</span>
+          <h3>NeuRRAM and IBM chips</h3>
+          <p>Use measured RRAM and PCM systems to understand calibration, converters, hardware-aware training, and complete-system boundaries.</p>
+          <a href="analog-cim-evidence.html">Open evidence ledger</a>
+        </article>
+      </div>
+    </section>
+
+    <section class="section" id="sources">
+      <div class="section-heading">
+        <p class="eyebrow">Primary sources</p>
+        <h2>Architecture source ledger</h2>
+        <p class="section-note">Company material establishes what Mythic discloses; peer-reviewed measured-silicon work supports cross-company technical comparison.</p>
+      </div>
+      <div id="architecture-sources" class="source-grid"></div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <p>Original study synthesis. Research snapshot: <span data-research-date>2026-07-11</span>.</p>
+    <div class="footer-links">
+      <a href="analog-cim-evidence.html">Next: evidence</a>
+      <a href="https://github.com/buicongnguyen/NPU">Source</a>
+    </div>
+  </footer>
+</body>
+</html>
