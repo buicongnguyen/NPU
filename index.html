@@ -167,7 +167,8 @@
           <span>AI PC</span>
           <h3>40+ TOPS in laptop thermals</h3>
           <p>
-            Copilot+ PCs mandate a 40+ TOPS integrated NPU (Intel Core Ultra, AMD Ryzen AI, Snapdragon X) to offload
+            Copilot+ PCs mandate a 40+ TOPS integrated NPU (for example Intel Core Ultra 200V / Series 2,
+            AMD Ryzen AI 300, and Snapdragon X / X2 platforms) to offload
             on-device AI from the CPU/iGPU for battery efficiency.
           </p>
         </article>
@@ -738,7 +739,7 @@
             </details>
             <details class="qa" data-cat="deployment">
               <summary><span class="qa-q">15. Compare deployment across the four tiers: mobile SoC, edge/embedded, AI PC, and datacenter/cloud. What distinguishes them in memory model, power, and accelerator type?</span><span class="qa-badge" data-diff="Intermediate">Intermediate</span></summary>
-              <p class="qa-a">Mobile SoC deployment uses an integrated NPU (Apple Neural Engine, Qualcomm Hexagon, MediaTek APU, Google Tensor) at roughly 1-5 W that shares unified LPDDR with the CPU/GPU and runs INT8/INT4 for camera pipelines, speech, and small on-device LLMs. Edge/embedded uses VPUs and small NPUs (Movidius, Coral Edge TPU, Jetson, Mobileye EyeQ) with SRAM scratchpads and direct sensor interfaces at single-digit watts for vision, robotics, and ADAS. AI PCs use integrated 40+ TOPS NPUs (Intel Core Ultra, AMD Ryzen AI, Snapdragon X) within laptop thermals for Copilot+ features, offloading from the CPU/iGPU for battery efficiency. Datacenter/cloud uses discrete GPUs, TPUs, and LPUs with dedicated multi-GB HBM, hundreds of watts to ~1 kW per package, and rack-scale interconnect (NVLink for GPUs, ICI for TPUs, RealScale for Groq); they alone do large-scale training plus high-throughput batched serving. The sharpest divide is memory: shared LPDDR or on-chip SRAM at the edge versus dedicated HBM requiring explicit host-device transfers in the datacenter.</p>
+              <p class="qa-a">Mobile SoC deployment uses an integrated NPU (Apple Neural Engine, Qualcomm Hexagon, MediaTek APU, Google Tensor) at roughly 1-5 W that shares unified LPDDR with the CPU/GPU and runs INT8/INT4 for camera pipelines, speech, and small on-device LLMs. Edge/embedded uses VPUs and small NPUs (Movidius, Coral Edge TPU, Jetson, Mobileye EyeQ) with SRAM scratchpads and direct sensor interfaces at single-digit watts for vision, robotics, and ADAS. AI PCs use integrated 40+ TOPS NPUs (for example Intel Core Ultra 200V / Series 2, AMD Ryzen AI 300, and Snapdragon X / X2 platforms) within laptop thermals for Copilot+ features, offloading from the CPU/iGPU for battery efficiency. Datacenter/cloud uses discrete GPUs, TPUs, and LPUs with dedicated multi-GB HBM, hundreds of watts to ~1 kW per package, and rack-scale interconnect (NVLink for GPUs, ICI for TPUs, RealScale for Groq); they alone do large-scale training plus high-throughput batched serving. The sharpest divide is memory: shared LPDDR or on-chip SRAM at the edge versus dedicated HBM requiring explicit host-device transfers in the datacenter.</p>
             </details>
             <details class="qa" data-cat="deployment">
               <summary><span class="qa-q">16. What is the Copilot+ PC NPU requirement, and how do applications actually reach the NPU on Windows versus on Apple and Android platforms?</span><span class="qa-badge" data-diff="Intermediate">Intermediate</span></summary>
