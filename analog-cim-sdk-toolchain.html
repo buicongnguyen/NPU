@@ -25,6 +25,7 @@
       <a href="analog-cim-ihw-patents.html">iHW patents</a>
       <a href="analog-cim-sdk-toolchain.html" aria-current="page">SDK</a>
       <a href="analog-cim-tenstorrent-reuse.html">Reuse</a>
+      <a href="analog-cim-scaleout-llm.html">Scale/LLM</a>
       <a href="analog-cim-interview.html">Interview</a>
       <a href="analog-cim-quiz.html">MCQ Lab</a>
     </nav>
@@ -845,6 +846,15 @@ acim-profile build/matmul.atrace --summary</code></pre>
           targets fail with stable status codes; IR, compile report, command list, and trace IDs identify the original ONNX node.
         </p>
       </div>
+      <div class="callout top-gap">
+        <p>
+          <strong>Second vertical slice:</strong> extend this exact artifact and HAL with capability, live-health,
+          calibration, binding, and topology epochs. Compile row- and column-parallel linear variants, bind around
+          injected row/column/tile faults, execute collectives on a fake <code>AcimMesh</code>, and recover from one link
+          failure. The <a href="analog-cim-scaleout-llm.html#implementation">scale-out implementation plan</a> defines
+          the schemas, sequence, and acceptance metrics.
+        </p>
+      </div>
     </section>
 
     <section class="section" id="roadmap" data-progress="acim-sdk-roadmap">
@@ -919,6 +929,7 @@ acim-profile build/matmul.atrace --summary</code></pre>
         <article class="source-card"><a href="https://github.com/mlcommons/inference_policies/blob/master/inference_rules.adoc">MLPerf Inference rules</a><span>Primary reference for system-under-test, quality, latency/throughput scenarios, reproducibility, and audit boundaries.</span></article>
         <article class="source-card"><a href="analog-cim-ihw-patents.html">iHW patent study</a><span>Patent mechanisms and evidence limits that motivate, but do not disclose, this software design.</span></article>
         <article class="source-card"><a href="analog-cim-tenstorrent-reuse.html">Tenstorrent reuse guide</a><span>Repository-level learn/adapt/replace decisions and license/evidence gates.</span></article>
+        <article class="source-card"><a href="analog-cim-scaleout-llm.html">ACiM scale-out and LLM design</a><span>Fault-aware descriptors, logical mesh, distributed placement, hybrid LLM mapping, recovery, and the second vertical slice.</span></article>
         <article class="source-card"><a href="analog-cim-hardware-software-codesign.html">Hardware/software co-design</a><span>Physical bottlenecks, measured-paper solutions, lifecycle, and analog/digital partition context.</span></article>
       </div>
     </section>

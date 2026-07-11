@@ -1,0 +1,745 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="A build-oriented architecture for scaling Analog CIM systems, tolerating cell, row, column, converter, tile, chip, and link faults, reusing selected Tenstorrent patterns, and running hybrid LLM inference.">
+  <title>Analog CIM Scale-Out and LLMs | NPU Study Guide</title>
+  <link rel="stylesheet" href="analog-cim.css">
+  <link rel="stylesheet" href="npu-engineering.css">
+  <link rel="stylesheet" href="analog-cim-scaleout.css">
+  <script src="npu-engineering.js" defer></script>
+</head>
+<body>
+  <header class="site-header">
+    <a class="brand" href="index.html" aria-label="NPU Study Guide home">
+      <img src="https://avatars.githubusercontent.com/u/72680210?v=4" alt="Bui Cong Nguyen avatar">
+      <span>NPU Study Guide</span>
+    </a>
+    <nav class="site-nav" aria-label="Analog CIM learning path">
+      <a href="analog-cim-architecture.html">Architecture</a>
+      <a href="analog-cim-evidence.html">Evidence</a>
+      <a href="analog-cim-hardware-software-codesign.html">Co-design</a>
+      <a href="analog-cim-ihw-patents.html">iHW patents</a>
+      <a href="analog-cim-sdk-toolchain.html">SDK</a>
+      <a href="analog-cim-tenstorrent-reuse.html">Reuse</a>
+      <a href="analog-cim-scaleout-llm.html" aria-current="page">Scale/LLM</a>
+      <a href="analog-cim-interview.html">Interview</a>
+      <a href="analog-cim-quiz.html">MCQ Lab</a>
+    </nav>
+  </header>
+
+  <main>
+    <section class="hero">
+      <div class="hero-copy">
+        <p class="eyebrow">System design | research snapshot 2026-07-11</p>
+        <h1>Analog CIM Scale-Out, Fault Tolerance, and LLM Inference</h1>
+        <p class="lede">
+          A concrete software architecture for turning imperfect analog arrays into a logical accelerator mesh. It
+          adapts selected Tenstorrent ideas at the descriptor, virtual-device, simulator, collective, and observability
+          boundaries while replacing Tensix execution with calibration-aware Analog CIM placement and a hybrid digital backend.
+        </p>
+        <div class="hero-actions">
+          <a class="button" href="#verdict">Read the LLM verdict</a>
+          <a class="button secondary" href="#fault-model">Open the fault model</a>
+          <a class="button secondary" href="#contracts">Inspect the contracts</a>
+        </div>
+        <div class="summary-strip" role="group" aria-label="Architecture summary">
+          <div><strong>6</strong><span>resource and fault levels</span></div>
+          <div><strong>2</strong><span>explicit execution planes</span></div>
+          <div><strong>5</strong><span>LLM partition modes</span></div>
+          <div><strong>1</strong><span>shared artifact and HAL</span></div>
+        </div>
+        <div class="evidence-key" role="group" aria-label="Evidence labels">
+          <span class="evidence-tag silicon">Measured silicon</span>
+          <span class="evidence-tag patent">Patent mechanism</span>
+          <span class="evidence-tag simulation">Simulation</span>
+          <span class="evidence-tag claim">Company claim</span>
+          <span class="evidence-tag design">Engineering design</span>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="verdict">
+      <div class="section-heading">
+        <p class="eyebrow">Executive answer</p>
+        <h2>Can a Mythic- or iHW-style Analog CIM system run an LLM?</h2>
+      </div>
+      <div class="verdict-banner">
+        <div>
+          <span class="evidence-tag design">Architecture conclusion</span>
+          <strong>Yes, as a hybrid inference system</strong>
+          <span>No public evidence yet establishes a legacy M1076 or an iHW product running a production decoder LLM end to end.</span>
+        </div>
+        <p>
+          Put static dense projections and feed-forward weights on Analog CIM arrays. Keep dynamic attention, KV-cache
+          writes, normalization, nonlinear functions, routing, sampling, and precision recovery on digital engines and
+          SRAM/DRAM. Scale the model with explicit tensor, pipeline, and expert parallelism. Judge success in
+          tokens/second, time-to-first-token, inter-token latency, accuracy, energy/token, capacity, and recovery time,
+          not array TOPS alone.
+        </p>
+      </div>
+      <div class="card-grid two top-gap">
+        <article class="learning-card">
+          <span class="card-label">Measured silicon</span>
+          <h3>Transformer feasibility is real but bounded</h3>
+          <p>
+            A 2025 IBM-led study mapped 7.1 million unique ALBERT weights to a fabricated 14 nm PCM chip and reported
+            average accuracy 1.8 percentage points below FP. Attention, activations, pooler, and classifier remained in
+            software, so this is strong evidence for analog linear layers, not an end-to-end decoder LLM.
+          </p>
+          <a href="https://www.nature.com/articles/s41467-025-63794-4">Read the Nature Communications paper</a>
+        </article>
+        <article class="learning-card">
+          <span class="card-label">Circuit and model simulation</span>
+          <h3>Dynamic attention needs different memory</h3>
+          <p>
+            A 2025 gain-cell proposal stores K/V values in write-friendly charge memory and computes both attention dot
+            products in the analog domain. Results use 64 &times; 64 SPICE simulations and PyTorch model evaluation,
+            not fabricated full-system silicon. It should be a separate target capability, not assumed for flash arrays.
+          </p>
+          <a href="https://www.nature.com/articles/s43588-025-00854-1">Read the Nature Computational Science paper</a>
+        </article>
+        <article class="learning-card">
+          <span class="card-label">Mythic evidence</span>
+          <h3>Legacy product facts and current roadmap differ</h3>
+          <p>
+            The M1076 brief documents 80 million weight capacity, 76 tiles, 25 TOPS, and a PCIe interface. Mythic's 2025
+            announcement claims a rebuilt chiplet architecture for 1T+ LLMs and publishes internal efficiency projections;
+            public independent silicon results for that roadmap are not yet identified here.
+          </p>
+          <a href="https://mythic.ai/wp-content/uploads/2022/03/M1076-AMP-Product-Brief-v1.0-1.pdf">Open the M1076 brief</a>
+        </article>
+        <article class="learning-card">
+          <span class="card-label">Hybrid confirmation</span>
+          <h3>Mythic's acquisition reinforces this partition</h3>
+          <p>
+            Mythic describes analog compute for dense matrix operations and the acquired Videantis digital architecture
+            for attention, control, programmability, and other high-performance workloads. That is the system boundary
+            this design makes explicit.
+          </p>
+          <a href="https://mythic.ai/whats-new/mythic-acquires-videantis-one-of-europes-leading-digital-processor-ip-companies-to-build-the-worlds-most-energy-efficient-ai-compute-platform/">Read the acquisition announcement</a>
+        </article>
+      </div>
+      <div class="callout caution top-gap">
+        <p>
+          <strong>iHW boundary:</strong> the public material reviewed for this study supports analog inference positioning,
+          patent mechanisms, and smaller-model demonstrations, but does not establish a public decoder-LLM silicon result.
+          The architecture below is a target-neutral proposal, not a disclosure of iHW's internal implementation.
+        </p>
+      </div>
+    </section>
+
+    <section class="section" id="compute-path">
+      <div class="section-heading">
+        <p class="eyebrow">Physical execution</p>
+        <h2>What actually happens during one Analog CIM matrix-vector operation</h2>
+        <p class="section-note">
+          Mythic publicly identifies a flash array and analog circuits, but not every internal encoding, converter, or
+          accumulation detail. The flow below is a generic differential or bit-sliced ACiM contract whose exact choices
+          must be supplied by the target descriptor.
+        </p>
+      </div>
+      <div class="signal-path" role="group" aria-label="Analog CIM signal path">
+        <article class="signal-stage"><b>1. Program</b><strong>Encode fixed weights</strong><span>Map quantized weight slices into conductance states, verify writes, and record achieved values.</span><code>Wq -&gt; G+, G-</code></article>
+        <article class="signal-stage"><b>2. Drive</b><strong>Encode activations</strong><span>DACs, pulse widths, or switched levels convert an input slice into row stimuli.</span><code>xq -&gt; V or t</code></article>
+        <article class="signal-stage"><b>3. Multiply</b><strong>Cell current</strong><span>Each enabled cell contributes current according to its programmed state and applied input.</span><code>Iij &asymp; Gij * Vi</code></article>
+        <article class="signal-stage"><b>4. Accumulate</b><strong>Column integration</strong><span>Kirchhoff summation and integration form one partial dot product per active column.</span><code>Ij = &sum;i Iij</code></article>
+        <article class="signal-stage"><b>5. Convert</b><strong>Read analog result</strong><span>ADC or charge-to-pulse circuitry digitizes the integrated result using a calibrated range.</span><code>qj = ADC(Ij)</code></article>
+        <article class="signal-stage"><b>6. Rebuild</b><strong>Digital correction</strong><span>Combine signs, slices, arrays, and chips; apply scale, bias, saturation, and optional residual correction.</span><code>y = requant(sum(q))</code></article>
+      </div>
+      <div class="equation-panel">
+        <code>y_hat = D(ADC(sum_i A(G_ij, x_i, theta))))</code>
+        <p>
+          <strong>The software-visible result is not only W &times; x.</strong> <code>A</code> includes device and circuit
+          behavior, <code>theta</code> identifies calibration and environment state, and <code>D</code> is digital
+          reconstruction. A compiler must preserve all three in the executable and debug map.
+        </p>
+      </div>
+      <div class="table-wrap top-gap">
+        <table>
+          <thead><tr><th scope="col">Decision</th><th scope="col">Hardware owns</th><th scope="col">Compiler owns</th><th scope="col">Runtime/firmware owns</th></tr></thead>
+          <tbody>
+            <tr><th scope="row">Weight representation</th><td>Cell levels, differential support, spare rows/columns, programming limits</td><td>Quantization, clipping, sign encoding, bit slicing, placement</td><td>Programming, verify/retry, checksum, provenance</td></tr>
+            <tr><th scope="row">Input representation</th><td>DAC or pulse modes, fanout, legal ranges</td><td>Activation precision, slice count, scale, schedule</td><td>Command sequencing and range selection</td></tr>
+            <tr><th scope="row">Output precision</th><td>Integration window, ADC channels, saturation behavior</td><td>ADC plan, partial-sum tree, digital correction</td><td>Calibration binding, telemetry, retry policy</td></tr>
+            <tr><th scope="row">Numerical guarantee</th><td>Characterized error envelope by operating point</td><td>Operator-specific tolerance and fallback variant</td><td>Verify live state remains inside the compiled envelope</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="section" id="fault-model">
+      <div class="section-heading">
+        <p class="eyebrow">Defect hierarchy</p>
+        <h2>A bad cell, a bad ADC, and a bad tile are different problems</h2>
+        <p class="section-note">
+          Each level needs a distinct health record and recovery action. Collapsing all defects into one bitmap makes
+          placement unstable, wastes healthy capacity, and prevents useful diagnostics.
+        </p>
+      </div>
+      <div class="callout verdict bottom-gap">
+        <p>
+          <strong>Important evidence correction:</strong> Mythic's public patent supports virtual addressing and
+          harvesting of defective compute tiles, including removal of a minimal set of tile rows or columns. It does
+          not by itself prove spare flash-cell rows, spare bitlines, or spare ADC channels inside Mythic's ACE array.
+          The row/ADC example below comes from a separate EnCharge AI patent and is used only as an alternative design pattern.
+        </p>
+      </div>
+      <div class="fault-stack">
+        <article class="fault-level"><b>L0</b><div><strong>Cell or device state</strong><span>Programming error, stuck cell, noise, drift, retention</span></div><div><strong>Mitigation</strong><span>Verify-and-program, differential encoding, redundant devices, sensitivity-aware placement, calibration, retraining or digital residual.</span></div><code>CellHealth + achieved_conductance</code></article>
+        <article class="fault-level"><b>L1</b><div><strong>Row or wordline</strong><span>Driver, line, or clustered cell failure</span></div><div><strong>Mitigation</strong><span>Redirect the logical row to a spare row, shift following rows, or reserve the region. Reprogram all affected weight slices.</span></div><code>RowRemap[logical] = physical</code></article>
+        <article class="fault-level"><b>L2</b><div><strong>Column or ADC channel</strong><span>Bitline, integrator, ADC, or output lane failure</span></div><div><strong>Mitigation</strong><span>Route the bitline to a spare converter, shift channels, or reduce usable output width. Rebuild the output-channel map.</span></div><code>ColumnRemap + AdcHealth</code></article>
+        <article class="fault-level"><b>L3</b><div><strong>Array or subarray</strong><span>Exhausted spares, local thermal/noise region</span></div><div><strong>Mitigation</strong><span>Quarantine the region, split the tensor differently, consume reserved capacity, or select a lower-stress precision mode.</span></div><code>ArrayCapability + health_class</code></article>
+        <article class="fault-level"><b>L4</b><div><strong>Compute tile</strong><span>Array, RISC-V, SIMD, SRAM, or router compute path</span></div><div><strong>Mitigation</strong><span>Assign only good tiles valid logical addresses. Preserve pass-through routing where hardware permits it.</span></div><code>LogicalTileMap + harvest_mask</code></article>
+        <article class="fault-level"><b>L5</b><div><strong>Chip, link, card, host</strong><span>Device, PCIe/fabric link, power, or host failure</span></div><div><strong>Mitigation</strong><span>Reform the logical mesh, reroute collectives, restore a distributed checkpoint, and rebind or recompile affected stages.</span></div><code>ClusterTopology + route_epoch</code></article>
+      </div>
+      <div class="card-grid two top-gap">
+        <article class="learning-card">
+          <span class="card-label">Mythic patent mechanism</span>
+          <h3>Virtualize the tile grid</h3>
+          <p>
+            Test tiles, mark low-performing or defective tiles, and create a physical-to-virtual coordinate map that
+            maximizes usable compute. A null-address tile can be skipped as a compute destination while packet routing
+            continues through it. Applications target a stable logical grid.
+          </p>
+          <a href="https://patents.google.com/patent/US11475973B2/en">Open US11475973B2</a>
+        </article>
+        <article class="learning-card">
+          <span class="card-label">Alternative array mechanism</span>
+          <h3>Redirect rows and converter channels</h3>
+          <p>
+            EnCharge describes normally disabled redundant ADC channels, input/output selection networks, and spare rows.
+            This is useful evidence for the required software contract, but it is a pending patent application and not
+            evidence of Mythic or iHW product behavior.
+          </p>
+          <a href="https://patents.google.com/patent/WO2025122556A1/en">Open WO2025122556A1</a>
+        </article>
+      </div>
+    </section>
+
+    <section class="section" id="lifecycle">
+      <div class="section-heading">
+        <p class="eyebrow">Health lifecycle</p>
+        <h2>Discover once, bind explicitly, monitor continuously</h2>
+      </div>
+      <div class="engineering-flow six" role="group" aria-label="Fault discovery and deployment lifecycle">
+        <article class="flow-step"><b>Factory</b><strong>Characterize</strong><span>BIST cells, rows, columns, ADCs, arrays, tiles, links, and corners</span></article>
+        <article class="flow-step"><b>Provision</b><strong>Create base map</strong><span>Burn immutable IDs and repair data; sign the factory health record</span></article>
+        <article class="flow-step"><b>Boot</b><strong>Discover live state</strong><span>Merge factory map, boot tests, firmware revision, topology, and calibration</span></article>
+        <article class="flow-step"><b>Compile</b><strong>Place logical work</strong><span>Use capability classes and reserve capacity without hard-coding serial numbers</span></article>
+        <article class="flow-step"><b>Load</b><strong>Bind and program</strong><span>Select physical resources, program weights, verify checksums, publish map epoch</span></article>
+        <article class="flow-step"><b>Run</b><strong>Observe and recover</strong><span>Track drift, saturation, retries, faults, route health, and rebind at a checkpoint</span></article>
+      </div>
+      <div class="table-wrap top-gap">
+        <table>
+          <thead><tr><th scope="col">Artifact</th><th scope="col">Mutability</th><th scope="col">Owner</th><th scope="col">Required fields</th></tr></thead>
+          <tbody>
+            <tr><th scope="row">Target descriptor</th><td>Versioned per architecture/SKU</td><td>Architecture + compiler</td><td>Arrays, dimensions, formats, commands, converters, memory, links, legal modes</td></tr>
+            <tr><th scope="row">Factory health</th><td>Immutable and signed</td><td>Manufacturing</td><td>Device ID, repair map, disabled resources, characterization bins, provenance</td></tr>
+            <tr><th scope="row">Live health</th><td>Changes at boot/runtime</td><td>Firmware/runtime</td><td>Available resources, temperatures, errors, spare budget, route epoch, timestamps</td></tr>
+            <tr><th scope="row">Calibration bundle</th><td>Changes with chip and environment</td><td>Calibration service</td><td>Ranges, offsets, gains, noise envelope, temperature/voltage window, expiry</td></tr>
+            <tr><th scope="row">Executable intent</th><td>Immutable build output</td><td>Compiler</td><td>Logical placement, variants, tolerance, constants, collectives, fallback, debug map</td></tr>
+            <tr><th scope="row">Binding record</th><td>One per deployment epoch</td><td>Runtime</td><td>Logical-to-physical map, programmed-weight hashes, calibration IDs, routes, checkpoint</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="section" id="contracts">
+      <div class="section-heading">
+        <p class="eyebrow">Buildable contracts</p>
+        <h2>The compiler targets capabilities; the runtime binds a particular device</h2>
+        <p class="section-note">
+          This is the key separation borrowed from virtual device and harvesting designs. A portable executable should
+          express logical resource requirements and legal variants. Serial-number-specific defects remain in the binding record.
+        </p>
+      </div>
+      <div class="schema-grid">
+        <article class="schema-block">
+          <h3>Target and logical-mesh descriptor</h3>
+          <pre><code>schema: acim.target/v1
+target: acim.flash.hybrid.v1
+tile:
+  logical_grid: [8, 8]
+  array_shapes: [[512, 512]]
+  weight_modes: [w4_diff, w8_sliced]
+  activation_modes: [a8_serial, a16_sliced]
+  adc_bits: [6, 8]
+  spare_rows: 8
+  spare_columns: 4
+digital:
+  ops: [layer_norm, softmax, rope, silu, topk]
+mesh:
+  shape: [2, 4]
+  links: [pcie, acim_fabric]
+  collectives: [all_gather, reduce_scatter, all_reduce]
+abi: acim.runtime/3</code></pre>
+        </article>
+        <article class="schema-block">
+          <h3>Live health and calibration view</h3>
+          <pre><code>schema: acim.health/v1
+device_id: chip-07
+health_epoch: 184
+calibration_id: cal-chip07-42c-1v0
+usable_tiles: 59
+tile_map: logical_to_physical.bin
+arrays:
+  - id: t03.a1
+    class: nominal
+    row_remap: {17: 519}
+    adc_remap: {61: 515}
+    noise_rms_lsb: 0.43
+    saturation_rate: 0.0007
+spare_budget:
+  rows_remaining: 7
+  columns_remaining: 3
+routes:
+  epoch: 12
+  unavailable_links: [chip07.east]</code></pre>
+        </article>
+        <article class="schema-block">
+          <h3>Executable physical intent</h3>
+          <pre><code>schema: acim.executable/v2
+graph_hash: sha256:...
+target_compat: acim.flash.hybrid.v1
+logical_mesh: [2, 4]
+programs:
+  - op: decoder.0.mlp.up
+    kind: acim.mvm
+    layout: column_parallel
+    weight_mode: w4_diff
+    adc_plan: adc6_x2
+    tolerance: rel_l2_0p02
+    reserve_class: one_array
+    fallback: digital.int8
+collectives:
+  - after: decoder.0.attn.out
+    kind: reduce_scatter
+debug_map: graph_to_command.cbor</code></pre>
+        </article>
+        <article class="schema-block">
+          <h3>Stable C++ runtime boundary</h3>
+          <pre><code>class AcimDevice {
+ public:
+  virtual CapabilityView capabilities() const = 0;
+  virtual HealthView health() const = 0;
+  virtual Binding bind(const Executable&amp;) = 0;
+  virtual Event program(const Binding&amp;) = 0;
+  virtual Event submit(const CommandBatch&amp;) = 0;
+  virtual RecoveryResult recover(const Fault&amp;) = 0;
+};
+
+class AcimMesh {
+ public:
+  virtual MeshTensor distribute(const Tensor&amp;, ShardSpec) = 0;
+  virtual Event collective(Collective, MeshTensor&amp;) = 0;
+  virtual Checkpoint checkpoint() = 0;
+  virtual void reform(const TopologyView&amp;) = 0;
+};</code></pre>
+        </article>
+      </div>
+      <div class="callout caution top-gap">
+        <p>
+          <strong>Security and correctness:</strong> firmware validates descriptor bounds, executable signatures, ABI
+          versions, programmed-weight hashes, calibration validity, DMA ranges, and route epochs. Host metadata is never
+          trusted merely because it came from the compiler.
+        </p>
+      </div>
+    </section>
+
+    <section class="section" id="mapping">
+      <div class="section-heading">
+        <p class="eyebrow">Fault-aware compiler</p>
+        <h2>Placement is a constrained optimization, not a rectangular tiling exercise</h2>
+      </div>
+      <div class="algorithm-block">
+        <header><strong>Compiler and runtime placement algorithm</strong><span>Compile against capability classes; bind against one health epoch.</span></header>
+        <pre><code>for op in topological_order(graph):
+  variants = legal_lowerings(op, target, accuracy_policy)
+  for variant in variants:
+    shards = tile_tensor(variant, logical_mesh)
+    candidates = resources_matching(shards, capability_class)
+    score = (
+        estimated_latency
+      + lambda_energy * estimated_energy
+      + lambda_error  * predicted_numerical_error
+      + lambda_comm   * collective_bytes
+      + lambda_wear   * programming_and_aging_cost
+      + lambda_risk   * spare_consumption
+    )
+  choose pareto_feasible_variant_or_fallback()
+
+at load time:
+  verify health_epoch and calibration envelope
+  match logical shards to physical arrays
+  apply row/column/tile remaps
+  program and verify weights
+  publish signed binding record
+
+on fault:
+  retry -&gt; recalibrate -&gt; local remap -&gt; tile rebind
+        -&gt; mesh reform/checkpoint restore -&gt; digital fallback</code></pre>
+      </div>
+      <div class="card-grid top-gap">
+        <article class="learning-card"><span class="card-label">Accuracy cost</span><h3>Predict layer sensitivity</h3><p>Use quantization sweeps, measured nonideality models, activation statistics, calibration state, and selective digital residuals. Sensitive layers can request wider ADC plans or digital execution.</p></article>
+        <article class="learning-card"><span class="card-label">Capacity cost</span><h3>Reserve without wasting the fleet</h3><p>Compile variants for nominal and degraded capacity classes. Keep spare rows, columns, arrays, and tiles out of normal placement unless policy explicitly spends them.</p></article>
+        <article class="learning-card"><span class="card-label">Communication cost</span><h3>Place around collectives</h3><p>Estimate bytes and hops for activation shards and partial sums. Local weights remove weight traffic, not all inter-chip traffic.</p></article>
+      </div>
+      <div class="callout top-gap">
+        <p>
+          <strong>Research input:</strong> the 2026 Dyn-A-Map paper ranks vulnerable subarray regions and relocates
+          important weights to healthier regions without retraining. Its evidence is pre-silicon SPICE and architecture
+          simulation, so use it as a mapping heuristic to validate on real devices, not as a proven field-repair result.
+          <a href="https://www.nature.com/articles/s44335-026-00072-6">Read Dyn-A-Map</a>.
+        </p>
+      </div>
+    </section>
+
+    <section class="section" id="tenstorrent">
+      <div class="section-heading">
+        <p class="eyebrow">Open-source architecture audit</p>
+        <h2>What to adapt from Tenstorrent, and what must remain ACiM-native</h2>
+        <p class="section-note">
+          Reuse decisions apply to selected modules and contracts after dependency and license review. Repository names
+          are not blanket approval to copy an implementation.
+        </p>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th scope="col">Reference</th><th scope="col">ACiM decision</th><th scope="col">Concrete adaptation</th><th scope="col">Do not import</th></tr></thead>
+          <tbody>
+            <tr><th scope="row">TT-MLIR + TT-XLA + Forge ONNX</th><td>Adapt frontend and pass patterns</td><td>Keep StableHLO/ONNX import, diagnostics, pass pipelines, and plugin boundaries; introduce ACiM target dialects and capability interfaces.</td><td>TTNN, TTMetal, TTKernel operations and Tensix legality assumptions.</td></tr>
+            <tr><th scope="row">TT-UMD SoC/cluster descriptors</th><td>Adapt isolated descriptor machinery</td><td>Use a grid descriptor as the compiler/runtime contract; extend harvesting into row, column, ADC, array, tile, and calibration views.</td><td>Tenstorrent discovery, PCIe transport, TLB, memory map, firmware, and device implementation.</td></tr>
+            <tr><th scope="row">MeshDevice + MeshTensor</th><td>Adapt virtual-device semantics</td><td>Create <code>AcimMesh</code>, explicit sharding/replication, mesh command queues, and explicit all-gather/reduce-scatter/all-reduce.</td><td>Assumed TT link topology, tensor layouts, kernels, and dispatch implementation.</td></tr>
+            <tr><th scope="row">Cluster descriptors + tt-run</th><td>Adapt topology/test patterns</td><td>Store static and discovered topologies independently; test subsets, fallback mappings, multi-host SPMD, and pipeline groups without hardware.</td><td>Tenstorrent-specific YAML fields and launcher/device behavior.</td></tr>
+            <tr><th scope="row">TT-Fabric</th><td>Study control-plane architecture</td><td>Separate persistent health/routing control from the data plane; pause, flush, reroute, reform a mesh, and restore checkpoints.</td><td>Fabric router, protocol, link, and firmware code tied to TT hardware.</td></tr>
+            <tr><th scope="row">tt-emule</th><td>Adapt same-API backend pattern</td><td>Run compiler/runtime tests against a functional ACiM emulator selected behind the same HAL as hardware.</td><td>Tensix core threads, circular buffers, NoC, SRAM, and kernel semantics.</td></tr>
+            <tr><th scope="row">ttnn-visualizer + tt-perf-report</th><td>Adapt reports and UX selectively</td><td>Visualize graph placement, analog ranges, defect maps, calibration epochs, converter use, collectives, and first divergent layer.</td><td>TT trace schemas, counters, memory layouts, and operation assumptions.</td></tr>
+            <tr><th scope="row">TT-Metal, UMD transport, KMD, firmware</th><td>Replace</td><td>Build ACiM commands, programming service, HAL, driver, firmware scheduler, power/reset, safety, and telemetry from the target ABI.</td><td>All device-specific implementations unless a narrow utility passes semantic, test, dependency, and license review.</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="card-grid two top-gap">
+        <article class="learning-card">
+          <span class="card-label">Why the UMD decision changed</span>
+          <h3>Descriptor concepts are explicitly reusable</h3>
+          <p>Tenstorrent's custom-SoC guide calls the SoC descriptor reusable for other grid-like SoCs and identifies it as a higher-stack contract. That supports adapting the descriptor/coordinate boundary while replacing transport and device code.</p>
+          <a href="https://github.com/tenstorrent/tt-umd/blob/main/docs/CUSTOM_MODIFICATION_GUIDE.md">Read the custom-SoC guide</a>
+        </article>
+        <article class="learning-card">
+          <span class="card-label">Other foundations</span>
+          <h3>Use target-neutral projects where they fit better</h3>
+          <p>MLIR supplies IR infrastructure, OpenXLA PJRT supplies a framework plugin contract, TVM supplies a target-extensible compiler reference, and AIHWKit/CrossSim supply analog-aware numerical modeling. Evaluate each behind the same target contract.</p>
+          <a href="analog-cim-sdk-toolchain.html#first-slice">Open the SDK implementation structure</a>
+        </article>
+      </div>
+    </section>
+
+    <section class="section" id="scale">
+      <div class="section-heading">
+        <p class="eyebrow">Scale-up and scale-out</p>
+        <h2>A logical mesh spans six physical scopes</h2>
+        <p class="section-note">
+          "Weights stay in memory" removes repeated model-weight fetches. It does not remove activation, partial-sum,
+          KV-cache, expert-routing, control, checkpoint, and telemetry traffic.
+        </p>
+      </div>
+      <div class="mesh-hierarchy" role="group" aria-label="Analog CIM scale hierarchy">
+        <article class="mesh-level"><b>Level 0</b><strong>Array</strong><span>One MVM slice, converter group, local spares</span></article>
+        <article class="mesh-level"><b>Level 1</b><strong>Tile</strong><span>Arrays, digital core, SRAM, local router</span></article>
+        <article class="mesh-level"><b>Level 2</b><strong>Chip</strong><span>Logical tile grid, NoC, shared services</span></article>
+        <article class="mesh-level"><b>Level 3</b><strong>Card</strong><span>Several chips, switch/fabric, power domain</span></article>
+        <article class="mesh-level"><b>Level 4</b><strong>Host</strong><span>Runtime executor, memory, queues, checkpoint shard</span></article>
+        <article class="mesh-level"><b>Level 5</b><strong>Cluster</strong><span>Distributed mesh, serving scheduler, fleet health</span></article>
+      </div>
+      <div class="plane-diagram top-gap">
+        <article class="plane data">
+          <h3>Data plane</h3>
+          <div class="plane-row"><strong>Weights</strong><span>Program once per model/binding epoch; verify and retain locally.</span></div>
+          <div class="plane-row"><strong>Activations</strong><span>Shard, multicast, pipeline, and exchange between analog and digital stages.</span></div>
+          <div class="plane-row"><strong>Partial sums</strong><span>Reduce across row-parallel shards with declared accumulation precision.</span></div>
+          <div class="plane-row"><strong>KV cache</strong><span>Allocate and page in write-friendly digital or specialized dynamic memory.</span></div>
+          <div class="plane-row"><strong>Collectives</strong><span>All-gather, reduce-scatter, all-reduce, broadcast, all-to-all.</span></div>
+        </article>
+        <article class="plane control">
+          <h3>Control plane</h3>
+          <div class="plane-row"><strong>Discovery</strong><span>Enumerate chips, arrays, links, topology, firmware, and capacity class.</span></div>
+          <div class="plane-row"><strong>Health</strong><span>Track calibration, temperature, saturation, retries, faults, and spare budget.</span></div>
+          <div class="plane-row"><strong>Placement</strong><span>Bind logical programs to a health epoch and route epoch.</span></div>
+          <div class="plane-row"><strong>Recovery</strong><span>Pause, drain, remap, reprogram, reform mesh, restore checkpoint, resume.</span></div>
+          <div class="plane-row"><strong>Governance</strong><span>Sign artifacts, enforce ABI, record provenance, support rollback.</span></div>
+        </article>
+      </div>
+      <div class="table-wrap top-gap">
+        <table>
+          <thead><tr><th scope="col">Parallel mode</th><th scope="col">Analog placement</th><th scope="col">Required communication</th><th scope="col">Primary risk</th></tr></thead>
+          <tbody>
+            <tr><th scope="row">Column-parallel linear</th><td>Shard output channels and their local weights</td><td>All-gather output shards when the next operator needs the full tensor</td><td>Output/ADC imbalance and gather latency</td></tr>
+            <tr><th scope="row">Row-parallel linear</th><td>Shard input channels and produce partial outputs</td><td>Reduce-scatter or all-reduce partial sums in an explicit accumulator format</td><td>Reduction bandwidth and numerical order</td></tr>
+            <tr><th scope="row">Pipeline parallel</th><td>Place layer ranges on chips/cards/hosts</td><td>Point-to-point activation transfer and microbatch scheduling</td><td>Bubbles, stage imbalance, recovery scope</td></tr>
+            <tr><th scope="row">Expert parallel</th><td>Store different MoE experts in local arrays</td><td>Top-k routing and all-to-all token exchange; return weighted expert outputs</td><td>Hot experts, dynamic traffic, stranded capacity</td></tr>
+            <tr><th scope="row">Data parallel serving</th><td>Replicate the model or pipeline for independent requests</td><td>Request routing and model/adapter distribution; no per-token gradient reduction</td><td>Weight programming time and replica capacity</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="callout caution top-gap">
+        <p>
+          Mythic's statement that future APUs do not need a GPU-like high-speed APU-to-APU link is a company claim.
+          Whether it holds depends on model partitioning, batch, context, topology, and how much activation/KV/partial-sum
+          traffic remains. The runtime must model and measure that traffic rather than encode the claim as an assumption.
+        </p>
+      </div>
+    </section>
+
+    <section class="section" id="llm">
+      <div class="section-heading">
+        <p class="eyebrow">Hybrid LLM mapping</p>
+        <h2>Place operators by state behavior, not by the word "MatMul"</h2>
+      </div>
+      <div class="llm-path" role="group" aria-label="Hybrid decoder layer">
+        <article class="llm-stage digital"><b>Digital</b><strong>Norm + RoPE</strong><span>Reductions, reciprocal/sqrt, position-dependent transforms</span></article>
+        <article class="llm-stage analog"><b>Analog</b><strong>Q/K/V projections</strong><span>Static dense weights; shard by head or hidden dimension</span></article>
+        <article class="llm-stage digital"><b>Digital/dynamic CIM</b><strong>Attention + KV</strong><span>Per-token writes, QK, mask, softmax, AV, paging</span></article>
+        <article class="llm-stage analog"><b>Analog</b><strong>Output + MLP</strong><span>Static dense projections, gate/up/down matrices</span></article>
+        <article class="llm-stage mixed"><b>Mixed</b><strong>Residual + sample</strong><span>Digital accumulation, LM head option, logits, top-k/p sampling</span></article>
+      </div>
+      <div class="table-wrap top-gap">
+        <table>
+          <thead><tr><th scope="col">LLM work</th><th scope="col">Default target</th><th scope="col">Why</th><th scope="col">Compiler/runtime requirement</th></tr></thead>
+          <tbody>
+            <tr><th scope="row">Embedding / LM head</th><td>Analog when capacity and lookup behavior fit; otherwise digital memory</td><td>Static weights but irregular lookup or very wide output</td><td>Vocabulary partition, gather/top-k strategy, tied-weight handling</td></tr>
+            <tr><th scope="row">Q/K/V and output projections</th><td>Analog CIM</td><td>Large fixed dense matrices with repeated use</td><td>Head-aware sharding, activation scales, calibration, collectives</td></tr>
+            <tr><th scope="row">MLP gate/up/down</th><td>Analog CIM</td><td>Usually the largest fixed-weight compute share</td><td>Fuse digital activation where legal; balance array and converter use</td></tr>
+            <tr><th scope="row">QK<sup>T</sup> and attention-value product</th><td>Digital engine by default</td><td>Both operands depend on runtime tokens; NVM reprogramming is a poor fit</td><td>Specialized gain-cell/dynamic-CIM capability may override this explicitly</td></tr>
+            <tr><th scope="row">KV cache</th><td>SRAM/DRAM/HBM or write-friendly dynamic CIM</td><td>Grows per request and changes every token</td><td>Paged allocation, eviction, sharing, compression, context policy</td></tr>
+            <tr><th scope="row">LayerNorm/RMSNorm, RoPE, softmax, SiLU/GELU</th><td>Digital vector/scalar engine</td><td>Reductions, transcendental/approximate functions, control, precision</td><td>Stable kernels, fusion, scratch planning, numerical contract</td></tr>
+            <tr><th scope="row">MoE router and top-k</th><td>Digital</td><td>Dynamic sparse decision and load balancing</td><td>Expert placement, capacity factors, all-to-all, hot-expert telemetry</td></tr>
+            <tr><th scope="row">LoRA / accuracy adapter</th><td>Digital companion</td><td>Small, updateable correction avoids reprogramming base analog weights</td><td>Version adapters separately and overlap their GEMM with analog MVM</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="card-grid two top-gap">
+        <article class="learning-card">
+          <span class="card-label">Prefill</span>
+          <h3>High parallelism favors array utilization</h3>
+          <p>Many prompt tokens turn projection and MLP work into matrix-matrix execution. Tile tokens and output channels together, overlap digital attention with analog projections, and pipeline collectives. Time-to-first-token remains the product metric.</p>
+        </article>
+        <article class="learning-card">
+          <span class="card-label">Decode</span>
+          <h3>Weight locality helps, but dynamic state dominates</h3>
+          <p>Each step is sequential and often matrix-vector at low batch. Converter latency, digital companion balance, KV-cache access, inter-chip activation traffic, and synchronization can dominate. Measure inter-token latency and energy/token.</p>
+        </article>
+      </div>
+      <div class="callout top-gap">
+        <p>
+          <strong>Software pattern worth reusing:</strong> vLLM's PagedAttention shows why the KV cache needs a virtualized,
+          dynamically allocated memory layer. Reuse the paging and serving concepts; replace GPU-specific kernels and
+          memory APIs with the ACiM hybrid runtime. <a href="https://arxiv.org/abs/2309.06180">Read the PagedAttention paper</a>.
+        </p>
+      </div>
+    </section>
+
+    <section class="section" id="precision">
+      <div class="section-heading">
+        <p class="eyebrow">Four-bit LLMs</p>
+        <h2>Four logical bits do not automatically mean one cheap analog operation</h2>
+      </div>
+      <div class="card-grid two">
+        <article class="learning-card">
+          <span class="card-label">Representation</span>
+          <h3>Separate model bits from physical cost</h3>
+          <ul class="decision-list">
+            <li><strong>Logical weight format</strong><span>W4 may be symmetric/asymmetric and per-tensor, per-channel, or group-scaled.</span></li>
+            <li><strong>Cell representation</strong><span>One logical weight may use one multi-level cell, a differential pair, several devices, or bit slices.</span></li>
+            <li><strong>Activation execution</strong><span>A8/A16 may require serial input slices and multiple integration cycles.</span></li>
+            <li><strong>Output reconstruction</strong><span>ADC width, partial-sum count, scale precision, and digital accumulation determine effective accuracy.</span></li>
+          </ul>
+        </article>
+        <article class="learning-card">
+          <span class="card-label">Accuracy policy</span>
+          <h3>Use selective precision, not one global fidelity</h3>
+          <ul class="decision-list">
+            <li><strong>Quantize with measured ranges</strong><span>Calibrate group scales and clipping using representative prompts and target nonideality.</span></li>
+            <li><strong>Protect sensitive paths</strong><span>Keep norms, accumulators, logits, outlier channels, and selected layers in higher-precision digital execution.</span></li>
+            <li><strong>Train or adapt for hardware</strong><span>Use noise-aware fine-tuning or a small digital LoRA/residual adapter when model access permits.</span></li>
+            <li><strong>Promote on evidence</strong><span>Choose more slices, wider conversion, repeat-and-average, or fallback only when accuracy gain exceeds latency/energy cost.</span></li>
+          </ul>
+        </article>
+      </div>
+      <div class="callout caution top-gap">
+        <p>
+          The M1076 brief reports capacity in "weight parameters," not packed bytes. A 4-bit software checkpoint cannot
+          be assumed to double M1076 weight capacity. Physical packing depends on unpublished cell encoding, differential
+          representation, redundancy, slicing, and metadata. The compiler must query a target-specific
+          <code>physical_slots_per_logical_weight</code> function.
+        </p>
+      </div>
+      <div class="callout top-gap">
+        <p>
+          A recent transformer adaptation study places fixed base-model weights on analog tiles and small LoRA corrections
+          on digital cores; it reports simulation through LLaMA 3.1 8B, not full-system LLM silicon. This is a useful
+          software architecture for preserving programmable adaptation without repeatedly reprogramming NVM arrays.
+          <a href="https://arxiv.org/abs/2411.17367">Read the AHWA-LoRA study</a>.
+        </p>
+      </div>
+    </section>
+
+    <section class="section" id="capacity">
+      <div class="section-heading">
+        <p class="eyebrow">Capacity sanity check</p>
+        <h2>Legacy M1076 numbers show why a new scale architecture is necessary</h2>
+        <p class="section-note">
+          Illustrative lower bounds assume one model parameter consumes one advertised weight slot and ignore spares,
+          replication, calibration data, digital state, and unavailable capacity. They are not performance estimates.
+        </p>
+      </div>
+      <div class="metric-grid">
+        <article class="metric"><strong>80M</strong><span>weights per M1076</span><small>Legacy product brief</small></article>
+        <article class="metric"><strong>320M</strong><span>weights per 4-chip card</span><small>MP10304 product brief</small></article>
+        <article class="metric"><strong>1.28B</strong><span>weights per claimed 16-chip card</span><small>2021 company announcement</small></article>
+        <article class="metric"><strong>ceil(P/C)</strong><span>minimum capacity units</span><small>Before reserve and system overhead</small></article>
+      </div>
+      <div class="table-wrap top-gap">
+        <table>
+          <thead><tr><th scope="col">Model parameters</th><th scope="col">M1076 chips at 80M</th><th scope="col">4-chip cards at 320M</th><th scope="col">16-chip units at 1.28B</th><th scope="col">Interpretation</th></tr></thead>
+          <tbody>
+            <tr><th scope="row">7B</th><td>88</td><td>22</td><td>6</td><td>Minimum advertised slots; practical count is higher.</td></tr>
+            <tr><th scope="row">70B</th><td>875</td><td>219</td><td>55</td><td>Communication, power, host, and yield become system-level constraints.</td></tr>
+            <tr><th scope="row">1T</th><td>12,500</td><td>3,125</td><td>782</td><td>Mythic's current 1T claim necessarily refers to a rebuilt architecture, not simple M1076 scaling.</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="callout caution top-gap">
+        <p>
+          A capacity fit is not an execution proof. The next gates are supported operators, physical weight encoding,
+          programming time, yield reserve, activation/partial-sum bandwidth, collectives, digital companion capacity,
+          KV memory, accuracy at scale, thermal limits, and end-to-end tokens/second.
+        </p>
+      </div>
+    </section>
+
+    <section class="section" id="recovery">
+      <div class="section-heading">
+        <p class="eyebrow">Runtime state machine</p>
+        <h2>Recovery escalates from cheap local action to distributed restart</h2>
+      </div>
+      <div class="engineering-flow six" role="group" aria-label="Analog CIM recovery state machine">
+        <article class="flow-step"><b>Observe</b><strong>Detect anomaly</strong><span>Timeout, checksum, saturation, drift, ECC, route, or numerical sentinel</span></article>
+        <article class="flow-step"><b>Retry</b><strong>Repeat safely</strong><span>Replay idempotent command or use repeat-and-average within policy</span></article>
+        <article class="flow-step"><b>Correct</b><strong>Recalibrate</strong><span>Refresh offset/range/drift state and verify the operating envelope</span></article>
+        <article class="flow-step"><b>Remap</b><strong>Spend local spare</strong><span>Redirect row/column/ADC or bind an alternate array/tile; reprogram weights</span></article>
+        <article class="flow-step"><b>Reform</b><strong>Change mesh</strong><span>Drain queues, update route epoch, restore distributed checkpoint</span></article>
+        <article class="flow-step"><b>Degrade</b><strong>Fallback or reject</strong><span>Use digital variant, lower service tier, quarantine device, or fail explicitly</span></article>
+      </div>
+      <div class="table-wrap top-gap">
+        <table>
+          <thead><tr><th scope="col">Recovery invariant</th><th scope="col">Reason</th><th scope="col">Test</th></tr></thead>
+          <tbody>
+            <tr><th scope="row">No stale physical address survives a map epoch</th><td>Prevents commands from reaching harvested or reassigned resources</td><td>Inject remap between queued batches and reject old-epoch descriptors</td></tr>
+            <tr><th scope="row">Weights match the binding record</th><td>Row/column/tile movement changes physical storage</td><td>Corrupt a programmed block and require checksum failure before execution</td></tr>
+            <tr><th scope="row">Calibration matches operating conditions</th><td>Converter and device behavior changes with time and environment</td><td>Cross temperature/voltage boundary and force recalibration or fallback</td></tr>
+            <tr><th scope="row">Collectives use one topology epoch</th><td>Mixed route views can deadlock or corrupt partial sums</td><td>Drop a link during reduce-scatter and verify drain/reform/restart</td></tr>
+            <tr><th scope="row">Retries preserve request semantics</th><td>Duplicate execution can alter stateful work or output ordering</td><td>Replay at every command boundary with idempotency and sequence checks</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="section" id="implementation" data-progress="acim-scale-implementation">
+      <div class="section-heading">
+        <p class="eyebrow">Implementation plan</p>
+        <h2>Build one fault-aware distributed linear layer before a full LLM</h2>
+      </div>
+      <div class="progress-panel" aria-live="polite">
+        <div class="progress-track"><!-- [html-validate-disable-next prefer-native-element] --><div class="progress-bar" data-progress-bar role="progressbar" aria-label="Scale-out implementation progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"></div></div>
+        <span class="progress-value" data-progress-value>0 / 8 complete</span>
+      </div>
+      <div class="lab-list">
+        <label class="lab-item"><input type="checkbox" data-step="schemas"><span><strong>Version the schemas</strong><span>Define target, health, calibration, executable, binding, topology, and trace schemas with compatibility tests.</span></span></label>
+        <label class="lab-item"><input type="checkbox" data-step="sim"><span><strong>Implement the functional backend</strong><span>Execute ACiM MVM plus injected noise, saturation, drift, row/column/tile defects, and digital fallback behind the production HAL.</span></span></label>
+        <label class="lab-item"><input type="checkbox" data-step="import"><span><strong>Import one transformer block</strong><span>Use ONNX or StableHLO; preserve QKV, attention, norm, residual, and MLP boundaries with support diagnostics.</span></span></label>
+        <label class="lab-item"><input type="checkbox" data-step="lower"><span><strong>Lower one distributed linear</strong><span>Generate column- and row-parallel variants, logical array placement, ADC plan, accumulator format, and collective intent.</span></span></label>
+        <label class="lab-item"><input type="checkbox" data-step="bind"><span><strong>Bind around injected defects</strong><span>Apply row/column remaps and tile harvesting, program weights, verify hashes, and emit a reproducible binding record.</span></span></label>
+        <label class="lab-item"><input type="checkbox" data-step="mesh"><span><strong>Run on a fake AcimMesh</strong><span>Execute all-gather and reduce-scatter across simulated chips with link delay, loss, timeout, and topology reform.</span></span></label>
+        <label class="lab-item"><input type="checkbox" data-step="block"><span><strong>Execute a hybrid decoder block</strong><span>Analog projections/MLP, digital attention/KV/norm/activation, layerwise comparison, and first-divergence reporting.</span></span></label>
+        <label class="lab-item"><input type="checkbox" data-step="silicon"><span><strong>Correlate with silicon</strong><span>Replace modeled distributions with measured chips and gate accuracy, latency, energy, programming, drift, yield, and recovery.</span></span></label>
+      </div>
+      <div class="card-grid two top-gap">
+        <article class="learning-card">
+          <span class="card-label">Suggested repository boundary</span>
+          <h3>Keep physical state out of the graph IR</h3>
+          <p><code>frontend/</code>, <code>ir/</code>, <code>passes/</code>, <code>target/</code>, <code>artifact/</code>, <code>runtime/</code>, <code>hal/</code>, <code>sim/</code>, <code>firmware/</code>, <code>driver/</code>, <code>tools/</code>, <code>models/</code>, and <code>tests/</code> can evolve independently behind versioned contracts.</p>
+        </article>
+        <article class="learning-card">
+          <span class="card-label">Acceptance gate</span>
+          <h3>Prove end-to-end value</h3>
+          <p>Report perplexity/task accuracy, TTFT, inter-token latency, throughput, energy/token, programmed capacity, converter utilization, communication bytes, spare use, reprogram time, fault coverage, and recovery time against digital baselines.</p>
+        </article>
+      </div>
+    </section>
+
+    <section class="section" id="claim-ledger">
+      <div class="section-heading">
+        <p class="eyebrow">Professional claim ledger</p>
+        <h2>What the evidence supports today</h2>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th scope="col">Statement</th><th scope="col">Evidence class</th><th scope="col">Supported conclusion</th><th scope="col">Do not conclude</th></tr></thead>
+          <tbody>
+            <tr><th scope="row">M1076 has flash-based ACE arrays and 80M-weight capacity</th><td><span class="evidence-tag claim">Vendor product brief</span></td><td>Legacy architecture and advertised capacity are documented.</td><td>Exact cell encoding, defect repair, packed W4 capacity, or LLM performance.</td></tr>
+            <tr><th scope="row">Mythic tile grid can hide defective compute tiles</th><td><span class="evidence-tag patent">Granted patent</span></td><td>Virtual tile addressing and row/column tile harvesting are disclosed mechanisms.</td><td>That every mechanism ships, or that internal flash rows/ADCs use the same repair.</td></tr>
+            <tr><th scope="row">ALBERT achieves near-iso-accuracy on an analog chip</th><td><span class="evidence-tag silicon">Measured silicon</span></td><td>Static transformer linear layers can work with mapping, programming, HWA fine-tuning, and recalibration.</td><td>End-to-end decoder LLM, on-chip attention, or billion-parameter scale.</td></tr>
+            <tr><th scope="row">Gain-cell analog attention can approach GPT-2 model quality</th><td><span class="evidence-tag simulation">SPICE + software</span></td><td>A specialized dynamic-memory attention path is plausible and has a concrete co-design.</td><td>Fabricated system speed, energy, yield, retention, or production readiness.</td></tr>
+            <tr><th scope="row">Mythic supports 1T+ LLMs with large efficiency gains</th><td><span class="evidence-tag claim">Roadmap/internal benchmark</span></td><td>The company has declared a new chiplet and hybrid-system direction.</td><td>Independent, shipping, end-to-end LLM performance.</td></tr>
+            <tr><th scope="row">This page's AcimMesh and schemas</th><td><span class="evidence-tag design">Engineering proposal</span></td><td>They are implementable requirements derived from public mechanisms and software patterns.</td><td>That Mythic, iHW, Tenstorrent, or another vendor uses these exact interfaces.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="section" id="sources">
+      <div class="section-heading">
+        <p class="eyebrow">Primary sources</p>
+        <h2>Architecture, patents, measured results, and open-source references</h2>
+      </div>
+      <div class="source-grid">
+        <article class="source-card"><a href="https://mythic.ai/wp-content/uploads/2022/03/M1076-AMP-Product-Brief-v1.0-1.pdf">Mythic M1076 product brief</a><span>76 tiles, flash ACE, digital tile resources, 80M weights, 25 TOPS, PCIe</span></article>
+        <article class="source-card"><a href="https://mythic.ai/wp-content/uploads/2022/03/MP10304-Card-Product-Brief-v20211115-16.pdf">Mythic MP10304 product brief</a><span>Four-chip card, 320M weights, 100 TOPS, combined model execution</span></article>
+        <article class="source-card"><a href="https://mythic.ai/whats-new/mythic-expands-product-lineup-with-new-scalable-power-efficient-analog-matrix-processor-for-edge-ai-applications/">Mythic 2021 scale announcement</a><span>Company claims for a 16-chip, 1.28B-weight card</span></article>
+        <article class="source-card"><a href="https://mythic.ai/whats-new/mythic-to-challenge-ais-gpu-pantheon-with-100x-energy-advantage-and-oversubscribed-125m-raise/">Mythic 2025 roadmap announcement</a><span>Company claims for rebuilt chiplets, 1T+ LLMs, scaling, CAMP SDK, and internal benchmarks</span></article>
+        <article class="source-card"><a href="https://mythic.ai/whats-new/mythic-acquires-videantis-one-of-europes-leading-digital-processor-ip-companies-to-build-the-worlds-most-energy-efficient-ai-compute-platform/">Mythic and Videantis acquisition</a><span>Disclosed analog/digital hybrid partition, including digital attention</span></article>
+        <article class="source-card"><a href="https://patents.google.com/patent/US11475973B2/en">Mythic tile redundancy patent</a><span>Testing, virtual addressing, tile harvesting, and pass-through routing</span></article>
+        <article class="source-card"><a href="https://patents.google.com/patent/WO2025122556A1/en">EnCharge row/column redundancy patent</a><span>Alternative spare-row and redundant-ADC selection mechanism</span></article>
+        <article class="source-card"><a href="https://www.nature.com/articles/s41467-025-63794-4">ALBERT on 14 nm analog silicon</a><span>Measured hardware mapping, accuracy, HWA fine-tuning, drift, and off-chip boundaries</span></article>
+        <article class="source-card"><a href="https://www.nature.com/articles/s43588-025-00854-1">Gain-cell analog attention</a><span>SPICE and model simulation for write-friendly KV storage and analog attention</span></article>
+        <article class="source-card"><a href="https://www.nature.com/articles/s43588-024-00753-x">3D AIMC mixture-of-experts study</a><span>Simulation-based LLM scaling and published code/data links</span></article>
+        <article class="source-card"><a href="https://www.nature.com/articles/s44335-026-00072-6">Dyn-A-Map</a><span>Pre-silicon fault sensitivity and post-training spatial remapping</span></article>
+        <article class="source-card"><a href="https://arxiv.org/abs/2411.17367">AHWA-LoRA transformer adaptation</a><span>Simulation of analog base weights with small digital adapters, including an 8B decoder model</span></article>
+        <article class="source-card"><a href="https://github.com/tenstorrent/tt-umd/blob/main/docs/CUSTOM_MODIFICATION_GUIDE.md">TT-UMD custom-SoC guide</a><span>Reusable SoC/cluster descriptor boundary and custom implementation guidance</span></article>
+        <article class="source-card"><a href="https://github.com/tenstorrent/tt-metal/blob/main/tech_reports/Programming_Mesh_of_Devices/Programming_Mesh_of_Devices_with_TT-NN.md">Tenstorrent MeshDevice report</a><span>Virtual mesh, explicit sharding, replication, dispatch, and collectives</span></article>
+        <article class="source-card"><a href="https://github.com/tenstorrent/tt-metal/blob/main/tech_reports/TT-Fabric/TT-Fabric-Architecture.md">Tenstorrent TT-Fabric architecture</a><span>Data/control planes, routing, topology repair, checkpoints, and fault injection</span></article>
+        <article class="source-card"><a href="https://github.com/tenstorrent/tt-emule">Tenstorrent tt-emule</a><span>Same-host-API alternate backend pattern for hardware-free testing</span></article>
+        <article class="source-card"><a href="https://github.com/tenstorrent/tt-cluster-descriptors">Tenstorrent cluster descriptors</a><span>Static topology, subset, fallback, and multi-host test descriptions</span></article>
+        <article class="source-card"><a href="https://github.com/tenstorrent/ttnn-visualizer">TT-NN Visualizer</a><span>Graph, memory, operation, tensor, and performance-report UX reference</span></article>
+        <article class="source-card"><a href="https://github.com/tenstorrent/tt-perf-report">Tenstorrent performance report tool</a><span>Trace analysis, operation IDs, signposts, and bottleneck reports</span></article>
+        <article class="source-card"><a href="https://docs.tenstorrent.com/tt-mlir/specs/device.html">TT-MLIR device model</a><span>Logical grids, meshes, affine mapping, and virtual-device concepts</span></article>
+        <article class="source-card"><a href="https://github.com/IBM/aihwkit">IBM AIHWKit</a><span>Open analog-aware training and inference simulation</span></article>
+        <article class="source-card"><a href="https://github.com/sandialabs/cross-sim">Sandia CrossSim</a><span>Open Analog CIM accuracy and nonideality simulation</span></article>
+        <article class="source-card"><a href="https://openxla.org/xla/pjrt/pjrt_integration">OpenXLA PJRT integration</a><span>Framework-to-device plugin contract</span></article>
+        <article class="source-card"><a href="https://tvm.apache.org/docs/arch/index.html">Apache TVM architecture</a><span>Target-extensible compiler and runtime reference</span></article>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <p>English-only system design. Public facts, patents, simulations, company claims, and proposed interfaces are labeled separately.</p>
+    <div class="footer-links">
+      <a href="analog-cim-sdk-toolchain.html">Back to SDK and compiler</a>
+      <a href="analog-cim-tenstorrent-reuse.html">Review reuse decisions</a>
+      <a href="https://github.com/buicongnguyen/NPU">Source</a>
+    </div>
+  </footer>
+</body>
+</html>

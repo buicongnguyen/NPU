@@ -148,7 +148,8 @@
           A separate learning path traces Mythic's flash-based matrix engine from device physics through ADCs,
           tile dataflow, quantization, and graph compilation. It also audits Nature-family accuracy claims and keeps
           measured results distinct from vendor roadmap statements, including the 2026 Videantis acquisition and
-          iHW's positional digit-slice, adaptive-ADC, grouped-quantization, and signed-weight patent stack.
+          iHW's positional digit-slice, adaptive-ADC, grouped-quantization, and signed-weight patent stack. The scale-out
+          design adds defect virtualization, multi-chip collectives, and a hybrid LLM execution architecture.
         </p>
       </div>
       <div class="evidence-grid compact">
@@ -193,6 +194,12 @@
           <h3>Can Tenstorrent accelerate an ACiM stack?</h3>
           <p>Separate portable infrastructure from Tensix-specific code, audit the target contract and licenses, score components, and gate a measured proof of concept.</p>
           <a href="analog-cim-tenstorrent-reuse.html">Open Tenstorrent reuse guide</a>
+        </article>
+        <article>
+          <span>Scale-out and LLM inference</span>
+          <h3>How does imperfect Analog CIM become a logical accelerator mesh?</h3>
+          <p>Design cell-to-cluster fault handling, logical/physical descriptors, fault-aware placement, collectives, recovery, four-bit execution, and a hybrid decoder LLM stack.</p>
+          <a href="analog-cim-scaleout-llm.html">Open scale-out and LLM design</a>
         </article>
         <article>
           <span>Interview</span>

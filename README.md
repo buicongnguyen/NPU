@@ -17,6 +17,7 @@ The Analog CIM learning path adds a source-critical Mythic case study:
 - SDK and compiler implementation guide: https://buicongnguyen.github.io/NPU/analog-cim-sdk-toolchain.html
 - Mythic and Videantis acquisition case study: https://buicongnguyen.github.io/NPU/analog-cim-mythic-videantis.html
 - Tenstorrent reuse decision guide: https://buicongnguyen.github.io/NPU/analog-cim-tenstorrent-reuse.html
+- Scale-out, fault tolerance, and LLM inference: https://buicongnguyen.github.io/NPU/analog-cim-scaleout-llm.html
 - Interview study: https://buicongnguyen.github.io/NPU/analog-cim-interview.html
 - Interactive MCQ lab: https://buicongnguyen.github.io/NPU/analog-cim-quiz.html
 

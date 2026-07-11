@@ -24,6 +24,7 @@
       <a href="analog-cim-ihw-patents.html">iHW patents</a>
       <a href="analog-cim-sdk-toolchain.html">SDK</a>
       <a href="analog-cim-tenstorrent-reuse.html">Reuse</a>
+      <a href="analog-cim-scaleout-llm.html">Scale/LLM</a>
       <a href="analog-cim-interview.html">Interview</a>
       <a href="analog-cim-quiz.html">MCQ Lab</a>
     </nav>
@@ -258,6 +259,14 @@
       <div class="critical-path">
         <strong>Mythic critical path</strong>
         <p>First prove converter and flash accuracy across devices and time. Then prove that the unified compiler keeps sensitive work digital without excessive boundary traffic. Finally report end-to-end accuracy, latency, energy, analog coverage, calibration, refresh, and fallback together. A peak analog TOPS/W number cannot answer those questions.</p>
+      </div>
+      <div class="callout" style="margin-top:12px">
+        <p>
+          <strong>System continuation:</strong> the
+          <a href="analog-cim-scaleout-llm.html">scale-out, defect-tolerance, and LLM design</a> specifies how tile
+          harvesting, row/column repair patterns, logical meshes, collectives, KV memory, digital attention, and
+          recovery fit into one compiler/runtime contract.
+        </p>
       </div>
     </section>
 
@@ -605,6 +614,7 @@
         <article class="source-card"><a href="https://mythic.ai/technology/mythic-ai-workflow/">Mythic AI workflow</a><span>FP32-to-ANA8 optimization, quantization-aware and analog-aware retraining, graph mapping, packing, code generation, and deployment artifact</span></article>
         <article class="source-card"><a href="https://mythic.ai/whats-new/an-evolution-in-power-management-with-mythics-analog-matrix-processor/">Mythic numerical-range discussion</a><span>Range setting, 8-bit-and-below inference, converter overhead, flash MVM, and no-external-DRAM rationale</span></article>
         <article class="source-card"><a href="https://mythic.ai/whats-new/mythic-to-challenge-ais-gpu-pantheon-with-100x-energy-advantage-and-oversubscribed-125m-raise/">Mythic 2025 funding and roadmap</a><span>$125 million round, architecture/software/strategy rebuild, 120 TOPS/W and LLM figures labeled as company or internal benchmarks</span></article>
+        <article class="source-card"><a href="analog-cim-scaleout-llm.html">ACiM scale-out and LLM design</a><span>Evidence-bounded Mythic capacity analysis, defect hierarchy, hybrid decoder partition, logical mesh, and recovery contracts</span></article>
         <article class="source-card"><a href="https://global.honda/en/topics/2026/c_2026-02-04eng.html">Honda official co-development announcement</a><span>Investment, automotive SoC plan, Honda model/ECU contribution, and Mythic analog CIM plus SDK contribution</span></article>
         <article class="source-card"><a href="https://www.eetimes.com/mythic-ai-accelerator-targets-high-end-edge-with-35-tops/">EE Times M1108 report</a><span>Tile structure, precision modes, ADC emphasis, ResNet-50 claim, and close-to-INT8 vendor statements</span></article>
         <article class="source-card"><a href="https://semiengineering.com/is-in-memory-compute-still-alive/">Semiconductor Engineering critique</a><span>Independent concerns about effective precision, aging, variation, analog noise, conversion overhead, and system completeness</span></article>

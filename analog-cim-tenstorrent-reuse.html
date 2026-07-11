@@ -24,6 +24,7 @@
       <a href="analog-cim-ihw-patents.html">iHW patents</a>
       <a href="analog-cim-sdk-toolchain.html">SDK</a>
       <a href="analog-cim-tenstorrent-reuse.html" aria-current="page">Reuse</a>
+      <a href="analog-cim-scaleout-llm.html">Scale/LLM</a>
       <a href="analog-cim-interview.html">Interview</a>
       <a href="analog-cim-quiz.html">MCQ Lab</a>
     </nav>
@@ -115,6 +116,15 @@
         <article class="reuse-mode adapt"><b>Mode 3</b><h3>Adapt</h3><p>Modify an isolated component whose concepts fit but whose target interface does not. Budget for rebasing, qualification, and divergence.</p></article>
         <article class="reuse-mode replace"><b>Mode 4</b><h3>Replace</h3><p>Implement a new analog backend when the original code assumes Tensix cores, tiles, circular buffers, NoC transactions, or Tenstorrent device ABIs.</p></article>
       </div>
+      <div class="callout" style="margin-top:12px">
+        <p>
+          <strong>2026 repository audit:</strong> the strongest additions are Tenstorrent's reusable SoC/cluster
+          descriptor boundary, MeshDevice virtual-device model, static cluster descriptors, <code>tt-emule</code>
+          alternate-backend pattern, TT-Fabric control-plane design, and report tooling. The
+          <a href="analog-cim-scaleout-llm.html">scale-out, fault-tolerance, and LLM design</a> turns those patterns into
+          concrete ACiM interfaces without importing Tensix execution semantics.
+        </p>
+      </div>
     </section>
 
     <section class="section" id="unknowns" data-progress="acim-target-contract">
@@ -188,10 +198,15 @@
             <tr data-domain="study"><th scope="row">TT-Lang DSL</th><td><span class="status-pill decision-study">Study only</span></td><td>The DSL is useful as a kernel-authoring reference, but its abstractions target Tenstorrent kernels.</td><td>Compare its programming model with an array-program, calibration, and digital-fallback DSL.</td></tr>
             <tr data-domain="replace"><th scope="row">TTKernel / TTMetal dialects</th><td><span class="status-pill decision-replace">Replace</span></td><td>They expose circular buffers, tiles, NoC transactions, synchronization, and a near 1:1 Metalium mapping.</td><td>Create ACiM operations for array programming, MVM, conversion, calibration, and digital work.</td></tr>
             <tr data-domain="study"><th scope="row">TT-Metalium runtime and kernels</th><td><span class="status-pill decision-study">Study only</span></td><td>The host workflow and command-queue patterns are instructive, but execution assumes Tensix cores and dataflow kernels.</td><td>Reuse only a proven target-neutral utility behind an ACiM HAL.</td></tr>
-            <tr data-domain="replace"><th scope="row">TT-UMD</th><td><span class="status-pill decision-replace">Replace</span></td><td>Device discovery, memory mapping, transport, and telemetry implement Tenstorrent hardware interfaces.</td><td>Specify the ACiM user-mode HAL and prove its device and simulation backends.</td></tr>
+            <tr data-domain="adapt"><th scope="row">TT-UMD descriptor, coordinate, and harvesting layer</th><td><span class="status-pill decision-adapt">Adapt</span></td><td>Tenstorrent explicitly describes the SoC descriptor as reusable for other grid-like SoCs and uses it as a higher-stack contract.</td><td>Prototype ACiM arrays, row/column/ADC maps, tile harvesting, calibration classes, and logical/physical coordinates without importing transport.</td></tr>
+            <tr data-domain="replace"><th scope="row">TT-UMD transport and device implementation</th><td><span class="status-pill decision-replace">Replace</span></td><td>Discovery, PCIe access, memory mapping, TLB behavior, firmware messages, and telemetry implement Tenstorrent devices.</td><td>Specify the ACiM user-mode HAL and prove device, functional-simulator, and queued-fake backends.</td></tr>
+            <tr data-domain="adapt"><th scope="row">MeshDevice, MeshTensor, and tt-run patterns</th><td><span class="status-pill decision-adapt">Adapt</span></td><td>A logical mesh over physical chips, explicit sharding/replication, SPMD dispatch, and explicit collectives transfer well at the architecture boundary.</td><td>Run one row-parallel and one column-parallel ACiM linear layer with all-gather and reduce-scatter through an <code>AcimMesh</code> API.</td></tr>
+            <tr data-domain="adapt"><th scope="row">TT cluster descriptors and topology mappings</th><td><span class="status-pill decision-adapt">Adapt</span></td><td>Static descriptors, alternate subsets, and fallback mappings make multi-chip tests reproducible without requiring hardware discovery.</td><td>Describe nominal, harvested, link-failed, card, multi-host, and checkpoint-recovery ACiM topologies.</td></tr>
+            <tr data-domain="study"><th scope="row">TT-Fabric architecture</th><td><span class="status-pill decision-study">Study only</span></td><td>Persistent control/data planes, rerouting, mesh reform, checkpoint restart, serialization, and fault injection are valuable system patterns.</td><td>Specify ACiM route epochs and recovery semantics; replace TT router, protocol, firmware, and link implementations.</td></tr>
+            <tr data-domain="study"><th scope="row">tt-emule</th><td><span class="status-pill decision-study">Study only</span></td><td>Its same-host-API alternate backend is a strong validation pattern, while its simulated cores, L1, circular buffers, semaphores, and NoC are Tensix-specific.</td><td>Make the same ACiM artifact and HAL tests run against functional, queued, nonideality, and hardware backends.</td></tr>
             <tr data-domain="replace"><th scope="row">TT-KMD</th><td><span class="status-pill decision-replace">Replace</span></td><td>The kernel driver is both hardware specific and GPL-2.0 licensed, which creates a distinct product and legal boundary.</td><td>Define the target DMA, isolation, interrupt, power, reset, and firmware ABI with legal review.</td></tr>
             <tr data-domain="reuse"><th scope="row">TT-Forge model corpus</th><td><span class="status-pill decision-reuse">Reuse candidate</span></td><td>Model manifests, demos, and regression patterns can accelerate coverage if individual code and asset licenses permit.</td><td>Produce an SPDX inventory and run a representative model subset through capability analysis.</td></tr>
-            <tr data-domain="adapt"><th scope="row">Explorer and profiler patterns</th><td><span class="status-pill decision-adapt">Adapt</span></td><td>Graph, memory, and timeline views are valuable, but the trace schema and counters must describe ACiM state.</td><td>Display array placement, ADC use, calibration version, drift state, and first divergent layer.</td></tr>
+            <tr data-domain="adapt"><th scope="row">TT-NN Visualizer, Model Explorer, and performance reports</th><td><span class="status-pill decision-adapt">Adapt</span></td><td>Graph, memory, tensor, operation, and trace-report UX is valuable, but the schemas and counters must describe ACiM state.</td><td>Display logical/physical placement, defect maps, ADC use, calibration version, drift state, collective bytes, and first divergent layer.</td></tr>
             <tr data-domain="reuse"><th scope="row">CI and differential-test patterns</th><td><span class="status-pill decision-reuse">Reuse candidate</span></td><td>Golden models, model sweeps, artifact retention, and regression gates are broadly portable engineering practices.</td><td>Confirm script licenses and replace device-specific runners, expectations, and thresholds.</td></tr>
           </tbody>
         </table>
@@ -374,7 +389,7 @@
           <tbody>
             <tr><th scope="row">TT-Metal</th><td>Apache License 2.0; NOTICE identifies separately licensed material and dependencies.</td><td>Audit selected files, NOTICE content, build dependencies, distribution package, and modifications.</td></tr>
             <tr><th scope="row">TT-MLIR</th><td>Apache License 2.0; license file lists LLVM, FlatBuffers, StableHLO, Shardy, and other third-party dependencies.</td><td>Inventory the exact dialect, tool, and dependency closure selected for reuse.</td></tr>
-            <tr><th scope="row">TT-UMD</th><td>Apache License 2.0.</td><td>Legal clarity does not create hardware fit; treat device-specific code as replace by default.</td></tr>
+            <tr><th scope="row">TT-UMD</th><td>Apache License 2.0.</td><td>Audit descriptor and coordinate modules separately from device transport; adapt only a narrow, tested boundary.</td></tr>
             <tr><th scope="row">TT-KMD</th><td>GNU General Public License version 2.</td><td>Require explicit legal and architecture review before any product dependency or derivative work.</td></tr>
             <tr><th scope="row">Models and examples</th><td>May include code, model weights, datasets, and third-party assets with separate terms.</td><td>Track each artifact rather than inheriting the repository's top-level label.</td></tr>
           </tbody>
@@ -494,10 +509,18 @@
         <article class="source-card"><a href="https://github.com/sandialabs/cross-sim">Sandia CrossSim</a><span>Analog inference simulation for programming error, drift, read noise, ADC precision, parasitics, slicing, and array size</span></article>
         <article class="source-card"><a href="https://tvm.apache.org/docs/arch/index.html">Apache TVM architecture</a><span>Target-extensible compiler and runtime architecture reference</span></article>
         <article class="source-card"><a href="https://openxla.org/xla/pjrt/pjrt_integration">OpenXLA PJRT integration</a><span>Framework-to-device plugin boundary and client integration model</span></article>
+        <article class="source-card"><a href="https://github.com/tenstorrent/tt-umd/blob/main/docs/CUSTOM_MODIFICATION_GUIDE.md">TT-UMD custom-SoC guide</a><span>Explicitly reusable SoC descriptor contract plus the boundary for custom device implementation</span></article>
+        <article class="source-card"><a href="https://github.com/tenstorrent/tt-metal/blob/main/tech_reports/Programming_Mesh_of_Devices/Programming_Mesh_of_Devices_with_TT-NN.md">TT-NN MeshDevice report</a><span>Virtual mesh, explicit tensor distribution, SPMD dispatch, and collective communication</span></article>
+        <article class="source-card"><a href="https://github.com/tenstorrent/tt-metal/blob/main/tech_reports/TT-Fabric/TT-Fabric-Architecture.md">TT-Fabric architecture</a><span>Data/control planes, rerouting, mesh repair, checkpoint recovery, modeling, and fault injection</span></article>
+        <article class="source-card"><a href="https://github.com/tenstorrent/tt-emule">Tenstorrent tt-emule</a><span>Same-host-API alternate backend for hardware-free tests; execution semantics remain Tensix-specific</span></article>
+        <article class="source-card"><a href="https://github.com/tenstorrent/tt-cluster-descriptors">Tenstorrent cluster descriptors</a><span>Static single-host, multi-host, subset, and fallback topology descriptions</span></article>
+        <article class="source-card"><a href="https://github.com/tenstorrent/ttnn-visualizer">TT-NN Visualizer</a><span>Graph, tensor, buffer, memory, operation, and performance-report tooling reference</span></article>
+        <article class="source-card"><a href="https://github.com/tenstorrent/tt-perf-report">Tenstorrent performance report tool</a><span>Trace, signpost, operation-ID, throughput, and bottleneck-analysis patterns</span></article>
         <article class="source-card"><a href="https://www.ihw-ai.com/">IHW company overview</a><span>Public analog APU positioning and product claims</span></article>
         <article class="source-card"><a href="https://ihw-ai.com/sub03">IHW product roadmap</a><span>Public Infertron product categories, applications, and roadmap positioning</span></article>
         <article class="source-card"><a href="https://spdx.dev/use/specifications/">SPDX specifications</a><span>Software bill of materials and license-expression standards</span></article>
         <article class="source-card"><a href="analog-cim-evidence.html#paper-ledger">Analog CIM accuracy evidence ledger</a><span>Measured-silicon papers, claimed mitigations, remaining issues, and evidence boundaries</span></article>
+        <article class="source-card"><a href="analog-cim-scaleout-llm.html">ACiM scale-out and LLM design</a><span>Fault hierarchy, logical mesh, compiler/runtime contracts, hybrid LLM partition, and implementation plan</span></article>
       </div>
     </section>
   </main>
