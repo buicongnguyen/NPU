@@ -22,6 +22,7 @@
       <a href="analog-cim-evidence.html">Evidence</a>
       <a href="analog-cim-hardware-software-codesign.html">Co-design</a>
       <a href="analog-cim-ihw-patents.html" aria-current="page">iHW patents</a>
+      <a href="analog-cim-sdk-toolchain.html">SDK</a>
       <a href="analog-cim-tenstorrent-reuse.html">Reuse</a>
       <a href="analog-cim-interview.html">Interview</a>
       <a href="analog-cim-quiz.html">MCQ Lab</a>
@@ -311,13 +312,20 @@ I[k,j]    analog output current for significance slice k</code></pre>
 
     <section class="section" id="software">
       <div class="section-heading">
-        <p class="eyebrow">Compiler and runtime consequences</p>
-        <h2>Build the toolchain around a physical accuracy contract</h2>
+        <p class="eyebrow">Patent-to-software bridge</p>
+        <h2>Turn each claimed mechanism into a compiler or runtime contract</h2>
         <p class="section-note">
-          A target-neutral frontend can still import PyTorch, ONNX, or StableHLO. The ACiM backend cannot pretend the
-          device is an ordinary digital matrix unit: placement, digit significance, converter range, calibration, and
-          reconstruction are part of executable semantics. The design below is a proposed production toolchain, not a
-          disclosure of iHW's internal software.
+          This section traces the patent mechanisms into required software semantics; it is not a disclosure of iHW's
+          implementation. The companion SDK guide defines the module boundaries, public API, artifact schema,
+          simulator/HAL contract, first vertical slice, and CI plan needed to turn those requirements into code.
+        </p>
+      </div>
+      <div class="callout">
+        <p>
+          <strong>Continue with the build specification:</strong>
+          <a href="analog-cim-sdk-toolchain.html">Analog CIM SDK and Compiler: From Model to Running Code</a>
+          separates model calibration, target characterization, and device state, then follows one ONNX MatMul through
+          compilation, packaging, simulation, and execution.
         </p>
       </div>
       <div class="engineering-flow six" aria-label="iHW-style ACiM compiler and runtime flow">
@@ -628,7 +636,7 @@ subject to:
     <section class="section" id="sources">
       <div class="section-heading">
         <p class="eyebrow">Sources</p>
-        <h2>Patent records and primary toolchain documentation; company claims labeled separately</h2>
+        <h2>Patent records and company claims, with evidence limits stated explicitly</h2>
       </div>
       <div class="source-grid">
         <article class="source-card"><a href="https://patents.google.com/patent/US12586636B2/en">US 12,586,636 B2</a><span>Granted core patent: positional output-line significance, analog accumulation, digital reconstruction, mixed-radix reliability, signed paths, and input encoding.</span></article>
@@ -639,13 +647,7 @@ subject to:
         <article class="source-card"><a href="https://patents.google.com/patent/US20260024581A1/en">US 2026/0024581 A1</a><span>Pending signed-weight array arrangement with changed line directions and paired read modes.</span></article>
         <article class="source-card"><a href="https://patents.justia.com/patent/12268104">US 12,268,104 B2</a><span>Granted chalcogenide memory composition and operating method; a separate device-level path rather than proof of the flash ACiM implementation.</span></article>
         <article class="source-card"><a href="https://www.wanted.co.kr/wd/372180">iHW recruiting and company profile</a><span>Company-originated 8-bit-weight ACiM silicon, MobileNet demonstration, and patent-count statements. Treat as claims pending independent evidence.</span></article>
-        <article class="source-card"><a href="https://docs.tenstorrent.com/tt-mlir/overview.html">TT-MLIR architecture and dialect overview</a><span>Official TTIR, TTNN, D2M, TTKernel, and TTMetal layering used as a compiler-architecture reference, not as an ACiM target definition.</span></article>
-        <article class="source-card"><a href="https://docs.tenstorrent.com/tt-mlir/optimizer.html">TT-MLIR optimizer</a><span>Official legal-layout generation, operation-model integration, memory-layout analysis, and configuration search used to motivate ACiM candidate selection.</span></article>
-        <article class="source-card"><a href="https://docs.tenstorrent.com/tt-mlir/specs/device.html">TT-MLIR device representation</a><span>Official system descriptor, logical/physical grid, and target-lowering concepts used as a cross-compilation reference.</span></article>
-        <article class="source-card"><a href="https://docs.tenstorrent.com/tt-mlir/flatbuffers.html">TT-MLIR FlatBuffer formats</a><span>Official target description and compiled-artifact formats used as a versioned packaging reference.</span></article>
-        <article class="source-card"><a href="https://docs.tenstorrent.com/tt-mlir/ttrt.html">Tenstorrent runtime tool</a><span>Official inspect, run, query, performance, checking, golden-tensor, debugger, and strict-versioning workflow used as a tool-suite reference.</span></article>
-        <article class="source-card"><a href="https://github.com/IBM/aihwkit">IBM Analog Hardware Acceleration Kit</a><span>Open-source analog device simulation, ADC/DAC bounds, statistical noise, input scaling, hardware-aware training, and inference concepts.</span></article>
-        <article class="source-card"><a href="https://mlir.llvm.org/docs/DialectConversion/">MLIR dialect conversion</a><span>Official conversion-target, legality, rewrite-pattern, and type-conversion infrastructure supporting staged lowering.</span></article>
+        <article class="source-card"><a href="analog-cim-sdk-toolchain.html">Analog CIM SDK and compiler guide</a><span>Primary compiler, runtime, framework-plugin, simulator, artifact-format, and test references are collected with the build-oriented design.</span></article>
         <article class="source-card"><a href="analog-cim-evidence.html">Analog CIM evidence review</a><span>Independent paper checklist, measured-silicon evidence, accuracy limits, and claims that should not be generalized across devices.</span></article>
         <article class="source-card"><a href="analog-cim-tenstorrent-reuse.html">Tenstorrent reuse decision guide</a><span>Component-level study, adapt, reuse, and replace decisions for an ACiM compiler and runtime.</span></article>
       </div>

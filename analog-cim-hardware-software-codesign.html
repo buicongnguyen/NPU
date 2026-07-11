@@ -21,6 +21,7 @@
       <a href="analog-cim-evidence.html">Evidence</a>
       <a href="analog-cim-hardware-software-codesign.html" aria-current="page">Co-design</a>
       <a href="analog-cim-ihw-patents.html">iHW patents</a>
+      <a href="analog-cim-sdk-toolchain.html">SDK</a>
       <a href="analog-cim-tenstorrent-reuse.html">Reuse</a>
       <a href="analog-cim-interview.html">Interview</a>
       <a href="analog-cim-quiz.html">MCQ Lab</a>
@@ -637,6 +638,14 @@
         <article class="flow-step"><b>6. Deploy</b><strong>Runtime</strong><span>Write-verify or MVM-optimize, calibrate, bind state, execute, trace, recover</span></article>
         <article class="flow-step"><b>7. Maintain</b><strong>Fleet loop</strong><span>Health vectors, drift, refresh, fallback, rollback, evidence</span></article>
       </div>
+      <div class="callout top-gap">
+        <p>
+          <strong>Implementation boundary:</strong> this page explains why each hardware/software mechanism is needed.
+          The <a href="analog-cim-sdk-toolchain.html">Analog CIM SDK and compiler guide</a> specifies the concrete
+          libraries, calibration artifacts, C ABI, queues and events, MLIR passes, artifact schema, simulator/HAL
+          backends, framework adapters, and first runnable MatMul slice.
+        </p>
+      </div>
 
       <div class="codesign-lanes" style="margin-top:14px">
         <section>
@@ -812,6 +821,7 @@
         <article class="source-card"><a href="https://doi.org/10.1038/s41467-025-63794-4">ALBERT on PCM hardware</a><span>Nature Communications 2025 | transformer mapping, HWA fine-tuning, calibration, drift and hybrid boundary</span></article>
         <article class="source-card"><a href="https://doi.org/10.1038/s41467-025-57183-0">Full-stack memristor CIM system</a><span>Nature Communications 2025 | compiler, CIM IR, optimizer, simulator, automatic deployment, eight-chip hardware</span></article>
         <article class="source-card"><a href="https://github.com/Tsinghua-LEMON-Lab/OpenCIMTC">OpenCIMTC source</a><span>Compiler, optimizer, simulator, trainable modules, examples, and paper artifacts</span></article>
+        <article class="source-card"><a href="analog-cim-sdk-toolchain.html">Analog CIM SDK and compiler guide</a><span>Build-oriented companion defining software contracts, interfaces, artifact schemas, tests, and implementation order.</span></article>
         <article class="source-card"><a href="https://doi.org/10.1109/IEDM45625.2022.10019486">Gradient descent-based AIMC programming</a><span>IEEE IEDM 2022 | measured 14-nm PCM cores, random-probe MVM loss, pulse optimization, 24-hour drift, and ResNet-9 evaluation</span></article>
         <article class="source-card"><a href="https://doi.org/10.1038/s41467-023-40770-4">Hardware-aware training study</a><span>Nature Communications 2023 | realistic crossbar model across CNN, recurrent, and transformer workloads</span></article>
         <article class="source-card"><a href="https://arxiv.org/abs/2606.02672">Unified heterogeneous AIMC mapping workflow</a><span>June 2026 preprint | mapping-method taxonomy, four-stage workflow, and marginal GPT-2 projection sensitivity; no completed hardware mapping</span></article>

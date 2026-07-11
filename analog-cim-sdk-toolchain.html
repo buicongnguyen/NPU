@@ -1,0 +1,935 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="A build-oriented reference architecture for an Analog CIM SDK and compiler: model import, MLIR dialects and passes, calibration artifacts, executable format, public C API, HAL, simulator backends, runtime, firmware, framework plugins, testing, and a staged implementation plan.">
+  <title>Analog CIM SDK and Compiler Implementation Guide | NPU Study Guide</title>
+  <link rel="stylesheet" href="analog-cim.css">
+  <link rel="stylesheet" href="npu-engineering.css">
+  <link rel="stylesheet" href="analog-cim-codesign.css">
+  <link rel="stylesheet" href="analog-cim-mythic.css">
+  <link rel="stylesheet" href="analog-cim-reuse.css">
+  <script src="npu-engineering.js" defer></script>
+</head>
+<body>
+  <header class="site-header">
+    <a class="brand" href="index.html" aria-label="NPU Study Guide home">
+      <img src="https://avatars.githubusercontent.com/u/72680210?v=4" alt="Bui Cong Nguyen avatar">
+      <span>NPU Study Guide</span>
+    </a>
+    <nav class="site-nav" aria-label="Analog CIM learning path">
+      <a href="analog-cim-architecture.html">Architecture</a>
+      <a href="analog-cim-evidence.html">Evidence</a>
+      <a href="analog-cim-hardware-software-codesign.html">Co-design</a>
+      <a href="analog-cim-ihw-patents.html">iHW patents</a>
+      <a href="analog-cim-sdk-toolchain.html" aria-current="page">SDK</a>
+      <a href="analog-cim-tenstorrent-reuse.html">Reuse</a>
+      <a href="analog-cim-interview.html">Interview</a>
+      <a href="analog-cim-quiz.html">MCQ Lab</a>
+    </nav>
+  </header>
+
+  <main>
+    <section class="hero">
+      <div class="hero-copy">
+        <p class="eyebrow">Implementation reference | source review 2026-07-11</p>
+        <h1>Analog CIM SDK and Compiler: From Model to Running Code</h1>
+        <p class="lede">
+          This page turns the Analog CIM research into an implementable software architecture. It defines the public
+          SDK, compiler IR and passes, target and calibration artifacts, simulator and hardware backends, runtime and
+          firmware contracts, framework integration, tests, and the smallest vertical slice that should work before
+          the project grows. It is a reference design, not a disclosure of iHW, Mythic, IBM, or Tenstorrent internals.
+        </p>
+        <div class="hero-actions">
+          <a class="button" href="#first-slice">Build the first vertical slice</a>
+          <a class="button secondary" href="#flow">Trace the complete flow</a>
+          <a class="button secondary" href="#sdk-api">Inspect the SDK API</a>
+          <a class="button secondary" href="#compiler">Inspect the compiler</a>
+        </div>
+        <div class="summary-strip" aria-label="Analog CIM SDK implementation summary">
+          <div><strong>First frontend</strong><span>Standalone ONNX import; ORT plugin second</span></div>
+          <div><strong>Compiler core</strong><span>MLIR with plan, physical, and command levels</span></div>
+          <div><strong>Stable boundary</strong><span>C ABI over opaque handles and asynchronous events</span></div>
+          <div><strong>Bring-up strategy</strong><span>Functional simulator before noise, timing, or silicon</span></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="review">
+      <div class="section-heading">
+        <p class="eyebrow">Documentation review</p>
+        <h2>What the previous pages explained, and what was still missing for implementation</h2>
+        <p class="section-note">
+          The existing pages remain useful for physics, evidence, co-design, and reuse decisions. The changes below
+          remove ambiguous ownership and add the contracts needed to write and test code.
+        </p>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th scope="col">Priority</th><th scope="col">Review finding</th><th scope="col">Why it blocks real code</th><th scope="col">Resolution in this guide</th></tr></thead>
+          <tbody>
+            <tr><th scope="row"><span class="status-pill status-open">P1</span></th><td>Model calibration, silicon characterization, and per-device calibration were discussed under one name.</td><td>They have different producers, update schedules, security requirements, and consumers.</td><td>Three separate schemas and lifecycle owners are defined.</td></tr>
+            <tr><th scope="row"><span class="status-pill status-open">P1</span></th><td>The executable and serial-number-specific device state were treated as one artifact.</td><td>That prevents portable AOT compilation and creates a rebuild for every replacement device.</td><td>A device-class executable is bound to a separate device-state bundle at load time.</td></tr>
+            <tr><th scope="row"><span class="status-pill status-open">P1</span></th><td>No stable SDK API, handle ownership, queue, event, buffer, or error contract was specified.</td><td>Compiler, runtime, simulator, applications, and tests cannot evolve independently.</td><td>A versioned C ABI, C++ HAL, and Python workflow are provided.</td></tr>
+            <tr><th scope="row"><span class="status-pill status-open">P1</span></th><td>Accuracy simulation and performance simulation were not separated strongly enough.</td><td>AIHWKit and CrossSim can model numerical non-idealities, but they are not a product cycle/energy model.</td><td>Functional, statistical, cycle/resource, and hardware backends have distinct acceptance criteria.</td></tr>
+            <tr><th scope="row"><span class="status-pill status-conditional">P2</span></th><td>PyTorch, ONNX, StableHLO, ORT, and PJRT appeared as equivalent starting points.</td><td>Supporting several frontends before one executable path works multiplies semantic and build risk.</td><td>The MVP starts with ONNX; ORT and PJRT are staged integrations.</td></tr>
+            <tr><th scope="row"><span class="status-pill status-conditional">P2</span></th><td>The compiler pipeline had no repository ownership or executable acceptance test.</td><td>A list of passes does not show which library owns state or when a feature is complete.</td><td>Modules, CLI commands, CI lanes, and vertical-slice exit tests are defined.</td></tr>
+            <tr><th scope="row"><span class="status-pill status-conditional">P2</span></th><td>Firmware validation and recovery were described but not represented as a command protocol.</td><td>Raw or weakly checked descriptors can damage state, hang queues, or use stale calibration.</td><td>A bounded command set, state machine, validation rules, and recovery policy are specified.</td></tr>
+            <tr><th scope="row"><span class="status-pill status-partial">P3</span></th><td>Patent evidence and implementation design occupied the same long page.</td><td>Readers could confuse a proposed software design with a vendor-disclosed implementation.</td><td>The patent page now labels its software mapping as proposed, links here, and makes this page the authoritative build specification.</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="callout verdict top-gap">
+        <p>
+          <strong>Architecture recommendation:</strong> build a simulator-first inference stack around one stable
+          executable contract. Keep framework adapters above the compiler, physical device state below the artifact,
+          and vendor-specific hardware behind a HAL. Do not begin by forking TTMetal, implementing PJRT, or supporting
+          a complete model before one statically shaped MatMul compiles and runs end to end.
+        </p>
+      </div>
+    </section>
+
+    <section class="section" id="boundaries">
+      <div class="section-heading">
+        <p class="eyebrow">Product boundaries</p>
+        <h2>Toolchain, SDK, runtime, HAL, driver, and firmware are different products</h2>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th scope="col">Layer</th><th scope="col">Public responsibility</th><th scope="col">Must not own</th><th scope="col">Primary consumers</th></tr></thead>
+          <tbody>
+            <tr><th scope="row">Model tools</th><td>Validate ONNX, collect representative ranges, compare accuracy, and produce model-calibration inputs.</td><td>Physical addresses, queue descriptors, kernel-driver calls, or device secrets</td><td>ML engineers and compiler CI</td></tr>
+            <tr><th scope="row">Compiler toolchain</th><td>Import, legalize, quantize, partition, map, schedule, lower, package, inspect, and verify.</td><td>Live device ownership, asynchronous request state, or field recovery decisions</td><td>Build systems, framework plugins, release engineering</td></tr>
+            <tr><th scope="row">Public SDK</th><td>Expose device discovery, executable loading, buffers, sessions, queues, events, telemetry, and errors.</td><td>Compiler implementation classes, direct register access, or unstable C++ internals</td><td>Applications, frameworks, tests, samples</td></tr>
+            <tr><th scope="row">Runtime</th><td>Validate compatibility, bind device state, manage memory, submit work, synchronize, and apply recovery policy.</td><td>Framework graph semantics or unrestricted firmware commands</td><td>SDK bindings and execution providers</td></tr>
+            <tr><th scope="row">HAL</th><td>Provide one internal device interface implemented by simulation and silicon backends.</td><td>User-facing ABI promises or model-level graph transformations</td><td>Runtime, bring-up tests, emulators</td></tr>
+            <tr><th scope="row">Driver</th><td>Isolation, DMA/IOMMU, interrupts, mapping, reset, power, and firmware transport.</td><td>Model partitioning, quantization policy, or source-level debug meaning</td><td>HAL hardware backend and system software</td></tr>
+            <tr><th scope="row">Firmware</th><td>Validate bounded descriptors, schedule engines, own programming/calibration sequences, report faults, and recover.</td><td>Untrusted host pointers, arbitrary array voltages, or policy hidden from telemetry</td><td>Driver, runtime, manufacturing tools</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="section" id="calibration">
+      <div class="section-heading">
+        <p class="eyebrow">Corrected calibration model</p>
+        <h2>Three kinds of calibration create three different artifacts</h2>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th scope="col">Artifact</th><th scope="col">Producer and input</th><th scope="col">Contents</th><th scope="col">Update trigger</th><th scope="col">Consumer</th></tr></thead>
+          <tbody>
+            <tr><th scope="row">Model calibration <code>.qcal</code></th><td>ML/compiler team; representative model inputs</td><td>Activation histograms, clipping, group scales, outlier policy, sensitivity, dataset hash</td><td>Model, preprocessing, dataset, or quantization policy changes</td><td>Quantization and partition passes</td></tr>
+            <tr><th scope="row">Target characterization <code>.achar</code></th><td>Silicon/algorithm team; measured chip populations and PVT sweeps</td><td>Array distributions, transfer models, ADC/DAC behavior, IR drop, drift, faults, timing, energy coefficients, confidence</td><td>Device revision, process, firmware, characterization method, or qualification changes</td><td>Compiler operation model and statistical/cycle simulators</td></tr>
+            <tr><th scope="row">Device state <code>.acal</code></th><td>Manufacturing or firmware; one device serial number</td><td>Gain/offset trims, usable-array bitmap, remaps, weak cells, sensor references, calibration age, signature</td><td>Factory test, replacement, boot check, thermal event, aging threshold, recalibration, or repair</td><td>Runtime, firmware, and hardware backend</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="callout caution top-gap">
+        <p>
+          <strong>Proposed file extensions are illustrative.</strong> The important contract is ownership. A model build
+          may depend on a target class and characterization version, but it should not embed mutable calibration from a
+          particular serial number. The runtime binds an accepted <code>.acal</code> bundle and rejects stale or incompatible state.
+        </p>
+      </div>
+
+      <div class="section-heading top-gap">
+        <h3>Keep the portable executable separate from device binding</h3>
+      </div>
+      <div class="formula-grid">
+        <article class="formula-card"><strong>Target descriptor</strong><code>.atarget</code><span>Static device class, revision, arrays, memory, commands, formats, and ABI capabilities.</span></article>
+        <article class="formula-card"><strong>Model executable</strong><code>.acx</code><span>Portable within declared target requirements; graph, constants, plans, commands, kernels, and debug maps.</span></article>
+        <article class="formula-card"><strong>Device binding</strong><code>.acal</code><span>Serial-specific calibration, remap, health, age, and signature loaded independently.</span></article>
+        <article class="formula-card"><strong>Execution evidence</strong><code>.atrace</code><span>Correlation IDs, timings, bytes, phases, saturation, faults, fallback, and calibration identity.</span></article>
+      </div>
+      <div class="code-panel top-gap">
+        <header><strong>Deterministic cache key</strong><span>Everything that can change generated behavior</span></header>
+        <pre><code>compile_cache_key = hash(
+  normalized_model,
+  model_calibration,
+  target_descriptor,
+  characterization_version,
+  compiler_version,
+  compiler_options,
+  artifact_schema_major
+)
+
+load_binding_key = hash(
+  executable_target_requirements,
+  device_revision,
+  firmware_abi,
+  device_state_schema,
+  device_state_calibration_id
+)</code></pre>
+      </div>
+    </section>
+
+    <section class="section" id="flow">
+      <div class="section-heading">
+        <p class="eyebrow">End-to-end flow</p>
+        <h2>Characterize the target, build the executable, then bind and run</h2>
+      </div>
+      <div class="cim-system-flow">
+        <section class="flow-band">
+          <header><b>Plane A</b><strong>Target characterization</strong><span>Runs in lab and manufacturing infrastructure, not on every application build.</span></header>
+          <ol class="flow-track five">
+            <li><b>A1</b><strong>Measure silicon</strong><span>Arrays, ADC/DAC, wires, programming, PVT, drift, timing, energy</span></li>
+            <li><b>A2</b><strong>Fit models</strong><span>Distributions, correlations, guard bands, confidence, device classes</span></li>
+            <li><b>A3</b><strong>Validate predictors</strong><span>Hold-out chips and workloads; numerical and cycle correlation</span></li>
+            <li><b>A4</b><strong>Sign target data</strong><span>Versioned <code>.atarget</code> and <code>.achar</code> artifacts</span></li>
+            <li><b>A5</b><strong>Publish compatibility</strong><span>Compiler, firmware, simulator, and qualification matrix</span></li>
+          </ol>
+        </section>
+        <div class="flow-transition"><span>target class becomes a compiler input</span></div>
+        <section class="flow-band flow-deploy">
+          <header><b>Plane B</b><strong>Offline model build</strong><span>Runs in CI, an SDK tool, or a framework execution-provider compile callback.</span></header>
+          <ol class="flow-track six">
+            <li><b>B1</b><strong>Check and import</strong><span>ONNX checker, shape inference, source locations, reference tensors</span></li>
+            <li><b>B2</b><strong>Calibrate model</strong><span>Representative inputs, ranges, clipping, scales, sensitivity</span></li>
+            <li><b>B3</b><strong>Plan graph</strong><span>Support, quantization, analog/digital partition, fusion, fallback</span></li>
+            <li><b>B4</b><strong>Map physical work</strong><span>Digits, arrays, faults, ADC ranges, phases, buffers, schedule</span></li>
+            <li><b>B5</b><strong>Lower and package</strong><span>Commands, digital kernels, program recipe, ABI, debug map</span></li>
+            <li><b>B6</b><strong>Verify artifact</strong><span>Functional, statistical, cycle, version, schema, and reproducibility gates</span></li>
+          </ol>
+        </section>
+        <div class="flow-transition"><span>portable executable is delivered</span></div>
+        <section class="flow-band flow-inference">
+          <header><b>Plane C</b><strong>Load and execution</strong><span>Runs through the public SDK, runtime, HAL, driver, firmware, and device.</span></header>
+          <ol class="flow-track six">
+            <li><b>C1</b><strong>Discover device</strong><span>Revision, firmware ABI, memory, health, supported modes</span></li>
+            <li><b>C2</b><strong>Bind device state</strong><span>Validate calibration signature, age, temperature, and remaps</span></li>
+            <li><b>C3</b><strong>Load executable</strong><span>Check target requirements, allocate resources, program/verify weights</span></li>
+            <li><b>C4</b><strong>Submit requests</strong><span>Bind buffers, enqueue, return event, overlap transfer and compute</span></li>
+            <li><b>C5</b><strong>Execute and observe</strong><span>Pulse, MVM, convert, reconstruct, digital work, telemetry</span></li>
+            <li><b>C6</b><strong>Recover or complete</strong><span>Repeat, remap, recalibrate, refresh, fallback, reset, or return</span></li>
+          </ol>
+        </section>
+        <div class="flow-feedback"><strong>Closed feedback loop</strong><span>Silicon trace and model accuracy &rarr; correlation report &rarr; characterization or compiler update &rarr; new versioned artifacts &rarr; staged qualification</span></div>
+      </div>
+
+      <div class="sequence-heading">
+        <p class="eyebrow">SDK sequence diagram</p>
+        <h3>One executable moves through five ownership boundaries</h3>
+        <p>The compile path may run once per model release. Device binding and load run per deployment or boot. Submit and completion repeat per request.</p>
+      </div>
+      <div class="diagram-scroll" tabindex="0" aria-label="Scrollable Analog CIM SDK sequence diagram">
+        <div class="cim-sequence">
+          <div class="sequence-header" aria-label="Sequence participants">
+            <div><b>Application</b><span>Python, C, C++</span></div>
+            <div><b>Framework/CLI</b><span>ONNX or plugin</span></div>
+            <div><b>Compiler</b><span>MLIR and packager</span></div>
+            <div><b>Runtime/HAL</b><span>Buffers and queues</span></div>
+            <div><b>Firmware/device</b><span>Physical execution</span></div>
+          </div>
+          <ol class="sequence-body">
+            <li class="sequence-phase"><span>Offline compile</span></li>
+            <li class="sequence-row"><div class="sequence-event event-1-2" aria-label="Application to framework: provide model and deployment policy"><span>Model + deployment policy + representative-data identity</span></div></li>
+            <li class="sequence-row"><div class="sequence-event event-2-3" aria-label="Framework to compiler: submit normalized graph and target"><span>Normalized graph + target/characterization versions</span></div></li>
+            <li class="sequence-row"><div class="sequence-self self-digital" aria-label="Compiler internal: import, analyze, partition, map, schedule, lower, verify"><span>Import &rarr; analyze &rarr; partition &rarr; map &rarr; schedule &rarr; lower &rarr; verify</span></div></li>
+            <li class="sequence-row"><div class="sequence-event event-2-3 reverse" aria-label="Compiler to framework: return executable and reports"><span><code>.acx</code> + support, accuracy, mapping, and cost reports</span></div></li>
+            <li class="sequence-phase"><span>Device binding and load</span></li>
+            <li class="sequence-row"><div class="sequence-event event-1-4" aria-label="Application to runtime: open device and load executable"><span>Open device + load executable</span></div></li>
+            <li class="sequence-row"><div class="sequence-event event-4-5" aria-label="Runtime to firmware: query capabilities and device state"><span>Query revision, firmware ABI, health, and <code>.acal</code></span></div></li>
+            <li class="sequence-row"><div class="sequence-event event-4-5 reverse" aria-label="Firmware to runtime: return validated device state"><span>Validated calibration/remap identity and resource availability</span></div></li>
+            <li class="sequence-row"><div class="sequence-event event-4-5" aria-label="Runtime to firmware: program and verify weights"><span>Program recipe + bounded write/verify commands</span></div></li>
+            <li class="sequence-row"><div class="sequence-event event-1-4 reverse" aria-label="Runtime to application: return ready session"><span>Ready session + compatibility and load report</span></div></li>
+            <li class="sequence-phase"><span>Repeated asynchronous request</span></li>
+            <li class="sequence-row"><div class="sequence-event event-1-4" aria-label="Application to runtime: bind buffers and submit"><span>Bind buffers + submit queue + request policy</span></div></li>
+            <li class="sequence-row"><div class="sequence-event event-1-4 reverse" aria-label="Runtime to application: return event"><span>Return event immediately</span></div></li>
+            <li class="sequence-row"><div class="sequence-event event-4-5" aria-label="Runtime to device: execute commands"><span>DMA &rarr; pulse/MVM &rarr; ADC &rarr; reconstruct &rarr; digital work</span></div></li>
+            <li class="sequence-row"><div class="sequence-event event-4-5 reverse" aria-label="Device to runtime: completion and telemetry"><span>Completion + counters + saturation/fault status</span></div></li>
+            <li class="sequence-row"><div class="sequence-event event-1-4 reverse" aria-label="Runtime to application: output and trace correlation"><span>Output + event status + trace correlation ID</span></div></li>
+          </ol>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="architecture">
+      <div class="section-heading">
+        <p class="eyebrow">Software architecture</p>
+        <h2>Use a thin stable public API over replaceable compiler and device internals</h2>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th scope="col">Module</th><th scope="col">Suggested library</th><th scope="col">Owns</th><th scope="col">Dependency rule</th></tr></thead>
+          <tbody>
+            <tr><th scope="row">ONNX frontend</th><td><code>libacim_frontend_onnx</code></td><td>Checker, shape inference, semantic import, source locations, constants</td><td>May depend on ONNX and MLIR; must not depend on runtime or driver</td></tr>
+            <tr><th scope="row">Compiler core</th><td><code>libacim_compiler</code></td><td>Dialects, analyses, passes, target operation model, reports</td><td>Depends on MLIR and schema libraries; hardware access is forbidden</td></tr>
+            <tr><th scope="row">Artifact support</th><td><code>libacim_artifact</code></td><td>Schema, serialization, hashes, signatures, inspect, compatibility rules</td><td>Shared by compiler and runtime; may not depend on either implementation</td></tr>
+            <tr><th scope="row">Public runtime ABI</th><td><code>libacim</code></td><td>C handles, status codes, discovery, sessions, buffers, queues, events, traces</td><td>Only stable exported surface; hides C++ classes and backend choice</td></tr>
+            <tr><th scope="row">Runtime core</th><td><code>libacim_runtime</code></td><td>Compatibility, memory plan, load, binding, queueing, recovery policy</td><td>Depends on artifact and HAL interfaces, never on a framework</td></tr>
+            <tr><th scope="row">HAL interfaces</th><td><code>libacim_hal</code></td><td>Backend, device, buffer, executable, command queue, event, telemetry interfaces</td><td>No vendor headers in public interfaces; backends are loadable or link-time modules</td></tr>
+            <tr><th scope="row">Simulation backends</th><td><code>acim_hal_functional</code>, <code>_analog</code>, <code>_cycle</code></td><td>Exact numerics, non-ideal distributions, timing/resources</td><td>Implement the same HAL and artifact semantics as hardware</td></tr>
+            <tr><th scope="row">Hardware backend</th><td><code>acim_hal_device</code></td><td>Driver calls, DMA, command submission, firmware events, reset, telemetry</td><td>Only module allowed to include driver or firmware transport headers</td></tr>
+            <tr><th scope="row">Framework plugins</th><td><code>acim_ort_ep</code>, later <code>acim_pjrt</code></td><td>Framework capabilities, graph handoff, buffer adaptation, fallback integration</td><td>Call compiler and public runtime APIs; do not duplicate backend logic</td></tr>
+            <tr><th scope="row">Python package</th><td><code>acim_sdk</code></td><td>Ergonomic compiler/runtime wrappers, reports, examples, notebooks</td><td>Thin bindings over stable C ABI plus optional compiler Python API</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="code-panel top-gap">
+        <header><strong>Repository structure</strong><span>One ownership boundary per top-level directory</span></header>
+        <pre><code>acim-stack/
+  include/acim/              stable C API and versioned public structs
+  api/cpp/                   header-only RAII wrapper over the C ABI
+  python/acim_sdk/           Python compiler and runtime bindings
+  compiler/
+    frontend/onnx/           ONNX validation and import
+    dialect/plan/            logical ACiM planning operations and attributes
+    dialect/physical/        arrays, slices, converters, calibration requirements
+    dialect/command/         firmware-visible command graph
+    analysis/                shape, range, sensitivity, legality, cost, liveness
+    transforms/              quantize, partition, map, schedule, lower, verify
+    target/                  target and characterization schema readers
+  artifact/                  FlatBuffer schema, serializer, verifier, inspector
+  runtime/                   sessions, buffers, queues, events, load, recovery
+  hal/                       backend interfaces and backend registry
+  backends/{functional,analog,cycle,device}/
+  driver/                    OS integration; separate release and privilege boundary
+  firmware/                  descriptor parser, scheduler, health, reset, calibration
+  integrations/{onnxruntime,pjrt}/
+  tools/                     acim-compile, inspect, run, profile, characterize
+  tests/{unit,ir,golden,differential,hardware,models}/
+  examples/{matmul,onnx_ep,async_pipeline}/</code></pre>
+      </div>
+    </section>
+
+    <section class="section" id="compiler">
+      <div class="section-heading">
+        <p class="eyebrow">Compiler implementation</p>
+        <h2>Start with upstream IR, then introduce hardware meaning in three small dialects</h2>
+        <p class="section-note">
+          MLIR's declarative ODS and dialect-conversion infrastructure provide generated operation classes, verifiers,
+          parsing, printing, and legality-driven lowering. Use them for infrastructure; do not import Tenstorrent target
+          semantics into an ACiM backend.
+        </p>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th scope="col">IR stage</th><th scope="col">Recommended representation</th><th scope="col">Allowed knowledge</th><th scope="col">Verifier examples</th></tr></thead>
+          <tbody>
+            <tr><th scope="row">Imported graph</th><td>Upstream <code>func</code>, <code>tensor</code>, <code>arith</code>, <code>linalg</code>, <code>quant</code>, or a small normalized frontend layer</td><td>Tensor semantics, shapes, constants, source names, QDQ scales</td><td>Ranks known where required, contraction dimensions agree, quantized zero is representable</td></tr>
+            <tr><th scope="row"><code>acim_plan</code></th><td>Logical MVM/Conv regions plus candidate precision, scale domain, fallback, and error budget</td><td>Target capabilities and measured operation-model estimates, not physical addresses</td><td>Every op has a legal implementation; scale and accumulator types are complete</td></tr>
+            <tr><th scope="row"><code>acim_physical</code></th><td>Arrays, rows/columns, digit slices, sign paths, ADC grades, phases, buffers, and calibration class</td><td>Target geometry, characterization, fault-reserve policy, and static schedule resources</td><td>No overlap, current and range limits pass, all slices reconstruct, resources fit</td></tr>
+            <tr><th scope="row"><code>acim_command</code></th><td>Bounded commands, dependencies, events, DMA, program/verify, execute, telemetry, and recovery points</td><td>Firmware ABI and driver-visible memory handles</td><td>No raw pointers, all buffer ranges valid, dependency graph acyclic, firmware supports opcode/version</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="code-panel top-gap">
+        <header><strong>Starter ODS shape</strong><span>Logical MVM is pure; programming and command operations are not</span></header>
+        <pre><code>def ACIMPlan_MvmOp : ACIMPlan_Op&lt;"mvm", [Pure]&gt; {
+  let summary = "Logical matrix-vector operation eligible for ACiM planning";
+  let arguments = (ins
+    AnyRankedTensor:$activation,
+    AnyRankedTensor:$weight,
+    ACIM_PrecisionAttr:$precision,
+    ACIM_ErrorBudgetAttr:$error_budget,
+    ACIM_FallbackAttr:$fallback);
+  let results = (outs AnyRankedTensor:$result);
+  let hasVerifier = 1;
+}
+
+def ACIMCmd_ProgramArrayOp : ACIMCmd_Op&lt;"program_array"&gt; {
+  let summary = "Request a bounded firmware-owned program and verify sequence";
+  let arguments = (ins
+    ACIM_ArrayRefType:$array,
+    ACIM_ProgramImageType:$image,
+    ACIM_CalibrationClassAttr:$calibration_class,
+    ACIM_EventType:$dependency);
+  let results = (outs ACIM_EventType:$completion);
+  let hasVerifier = 1;
+}</code></pre>
+      </div>
+
+      <div class="section-heading top-gap">
+        <h3>Implement passes in dependency order and save every boundary</h3>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th scope="col">Order</th><th scope="col">Pass/library</th><th scope="col">Implementation responsibility</th><th scope="col">Minimum test</th></tr></thead>
+          <tbody>
+            <tr><th scope="row">1</th><td><code>onnx-check-import</code></td><td>Run ONNX checking and shape inference; import only MatMul/Gemm first; preserve source location and constants.</td><td>Valid model imports; invalid rank/K dimension returns a stable diagnostic.</td></tr>
+            <tr><th scope="row">2</th><td><code>canonicalize-contracts</code></td><td>Normalize transpose, bias, broadcast, and contraction forms into one MVM semantic contract.</td><td>Equivalent ONNX forms produce identical normalized IR.</td></tr>
+            <tr><th scope="row">3</th><td><code>attach-quant-contract</code></td><td>Consume QDQ or <code>.qcal</code>; materialize scale, zero point, clipping, rounding, and accumulator type.</td><td>Integer software reference exactly matches expected output and saturation.</td></tr>
+            <tr><th scope="row">4</th><td><code>analyze-capability</code></td><td>Generate reason-coded analog, digital, and host candidates from target capabilities.</td><td>Unsupported shapes are rejected or receive an explicit fallback candidate.</td></tr>
+            <tr><th scope="row">5</th><td><code>partition-and-fuse</code></td><td>Choose regions using boundary conversion and transfer cost, not operation support alone.</td><td>A forced analog/digital override produces a report and valid graph.</td></tr>
+            <tr><th scope="row">6</th><td><code>decompose-weights</code></td><td>Generate radix/sign slices and reconstruction coefficients; preserve logical-to-physical debug mapping.</td><td>Reconstructed logical weights exactly equal the quantized reference.</td></tr>
+            <tr><th scope="row">7</th><td><code>place-arrays</code></td><td>Tile matrices, reserve spares, constrain current, pack slices, and emit calibration-class requirements.</td><td>No overlap; capacity and current constraints are checked by an independent verifier.</td></tr>
+            <tr><th scope="row">8</th><td><code>plan-adc-phases</code></td><td>Select ranges, converter sharing, phase count, repeat policy, and saturation/fallback guard.</td><td>Every candidate reports predicted error, phases, saturation margin, and confidence.</td></tr>
+            <tr><th scope="row">9</th><td><code>plan-memory-schedule</code></td><td>Allocate static arenas and overlap DMA, input encoding, MVM, ADC, reconstruction, and digital work.</td><td>Lifetime intervals do not overlap illegally; cycle model accepts the schedule.</td></tr>
+            <tr><th scope="row">10</th><td><code>lower-command-abi</code></td><td>Emit versioned bounded commands and events; insert firmware validation and recovery checkpoints.</td><td>Command schema round-trips and malformed descriptors fail before execution.</td></tr>
+            <tr><th scope="row">11</th><td><code>serialize-acx</code></td><td>Package target requirements, programs, constants, plans, commands, reports, and debug maps.</td><td>Artifact is deterministic, inspectable, schema-conformant, and rejects wrong target major versions.</td></tr>
+            <tr><th scope="row">12</th><td><code>differential-verify</code></td><td>Run exact reference and selected backends; compare checkpoints and release thresholds.</td><td>First divergent op, expected tolerance, seed, profile versions, and tensors are retained.</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="section-heading top-gap">
+        <h3>Candidate selection needs measured coefficients and uncertainty</h3>
+      </div>
+      <div class="code-panel">
+        <header><strong>Candidate record and constrained objective</strong><span>Persist this data in compiler reports</span></header>
+        <pre><code>candidate = {
+  implementation: analog | digital | host,
+  layout: {tiles, groups, buffers, sharding},
+  numerics: {weight_digits, activation_bits, adc_grade, accumulator},
+  physical: {arrays, phases, spares, calibration_class},
+  estimates: {latency_ns, energy_pj, error_distribution, confidence},
+  boundaries: {copies, conversions, synchronization},
+  fallback: {trigger, implementation, recovery_cost}
+}
+
+minimize latency_weight * latency_p99
+       + energy_weight  * energy
+       + risk_weight    * accuracy_risk
+       + boundary_weight * transfer_and_conversion
+       + wear_weight    * programming_and_refresh
+
+subject to error_budget, SRAM, current, ADC range, capacity,
+           firmware ABI, calibration class, and service policy.</code></pre>
+      </div>
+      <div class="callout caution top-gap">
+        <p>
+          <strong>Do not use an accuracy simulator as a latency oracle.</strong>
+          <a href="https://github.com/sandialabs/cross-sim">CrossSim</a> explicitly states that it does not model
+          accelerator energy, area, or speed. Use AIHWKit or CrossSim adapters for numerical studies, then maintain a
+          separately correlated cycle/resource model for queues, SRAM, NoC, converters, firmware, and digital work.
+        </p>
+      </div>
+    </section>
+
+    <section class="section" id="sdk-api">
+      <div class="section-heading">
+        <p class="eyebrow">Public SDK</p>
+        <h2>Stabilize a C ABI, then build C++ and Python ergonomics on top</h2>
+        <p class="section-note">
+          Opaque handles prevent ABI exposure of STL, compiler, and driver classes. Every public struct starts with its
+          size and API version so newer libraries can accept older callers safely.
+        </p>
+      </div>
+      <div class="code-panel">
+        <header><strong>C ABI v0 starter header</strong><span>Compile-ready shape; the API remains a proposed design</span></header>
+        <pre><code>#ifndef ACIM_SDK_H_
+#define ACIM_SDK_H_
+
+#include &lt;stddef.h&gt;
+#include &lt;stdint.h&gt;
+
+#if defined(_WIN32)
+#  if defined(ACIM_SDK_EXPORTS)
+#    define ACIM_API __declspec(dllexport)
+#  else
+#    define ACIM_API __declspec(dllimport)
+#  endif
+#elif defined(__GNUC__)
+#  define ACIM_API __attribute__((visibility("default")))
+#else
+#  define ACIM_API
+#endif
+
+#define ACIM_API_VERSION 1u
+#define ACIM_MAX_RANK 8u
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+typedef struct acim_context acim_context_t;
+typedef struct acim_device acim_device_t;
+typedef struct acim_executable acim_executable_t;
+typedef struct acim_session acim_session_t;
+typedef struct acim_queue acim_queue_t;
+typedef struct acim_buffer acim_buffer_t;
+typedef struct acim_event acim_event_t;
+
+typedef enum acim_status {
+  ACIM_STATUS_OK = 0,
+  ACIM_STATUS_INVALID_ARGUMENT,
+  ACIM_STATUS_UNSUPPORTED,
+  ACIM_STATUS_INCOMPATIBLE_ARTIFACT,
+  ACIM_STATUS_STALE_CALIBRATION,
+  ACIM_STATUS_RESOURCE_EXHAUSTED,
+  ACIM_STATUS_BUSY,
+  ACIM_STATUS_TIMEOUT,
+  ACIM_STATUS_CANCELED,
+  ACIM_STATUS_DEVICE_FAULT,
+  ACIM_STATUS_INTERNAL
+} acim_status_t;
+
+typedef enum acim_io_kind {
+  ACIM_IO_INPUT = 0,
+  ACIM_IO_OUTPUT = 1
+} acim_io_kind_t;
+
+typedef enum acim_element_type {
+  ACIM_ELEMENT_I8 = 0,
+  ACIM_ELEMENT_I32,
+  ACIM_ELEMENT_F16,
+  ACIM_ELEMENT_F32
+} acim_element_type_t;
+
+typedef enum acim_memory_flags {
+  ACIM_MEMORY_HOST_VISIBLE = 1u &lt;&lt; 0,
+  ACIM_MEMORY_HOST_PINNED  = 1u &lt;&lt; 1,
+  ACIM_MEMORY_DEVICE_LOCAL = 1u &lt;&lt; 2
+} acim_memory_flags_t;
+
+typedef struct acim_context_options {
+  uint32_t struct_size;
+  uint32_t api_version;
+  const char* backend_name;      /* functional, analog, cycle, device */
+  const char* backend_options;   /* validated JSON or key/value text */
+} acim_context_options_t;
+
+typedef struct acim_tensor_desc {
+  uint32_t struct_size;
+  uint32_t api_version;
+  const char* name;              /* executable-owned; valid until release */
+  acim_element_type_t element_type;
+  uint32_t rank;
+  int64_t dimensions[ACIM_MAX_RANK];
+  size_t byte_size;
+} acim_tensor_desc_t;
+
+typedef struct acim_buffer_binding {
+  uint32_t struct_size;
+  uint32_t api_version;
+  uint32_t tensor_index;
+  acim_buffer_t* buffer;
+  size_t offset;
+  size_t size;
+} acim_buffer_binding_t;
+
+typedef struct acim_error_info {
+  uint32_t struct_size;
+  uint32_t api_version;
+  acim_status_t status;
+  uint32_t subsystem;
+  int64_t device_code;
+  uint64_t trace_id;
+  char message[256];
+} acim_error_info_t;
+
+ACIM_API uint32_t acim_api_version(void);
+ACIM_API acim_status_t acim_context_create(
+    const acim_context_options_t*, acim_context_t**);
+ACIM_API acim_status_t acim_context_get_last_error(
+    acim_context_t*, acim_error_info_t*);
+ACIM_API acim_status_t acim_device_count(acim_context_t*, uint32_t*);
+ACIM_API acim_status_t acim_device_open(acim_context_t*, uint32_t, acim_device_t**);
+ACIM_API acim_status_t acim_device_get_capabilities(
+    acim_device_t*, char* json, size_t* inout_size);
+ACIM_API acim_status_t acim_device_bind_state(
+    acim_device_t*, const void* bytes, size_t size);
+ACIM_API acim_status_t acim_executable_load(
+    acim_device_t*, const void* bytes, size_t size, acim_executable_t**);
+ACIM_API acim_status_t acim_executable_get_tensor_desc(
+    acim_executable_t*, acim_io_kind_t, uint32_t index, acim_tensor_desc_t*);
+ACIM_API acim_status_t acim_session_create(
+    acim_device_t*, acim_executable_t*, acim_session_t**);
+ACIM_API acim_status_t acim_queue_create(
+    acim_session_t*, uint32_t queue_flags, acim_queue_t**);
+ACIM_API acim_status_t acim_buffer_allocate(
+    acim_device_t*, size_t bytes, uint32_t memory_flags, acim_buffer_t**);
+ACIM_API acim_status_t acim_buffer_write(
+    acim_buffer_t*, size_t offset, const void* source, size_t size);
+ACIM_API acim_status_t acim_buffer_read(
+    acim_buffer_t*, size_t offset, void* destination, size_t size);
+ACIM_API acim_status_t acim_queue_submit(
+    acim_queue_t*, const acim_buffer_binding_t* inputs, size_t input_count,
+    const acim_buffer_binding_t* outputs, size_t output_count, acim_event_t**);
+ACIM_API acim_status_t acim_event_wait(acim_event_t*, uint64_t timeout_ns);
+ACIM_API acim_status_t acim_event_cancel(acim_event_t*);
+ACIM_API acim_status_t acim_event_get_result(acim_event_t*, acim_error_info_t*);
+
+ACIM_API void acim_event_release(acim_event_t*);
+ACIM_API void acim_buffer_release(acim_buffer_t*);
+ACIM_API void acim_queue_release(acim_queue_t*);
+ACIM_API void acim_session_release(acim_session_t*);
+ACIM_API void acim_executable_release(acim_executable_t*);
+ACIM_API void acim_device_release(acim_device_t*);
+ACIM_API void acim_context_release(acim_context_t*);
+
+#ifdef __cplusplus
+}  /* extern "C" */
+#endif
+#endif  /* ACIM_SDK_H_ */</code></pre>
+      </div>
+      <div class="table-wrap top-gap">
+        <table>
+          <thead><tr><th scope="col">API rule</th><th scope="col">Required behavior</th><th scope="col">Test</th></tr></thead>
+          <tbody>
+            <tr><th scope="row">Ownership</th><td>Every successful create/open/load/allocate returns one owned reference. Parents outlive children; queues are drained or canceled before release; release is called exactly once.</td><td>Sanitizer and fault-injection tests cover success, partial construction, outstanding events, and every failure path.</td></tr>
+            <tr><th scope="row">Thread safety</th><td>Context/device queries are concurrent; a queue is ordered; independent queues may overlap; session concurrency is reported by capabilities, never assumed.</td><td>Multi-threaded submit and teardown with deterministic per-queue order and allowed cross-queue overlap.</td></tr>
+            <tr><th scope="row">Asynchrony</th><td>Submit returns an event without waiting; buffer lifetime extends through event completion.</td><td>Two queues overlap transfers and execution in the cycle and hardware backends.</td></tr>
+            <tr><th scope="row">Errors</th><td>Status codes are stable categories. Synchronous details are thread-local to the context; event results carry structured subsystem, device code, trace ID, and bounded message text.</td><td>Firmware fault, timeout, stale calibration, cancellation, and incompatibility map consistently across backends.</td></tr>
+            <tr><th scope="row">Versioning</th><td>The caller initializes <code>struct_size</code> and <code>api_version</code>; the library copies input strings and ignores compatible unknown trailing fields.</td><td>Old header/new library and new header/old library compatibility matrix plus malformed-size tests.</td></tr>
+            <tr><th scope="row">Tensor binding</th><td>Executable metadata fixes input/output index, name, type, shape, and byte size. Every binding validates index, offset, size, and memory compatibility before enqueue.</td><td>Wrong type/shape/order, undersized buffer, overlap, and stale-handle tests fail before device work begins.</td></tr>
+            <tr><th scope="row">Device state</th><td>The trusted <code>.acal</code> bundle is signature-, family-, schema-, age-, and temperature-checked before executable load and programming.</td><td>Wrong serial/family, expired calibration, revoked signature, and remap-capacity failures are reason-coded.</td></tr>
+            <tr><th scope="row">Memory</th><td>v0 exposes allocated host-visible, pinned, and device-local buffers with blocking read/write convenience calls. Zero-copy import is added only with explicit ownership, coherence, and synchronization rules.</td><td>Alignment, bounds, DMA direction, cache maintenance, and IOMMU isolation tests.</td></tr>
+            <tr><th scope="row">Cancellation</th><td>Cancellation is best-effort and reports whether execution stopped, completed, or required reset.</td><td>Cancel before dispatch, during DMA, during MVM, and after completion.</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="section-heading top-gap">
+        <h3>Python should expose the same lifecycle without hiding events or reports</h3>
+      </div>
+      <div class="code-panel">
+        <header><strong>Python compile and run</strong><span>One obvious path from ONNX to a simulator or device</span></header>
+        <pre><code>from acim_sdk import Compiler, CompileOptions, Context, TargetProfile
+
+target = TargetProfile.load("targets/rev_b.atarget", "targets/rev_b.achar")
+compiler = Compiler(target)
+
+artifact, report = compiler.compile_onnx(
+    "models/linear.onnx",
+    model_calibration="build/linear.qcal",
+    options=CompileOptions(
+        accuracy_budget=0.005,
+        latency_target_us=100,
+        allow_digital_fallback=True,
+        save_intermediate_ir="build/ir",
+    ),
+)
+artifact.save("build/linear.acx")
+report.save("build/linear.compile.json")
+
+with Context(backend="functional") as context:
+    device = context.open_device(0)
+    session = device.load("build/linear.acx")
+    output = session.run({"input": input_tensor})
+
+with Context(backend="device") as context:
+    device = context.open_device(0)
+    session = device.load("build/linear.acx")
+    event = session.submit({"input": input_tensor})
+    output = event.result(timeout=1.0)
+    event.trace().save("build/linear.atrace")</code></pre>
+      </div>
+    </section>
+
+    <section class="section" id="hal">
+      <div class="section-heading">
+        <p class="eyebrow">HAL and backends</p>
+        <h2>Make simulation and silicon execute the same artifact through the same internal interface</h2>
+      </div>
+      <div class="code-panel">
+        <header><strong>C++ HAL boundary</strong><span>Internal interface; the C ABI remains the public contract</span></header>
+        <pre><code>class Device {
+ public:
+  virtual ~Device() = default;
+  virtual StatusOr&lt;Capabilities&gt; QueryCapabilities() = 0;
+  virtual Status BindDeviceState(const DeviceState&amp;) = 0;
+  virtual StatusOr&lt;ExecutableHandle&gt; Load(const Artifact&amp;) = 0;
+  virtual StatusOr&lt;BufferHandle&gt; Allocate(const BufferDesc&amp;) = 0;
+  virtual StatusOr&lt;EventHandle&gt; Submit(
+      QueueId, ExecutableHandle, Span&lt;BufferBinding&gt;, const RunPolicy&amp;) = 0;
+  virtual Status Wait(EventHandle, Duration timeout) = 0;
+  virtual StatusOr&lt;Trace&gt; ReadTrace(EventHandle) = 0;
+  virtual Status Recover(const RecoveryRequest&amp;) = 0;
+};
+
+class Backend {
+ public:
+  virtual ~Backend() = default;
+  virtual StatusOr&lt;std::vector&lt;DeviceInfo&gt;&gt; Enumerate() = 0;
+  virtual StatusOr&lt;std::unique_ptr&lt;Device&gt;&gt; Open(DeviceId) = 0;
+};</code></pre>
+      </div>
+      <div class="table-wrap top-gap">
+        <table>
+          <thead><tr><th scope="col">Backend</th><th scope="col">Purpose</th><th scope="col">Must model</th><th scope="col">Must not claim</th><th scope="col">Exit criterion</th></tr></thead>
+          <tbody>
+            <tr><th scope="row">Functional</th><td>Bring up artifact, commands, memory, and exact quantized semantics quickly.</td><td>Shapes, types, saturation, rounding, slices, reconstruction, dependencies, fallback</td><td>Analog accuracy, timing, energy, area, or silicon behavior</td><td>Bit-exact against quantized reference for every supported operation</td></tr>
+            <tr><th scope="row">Statistical analog</th><td>Study accuracy sensitivity and hardware-aware training.</td><td>Programming error, noise, ADC/DAC bounds, drift, IR drop, sign mapping, variation distributions</td><td>Cycle latency or full-chip energy unless explicitly modeled and correlated</td><td>Error distributions match held-out device traces within declared confidence</td></tr>
+            <tr><th scope="row">Cycle/resource</th><td>Predict schedule, utilization, queueing, bandwidth, latency, and energy components.</td><td>Firmware phases, SRAM/NoC, converters, DMA, overlap, contention, fallback, counters</td><td>Task accuracy beyond inputs supplied by the numerical model</td><td>Kernel and model timelines correlate with RTL/C++ model and silicon measurements</td></tr>
+            <tr><th scope="row">Hardware</th><td>Execute on the real driver/firmware/device stack.</td><td>All ABI validation, memory, queues, calibration binding, faults, telemetry, recovery</td><td>Support not present in the queried firmware/device capabilities</td><td>Same artifact passes differential, stress, PVT, reset, and long-run tests</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="callout top-gap">
+        <p>
+          <strong>Adapter strategy:</strong> after license and dependency review, use <a href="https://github.com/IBM/aihwkit">AIHWKit</a> or
+          <a href="https://github.com/sandialabs/cross-sim">CrossSim</a> behind the statistical backend, not as the
+          public SDK. Translate the target characterization into their parameters and retain the adapter/version in
+          every report so results remain reproducible when those projects evolve.
+        </p>
+      </div>
+    </section>
+
+    <section class="section" id="artifact">
+      <div class="section-heading">
+        <p class="eyebrow">Executable format</p>
+        <h2>Use a schema with explicit compatibility rules, not an opaque binary blob</h2>
+      </div>
+      <div class="code-panel">
+        <header><strong>Illustrative FlatBuffer schema</strong><span>Proposed minimum; field IDs protect parallel schema evolution</span></header>
+        <pre><code>namespace acim.artifact;
+
+table Version {
+  major:ushort (id: 0);
+  minor:ushort (id: 1);
+  patch:uint   (id: 2);
+}
+
+table TargetRequirements {
+  device_family:string        (id: 0);
+  revision_min:uint           (id: 1);
+  revision_max:uint           (id: 2);
+  firmware_abi:Version        (id: 3);
+  calibration_schema:Version (id: 4);
+  characterization_hash:[ubyte] (id: 5);
+  required_features:[string]  (id: 6);
+}
+
+table Executable {
+  schema:Version                    (id: 0);
+  build_id:string                   (id: 1);
+  model_hash:[ubyte]                (id: 2);
+  target:TargetRequirements         (id: 3);
+  graph:[ubyte]                     (id: 4);
+  constants:[ubyte]                 (id: 5);
+  weight_program:[ubyte]            (id: 6);
+  command_streams:[ubyte]           (id: 7);
+  digital_kernels:[ubyte]           (id: 8);
+  memory_plan:[ubyte]               (id: 9);
+  numerical_contract:[ubyte]        (id: 10);
+  recovery_policy:[ubyte]           (id: 11);
+  debug_map:[ubyte]                 (id: 12);
+  compile_report:[ubyte]            (id: 13);
+  signature:[ubyte]                 (id: 14);
+}
+
+root_type Executable;
+file_identifier "ACIX";</code></pre>
+      </div>
+      <div class="table-wrap top-gap">
+        <table>
+          <thead><tr><th scope="col">Compatibility rule</th><th scope="col">Required behavior</th></tr></thead>
+          <tbody>
+            <tr><th scope="row">Schema major</th><td>Mismatch is rejected unless an explicit offline converter exists.</td></tr>
+            <tr><th scope="row">Schema minor</th><td>Readers accept older compatible fields; optional new fields use defaults and feature checks.</td></tr>
+            <tr><th scope="row">Firmware ABI</th><td>Major must match; minor compatibility follows queried feature/opcode support.</td></tr>
+            <tr><th scope="row">Target revision</th><td>Must fall in the compiled range and expose every required physical capability.</td></tr>
+            <tr><th scope="row">Characterization</th><td>Hash must be recognized by the runtime policy; unknown or revoked profiles require recompile.</td></tr>
+            <tr><th scope="row">Device state</th><td>Calibration schema, device family, serial signature, age, and temperature policy are checked at load.</td></tr>
+            <tr><th scope="row">Schema CI</th><td>Run <code>flatc --conform</code> against the previous released schema and round-trip old artifacts.</td></tr>
+            <tr><th scope="row">Security</th><td>Verify hashes/signatures before programming; firmware independently validates every descriptor and bound.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="section" id="firmware">
+      <div class="section-heading">
+        <p class="eyebrow">Runtime and firmware</p>
+        <h2>Make state transitions and recovery observable</h2>
+      </div>
+      <div class="engineering-flow six" aria-label="Analog CIM runtime state machine">
+        <article class="flow-step"><b>Closed</b><strong>No ownership</strong><span>Device handle absent; no mapped memory or pending work.</span></article>
+        <article class="flow-step"><b>Discovered</b><strong>Capabilities known</strong><span>Revision, ABI, features, memory, and health queried.</span></article>
+        <article class="flow-step"><b>Bound</b><strong>Calibration accepted</strong><span>Device state signature, age, temperature, and remaps valid.</span></article>
+        <article class="flow-step"><b>Loaded</b><strong>Executable ready</strong><span>Resources allocated; weights programmed and verified.</span></article>
+        <article class="flow-step"><b>Running</b><strong>Queues active</strong><span>Requests execute asynchronously with trace correlation.</span></article>
+        <article class="flow-step"><b>Degraded</b><strong>Recovery required</strong><span>Repeat, remap, recalibrate, refresh, fallback, reset, or fail.</span></article>
+      </div>
+      <div class="table-wrap top-gap">
+        <table>
+          <thead><tr><th scope="col">Command class</th><th scope="col">Examples</th><th scope="col">Firmware validation</th><th scope="col">Completion evidence</th></tr></thead>
+          <tbody>
+            <tr><th scope="row">Memory</th><td>DMA copy, fill, bind, release</td><td>IOMMU handle, bounds, alignment, direction, overlap, lifetime</td><td>Bytes, cycles, fault address, queue/event IDs</td></tr>
+            <tr><th scope="row">Weight lifecycle</th><td>Erase, program, verify, commit, rollback</td><td>Array ownership, recipe ID, voltage/current limits, endurance policy, transaction state</td><td>Program distribution, retries, failed cells, remap, image hash</td></tr>
+            <tr><th scope="row">Compute</th><td>Input encode, MVM phase, ADC read, reconstruct, digital kernel</td><td>Array/range/mode support, current bound, dependencies, buffers, calibration class</td><td>Phases, saturation, ADC range, cycles, output checksum</td></tr>
+            <tr><th scope="row">Health</th><td>Read sensors, self-test, calibrate, refresh</td><td>Privilege, idle state, thermal and power envelope, accepted procedure version</td><td>Calibration ID, temperature, weak resources, health vector, expiry</td></tr>
+            <tr><th scope="row">Control</th><td>Barrier, event, cancel, timeout, reset</td><td>Queue ownership, dependency validity, safe reset point, outstanding DMA/programming</td><td>Final state, canceled/completed work, data validity, reset reason</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="section" id="frameworks">
+      <div class="section-heading">
+        <p class="eyebrow">Framework integration</p>
+        <h2>Add framework plugins only after the standalone contract works</h2>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th scope="col">Stage</th><th scope="col">Integration</th><th scope="col">What to implement</th><th scope="col">Why this order</th></tr></thead>
+          <tbody>
+            <tr><th scope="row">MVP</th><td>Standalone ONNX CLI and Python compiler</td><td>Checker, shape inference, MatMul/Gemm import, static shapes, compile, inspect, run</td><td>Smallest dependency surface; deterministic artifacts; easy golden testing</td></tr>
+            <tr><th scope="row">Stage 2</th><td>ONNX Runtime plugin EP</td><td><code>GetCapability</code>, <code>Compile</code>, allocator/stream if needed, compatibility info, session options</td><td>Provides heterogeneous CPU fallback and a production application API without owning the whole framework</td></tr>
+            <tr><th scope="row">Stage 3</th><td>PyTorch export through ONNX</td><td>Document supported export profile, dynamic-shape limits, QDQ handling, and reproducible model preprocessing</td><td>Reuses the proven ONNX path instead of creating a second importer</td></tr>
+            <tr><th scope="row">Stage 4</th><td>StableHLO/PJRT plugin</td><td>PJRT C API client/device/buffer/executable/event behavior and StableHLO compiler entry</td><td>Useful for JAX/PyTorch-XLA, but larger ABI, async, sharding, and packaging surface</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="callout top-gap">
+        <p>
+          <a href="https://onnxruntime.ai/docs/execution-providers/add-execution-provider.html">Since ONNX Runtime 1.23,
+          its official guidance is to implement a new provider as a plugin EP</a>. The separate
+          <a href="https://onnxruntime.ai/docs/execution-providers/plugin-ep-libraries/development.html">plugin development contract</a>
+          asks <code>GetCapability()</code> which graph regions are supported and <code>Compile()</code> to produce
+          executable compute functions, while another provider can handle fallback. That is a good second integration
+          after the standalone compiler is stable.
+        </p>
+      </div>
+      <div class="code-panel top-gap">
+        <header><strong>Execution Provider responsibilities</strong><span>Keep the plugin thin</span></header>
+        <pre><code>GetCapability(graph, target):
+  validate shapes and dtypes
+  ask libacim_compiler for legal candidate regions
+  subtract regions whose boundary cost or error budget fails
+  return reason-coded supported subgraphs
+
+Compile(subgraphs):
+  compile each accepted subgraph to .acx bytes
+  retain compatibility metadata and cache key
+  create compute callback that calls the public acim runtime API
+
+Compute(inputs, outputs):
+  bind ORT buffers or copy through declared memory rules
+  submit asynchronously where the EP contract permits
+  translate acim status/faults to ORT status
+  never implement quantization, mapping, or driver logic in the EP</code></pre>
+      </div>
+    </section>
+
+    <section class="section" id="first-slice">
+      <div class="section-heading">
+        <p class="eyebrow">First buildable vertical slice</p>
+        <h2>Prove one exact MatMul from ONNX to artifact to simulator</h2>
+        <p class="section-note">
+          Start with <code>[1,128] x [128,64]</code>, INT8 inputs and weights, INT32 accumulation, static shapes,
+          no analog noise, one functional backend, and no framework plugin. This deliberately tests software contracts
+          before physical fidelity.
+        </p>
+      </div>
+      <div class="reuse-flow" aria-label="First Analog CIM SDK vertical slice">
+        <article class="flow-step"><b>1</b><strong>Create ONNX model</strong><span>Known constants and reference output</span></article>
+        <article class="flow-step"><b>2</b><strong>Import to MLIR</strong><span>Validated shape and MVM semantics</span></article>
+        <article class="flow-step"><b>3</b><strong>Lower plan</strong><span>Quant contract and logical slices</span></article>
+        <article class="flow-step"><b>4</b><strong>Map virtual array</strong><span>One target descriptor, no faults</span></article>
+        <article class="flow-step"><b>5</b><strong>Serialize <code>.acx</code></strong><span>Version, program, commands, debug map</span></article>
+        <article class="flow-step"><b>6</b><strong>Run functional HAL</strong><span>Public C API, buffers, queue, event</span></article>
+        <article class="flow-step"><b>7</b><strong>Compare and trace</strong><span>Bit-exact output and inspectable evidence</span></article>
+      </div>
+      <div class="code-panel top-gap">
+        <header><strong>Developer loop</strong><span>Commands the repository should support before adding Conv or hardware</span></header>
+        <pre><code>cmake -G Ninja -S . -B build \
+  -DACIM_ENABLE_ONNX=ON \
+  -DACIM_ENABLE_FUNCTIONAL_BACKEND=ON
+cmake --build build
+ctest --test-dir build --output-on-failure
+
+python examples/matmul/create_model.py --output build/matmul.onnx
+acim-compile build/matmul.onnx \
+  --target testdata/virtual.atarget \
+  --characterization testdata/ideal.achar \
+  --emit-ir build/ir \
+  --report build/matmul.compile.json \
+  -o build/matmul.acx
+
+acim-inspect build/matmul.acx --all
+acim-run build/matmul.acx \
+  --backend functional \
+  --inputs testdata/matmul_input.npz \
+  --golden testdata/matmul_golden.npz \
+  --trace build/matmul.atrace
+acim-profile build/matmul.atrace --summary</code></pre>
+      </div>
+      <div class="callout verdict top-gap">
+        <p>
+          <strong>Definition of done:</strong> a clean checkout builds without device hardware; the same <code>.acx</code>
+          is inspected and executed through the public C API; output is bit-exact; malformed artifacts and incompatible
+          targets fail with stable status codes; IR, compile report, command list, and trace IDs identify the original ONNX node.
+        </p>
+      </div>
+    </section>
+
+    <section class="section" id="roadmap" data-progress="acim-sdk-roadmap">
+      <div class="section-heading">
+        <p class="eyebrow">Implementation roadmap</p>
+        <h2>Expand only after each boundary has an executable test</h2>
+      </div>
+      <div class="progress-panel" aria-live="polite">
+        <div class="progress-track"><div class="progress-bar" data-progress-bar role="progressbar" aria-label="ACiM SDK implementation progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"></div></div>
+        <span class="progress-value" data-progress-value>0 / 10 complete</span>
+      </div>
+      <div class="lab-list">
+        <label class="lab-item"><input type="checkbox" data-step="contracts"><span><strong>1. Freeze contracts</strong><span>C API v0, target/characterization/device-state schemas, artifact v0, command v0, and error taxonomy.</span></span></label>
+        <label class="lab-item"><input type="checkbox" data-step="functional"><span><strong>2. Functional backend</strong><span>Exact quantized MatMul, slices, reconstruction, buffers, queues, events, and traces.</span></span></label>
+        <label class="lab-item"><input type="checkbox" data-step="compiler"><span><strong>3. One-op compiler</strong><span>ONNX MatMul/Gemm import, MLIR dialects, verifier, lowering, deterministic artifact, and inspector.</span></span></label>
+        <label class="lab-item"><input type="checkbox" data-step="analog"><span><strong>4. Statistical analog backend</strong><span>Measured/noise models, ADC/DAC bounds, bit slicing, sign mapping, seeds, distributions, and correlation report.</span></span></label>
+        <label class="lab-item"><input type="checkbox" data-step="cycle"><span><strong>5. Cycle/resource backend</strong><span>DMA, SRAM, NoC, converters, phases, digital reconstruction, queue overlap, counters, and energy components.</span></span></label>
+        <label class="lab-item"><input type="checkbox" data-step="partition"><span><strong>6. Partition and fallback</strong><span>Multiple operations, boundary cost, digital reference backend, support reasons, and mixed execution.</span></span></label>
+        <label class="lab-item"><input type="checkbox" data-step="ort"><span><strong>7. ONNX Runtime plugin</strong><span>Plugin EP discovery, capability, compile, compatibility, allocator/stream policy, fallback, and EP tests.</span></span></label>
+        <label class="lab-item"><input type="checkbox" data-step="hardware"><span><strong>8. Hardware HAL</strong><span>Driver/firmware ABI, device state, program/verify, DMA, queues, interrupts, faults, reset, and trace correlation.</span></span></label>
+        <label class="lab-item"><input type="checkbox" data-step="models"><span><strong>9. Model expansion</strong><span>Conv and attention projections, dynamic-shape policy, calibration workflow, full datasets, and analog coverage.</span></span></label>
+        <label class="lab-item"><input type="checkbox" data-step="release"><span><strong>10. Product qualification</strong><span>PVT, chip populations, aging, endurance, recovery, security, performance scenarios, documentation, and release matrix.</span></span></label>
+      </div>
+    </section>
+
+    <section class="section" id="testing">
+      <div class="section-heading">
+        <p class="eyebrow">Testing and CI</p>
+        <h2>Separate fast deterministic gates from statistical and hardware qualification</h2>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th scope="col">CI lane</th><th scope="col">Runs</th><th scope="col">Required evidence</th><th scope="col">Failure blocks</th></tr></thead>
+          <tbody>
+            <tr><th scope="row">Every change</th><td>Formatting, static analysis, schema conform, unit tests, IR verifier, exact golden operations</td><td>Deterministic logs, seeds, artifacts, and compiler pass failures</td><td>Merge</td></tr>
+            <tr><th scope="row">Nightly simulator</th><td>Model corpus, statistical sweeps, cycle/resource regressions, memory/concurrency stress</td><td>Accuracy distributions, latency/energy deltas, coverage, first divergence</td><td>Release candidate</td></tr>
+            <tr><th scope="row">Hardware presubmit</th><td>Small device pool, load/run/reset, firmware compatibility, differential ops, telemetry</td><td>Device IDs, firmware/calibration versions, traces, fault and reset reports</td><td>Hardware-facing merge</td></tr>
+            <tr><th scope="row">Qualification</th><td>Chip/lot population, PVT, thermal cycling, drift, retention, endurance, long-run service load</td><td>Mean/tails, rejected devices, remap, recalibration, recovery, accuracy and performance distributions</td><td>Product release</td></tr>
+            <tr><th scope="row">Benchmark</th><td>Same application path for accuracy and performance, single-stream and throughput scenarios</td><td>Complete system configuration, preprocessing, datasets, calibration, power, latency percentiles</td><td>Published claim</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="proof-grid top-gap">
+        <article><b>Correctness</b><strong>Exact before approximate</strong><p>Functional backend must be bit-exact before analog tolerance is introduced.</p></article>
+        <article><b>Reproducibility</b><strong>Hash every input</strong><p>Model, data, target, characterization, compiler, schema, seed, and device state.</p></article>
+        <article><b>Correlation</b><strong>First divergent boundary</strong><p>Framework, quantized, statistical, cycle, RTL/C++, firmware, and silicon checkpoints.</p></article>
+        <article><b>Performance</b><strong>Measure end to end</strong><p>Programming, conversion, fallback, memory, NoC, host, idle, and recovery costs.</p></article>
+      </div>
+    </section>
+
+    <section class="section" id="sources">
+      <div class="section-heading">
+        <p class="eyebrow">Primary references and explicit limits</p>
+        <h2>Use these projects for contracts and evidence, not as proof of an iHW implementation</h2>
+      </div>
+      <div class="source-grid">
+        <article class="source-card"><a href="https://docs.tenstorrent.com/tt-mlir/overview.html">TT-MLIR architecture</a><span>Official high-level and target dialect layering used as a compiler-structure reference.</span></article>
+        <article class="source-card"><a href="https://docs.tenstorrent.com/tt-mlir/optimizer.html">TT-MLIR optimizer</a><span>Official legal-layout, operation-model, memory-layout, and configuration-search concepts.</span></article>
+        <article class="source-card"><a href="https://docs.tenstorrent.com/tt-mlir/ttrt.html">Tenstorrent <code>ttrt</code></a><span>Official artifact inspect/run/check/perf/debug and strict-versioning workflow.</span></article>
+        <article class="source-card"><a href="https://docs.tenstorrent.com/tt-mlir/flatbuffers.html">TT-MLIR artifact formats</a><span>Official target description and compiled executable packaging reference.</span></article>
+        <article class="source-card"><a href="https://mlir.llvm.org/docs/DefiningDialects/Operations/">MLIR ODS</a><span>Official declarative operation, attribute, verifier, parser, printer, and generated-code specification.</span></article>
+        <article class="source-card"><a href="https://mlir.llvm.org/docs/DialectConversion/">MLIR dialect conversion</a><span>Official legality target, rewrite pattern, and type-conversion framework.</span></article>
+        <article class="source-card"><a href="https://onnx.ai/onnx/api/checker.html">ONNX checker</a><span>Official model validation API used before import.</span></article>
+        <article class="source-card"><a href="https://onnx.ai/onnx/repo-docs/ShapeInference.html">ONNX shape inference</a><span>Official shape/symbol propagation capabilities and documented limitations.</span></article>
+        <article class="source-card"><a href="https://onnxruntime.ai/docs/execution-providers/add-execution-provider.html">Adding an ONNX Runtime provider</a><span>Official recommendation to implement new providers as plugin EPs since ONNX Runtime 1.23.</span></article>
+        <article class="source-card"><a href="https://onnxruntime.ai/docs/execution-providers/plugin-ep-libraries/development.html">ONNX Runtime plugin EP</a><span>Official provider discovery, capability, compile, allocator, stream, compatibility, and concurrency contracts.</span></article>
+        <article class="source-card"><a href="https://openxla.org/xla/pjrt/pjrt_integration">PJRT plugin integration</a><span>Official C API integration and testing path; recommended here only after the MVP and ORT integration.</span></article>
+        <article class="source-card"><a href="https://iree.dev/developers/design-docs/hip-hal-driver/">IREE HAL driver design</a><span>Official driver/device/buffer/executable/command-buffer/event/semaphore structure used as a HAL reference.</span></article>
+        <article class="source-card"><a href="https://github.com/IBM/aihwkit">IBM AIHWKit</a><span>Open-source analog numerical simulation, ADC/DAC bounds, noise, mapping, and hardware-aware training.</span></article>
+        <article class="source-card"><a href="https://github.com/sandialabs/cross-sim">Sandia CrossSim</a><span>Open-source crossbar accuracy simulation with device, ADC, parasitic, slicing, sign, and array-size models; explicitly not a speed/energy/area model.</span></article>
+        <article class="source-card"><a href="https://flatbuffers.dev/evolution/">FlatBuffers schema evolution</a><span>Official field-order/ID, deprecation, and <code>flatc --conform</code> compatibility rules.</span></article>
+        <article class="source-card"><a href="https://github.com/mlcommons/inference_policies/blob/master/inference_rules.adoc">MLPerf Inference rules</a><span>Primary reference for system-under-test, quality, latency/throughput scenarios, reproducibility, and audit boundaries.</span></article>
+        <article class="source-card"><a href="analog-cim-ihw-patents.html">iHW patent study</a><span>Patent mechanisms and evidence limits that motivate, but do not disclose, this software design.</span></article>
+        <article class="source-card"><a href="analog-cim-tenstorrent-reuse.html">Tenstorrent reuse guide</a><span>Repository-level learn/adapt/replace decisions and license/evidence gates.</span></article>
+        <article class="source-card"><a href="analog-cim-hardware-software-codesign.html">Hardware/software co-design</a><span>Physical bottlenecks, measured-paper solutions, lifecycle, and analog/digital partition context.</span></article>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <p>Implementation reference. Proposed APIs and file names are labeled as design choices; vendor disclosures and external project capabilities are not conflated with this architecture.</p>
+    <div class="footer-links">
+      <a href="npu.html#analog-cim">Back to the NPU learning path</a>
+      <a href="https://github.com/buicongnguyen/NPU">Source</a>
+    </div>
+  </footer>
+</body>
+</html>
