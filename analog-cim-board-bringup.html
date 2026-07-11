@@ -7,7 +7,7 @@
   <title>Analog CIM Board Bring-Up | NPU Study Guide</title>
   <link rel="stylesheet" href="analog-cim.css">
   <link rel="stylesheet" href="npu-engineering.css">
-  <link rel="stylesheet" href="analog-cim-bringup.css">
+  <link rel="stylesheet" href="analog-cim-bringup.css?v=20260712-2">
   <script src="npu-engineering.js" defer></script>
 </head>
 <body>
@@ -1599,67 +1599,232 @@ readl(adev-&gt;bar0 + ACIM_DEVICE_STATUS);</code></pre>
     <section class="section" id="repository">
       <div class="section-heading">
         <p class="eyebrow">Implementation repository</p>
-        <h2>Generate shared protocol definitions and test each boundary independently</h2>
+        <h2>The skeleton is reasonable; make code, artifacts, data, and loaders traceable</h2>
+        <p class="section-note">
+          A directory tree is only the first layer of the design. Every owned source path should produce a named build
+          target or validated data file, identify who loads it, state how long it remains valid, and name the smallest
+          test that proves the boundary. The separate <a href="accelerator-repository-blueprint.html">repository blueprint</a>
+          covers CMake, compilers, CI, GoogleTest, and contribution mechanics in greater depth; this section maps those
+          mechanics onto ACiM board boot and model execution.
+        </p>
       </div>
       <div class="term-reminder" role="note" aria-label="Terminology used in the implementation repository section">
         <strong>Terms here</strong>
         <span><abbr class="term" title="Register-Transfer Level">RTL</abbr> = Register-Transfer Level hardware</span>
         <span><abbr class="term" title="User-space Application Programming Interface">UAPI</abbr> = kernel/userspace interface files</span>
         <span><abbr class="term" title="Continuous Integration">CI</abbr> = Continuous Integration</span>
+        <span>Build target = named output in the build graph</span>
+        <span>Loader = component that places an artifact into its execution context</span>
         <span>Generated code = mechanical output from the protocol schema</span>
       </div>
-      <div class="repository-tree">
+      <div class="callout top-gap">
+        <p>
+          <strong>Repository verdict:</strong> a monorepo is reasonable for the first end-to-end vertical slice because
+          protocol, simulator, compiler, runtime, KMD, firmware, tools, and tests can change atomically. Split a component
+          only when ownership, access control, release cadence, or build tooling requires it. A split repository must
+          consume a versioned protocol package and run the same cross-version compatibility suite before release.
+        </p>
+      </div>
+      <div class="repository-tree source-tree">
         <div class="code-panel">
-          <header><strong>Proposed source layout</strong><span>One protocol schema, several generated consumers</span></header>
+          <header><strong>Proposed source layout</strong><span>Source, generated contracts, platform integration, tests, and packaging have different owners</span></header>
           <pre><code>acim-stack/
-  spec/
-    registers.yaml
-    queue.yaml
-    firmware_abi.yaml
-    capabilities.schema.json
-  generated/
-    include/hw/acim_regs.h
-    include/hw/acim_queue.h
-    rtl/acim_regs_pkg.sv
-    docs/registers.md
-  include/
-    uapi/linux/acim_accel.h
-    acim/acim.h
-  driver/kmd/
-    pci.c  uapi.c  context.c  memory.c
-    queue.c  irq.c  firmware.c  reset.c  trace.c
-  runtime/umd/
-    device.cpp  buffer.cpp  queue.cpp  artifact.cpp
-    backends/kmd_linux.cpp  backends/vfio_lab.cpp
-  firmware/
-    boot/  mailbox/  scheduler/  dma/  analog/  digital/
-    health/  trace/  tests/
-  sim/
-    functional/  analog/  cycle/  pcie_model/
-  compiler/
-    dialect/  transforms/  target/  packaging/
-  tools/
-    acim-info  acim-fw  acim-memtest  acim-trace
-    acim-health  acim-support-bundle
-  tests/
-    uapi/  protocol/  simulator/  kmd/  firmware/
-    differential/  fault-injection/  yolo/</code></pre>
+|-- CMakeLists.txt
+|-- CMakePresets.json
+|-- .github/
+|   `-- workflows/                   # fast, hardware, nightly, release lanes
+|-- cmake/
+|   `-- toolchains/                 # host and controller cross builds
+|-- configs/
+|   |-- targets/chip-rev.yaml       # arrays, SRAM, ISA, precision, costs
+|   |-- boards/pcie-card.yaml       # IDs, BARs, DMA, MSI-X, clocks
+|   |-- models/yolo.yaml            # preprocessing, shapes, accuracy gates
+|   `-- test-matrices/              # simulator, FPGA, board, PVT lanes
+|-- spec/                            # authoritative binary contracts
+|   |-- registers.yaml
+|   |-- queue.yaml
+|   |-- firmware_abi.yaml
+|   |-- artifact.schema.json
+|   |-- calibration.schema.json
+|   `-- trace.schema.json
+|-- tools/codegen/                   # schema validation and emitters
+|-- generated/                       # optional distributable generated output
+|   |-- include/hw/
+|   |-- rtl/
+|   |-- firmware/
+|   `-- docs/
+|-- include/
+|   |-- uapi/linux/acim_accel.h      # stable userspace/kernel contract
+|   `-- acim/                        # supported SDK and HAL interfaces
+|-- compiler/
+|   |-- import/  dialect/  transforms/
+|   `-- target/  scheduling/  packaging/
+|-- runtime/umd/
+|   |-- device.cpp  buffer.cpp  queue.cpp  artifact.cpp
+|   `-- backends/kmd_linux.cpp  fake.cpp  cosim.cpp
+|-- driver/kmd/
+|   |-- pci.c  uapi.c  context.c  memory.c  queue.c  irq.c
+|   `-- firmware.c  reset.c  trace.c  health.c  Kbuild
+|-- firmware/
+|   |-- boot/  mailbox/  scheduler/  dma/
+|   `-- analog/  digital/  health/  trace/  tests/
+|-- kernels/
+|   |-- analog/                      # array programs and descriptors
+|   `-- digital/                     # DSP/vector/scalar fallback kernels
+|-- sim/
+|   |-- functional/  analog/  cycle/
+|   `-- pcie_model/                  # BAR, DMA, MSI-X, reset and fault model
+|-- platforms/
+|   |-- linux-pcie/                  # udev, module config, packages
+|   `-- embedded/board-name/         # DTB, Buildroot/Yocto, boot scripts
+|-- apps/
+|   |-- acim-smoke/
+|   `-- acim-yolo/
+|-- models/
+|   |-- manifests/  quantization/
+|   `-- golden/                      # small redistributable test tensors
+|-- calibration/
+|   `-- fixtures/                    # synthetic/non-production device profiles
+|-- tools/
+|   |-- acim-info/  acim-fw/  acim-memtest/
+|   `-- acim-trace/  acim-health/  acim-support-bundle/
+|-- scripts/
+|   |-- build/  test/  package/
+|   `-- ci/                          # orchestration, not duplicated test logic
+|-- tests/
+|   |-- unit/  contract/  smoke/  integration/
+|   |-- differential/  fault-injection/  end-to-end/
+|   `-- performance/  soak/  qualification/
+|-- packaging/
+`-- docs/</code></pre>
         </div>
         <div class="tree-notes">
           <div class="tree-note"><strong><code>spec/</code> is authoritative</strong><span>CI regenerates headers and fails on a diff. Every register includes access, owner, reset value, side effects and revision.</span></div>
-          <div class="tree-note"><strong><code>generated/</code> is mechanical</strong><span>RTL, KMD, firmware, simulator and documentation consume identical constants and field definitions.</span></div>
+          <div class="tree-note"><strong><code>generated/</code> is mechanical</strong><span>Generate into the build tree by default. Keep a source-tree mirror only when separate RTL/KMD builds or source packages require it; CI must regenerate with no diff. Generator version and schema hash travel with the output.</span></div>
           <div class="tree-note"><strong><code>uapi/</code> is append-only in behavior</strong><span>Run ABI layout checks on 32-bit and 64-bit builds; explicit reserved fields replace compiler padding.</span></div>
+          <div class="tree-note"><strong><code>configs/</code> is validated product data</strong><span>A chip target, board, model, and test matrix have schemas, units, revisions, and compatibility tests. They are not informal command-line flags.</span></div>
+          <div class="tree-note"><strong><code>platforms/</code> owns boot integration</strong><span>Keep PCIe packages and embedded BSP files outside runtime logic. The same UMD API should work after either platform reaches READY.</span></div>
           <div class="tree-note"><strong><code>sim/pcie_model</code> comes before the board</strong><span>Model BAR side effects, ring wrap, posted writes, interrupts, reset epochs, malformed commands and DMA faults.</span></div>
           <div class="tree-note"><strong><code>tools/</code> are release deliverables</strong><span>Enumeration, firmware, memory test, trace, health and support bundle are necessary to debug customer systems.</span></div>
-          <div class="tree-note"><strong><code>tests/yolo</code> stores provenance</strong><span>Model and dataset version, preprocessing, quantization, calibration, artifact hash, board profile and expected metrics.</span></div>
+          <div class="tree-note"><strong><code>models/</code> stores provenance, not arbitrary datasets</strong><span>Record model/dataset versions, preprocessing, quantization statistics, artifact hash, board profile and expected metrics. Keep only permitted small golden inputs in Git.</span></div>
+          <div class="tree-note"><strong><code>calibration/</code> contains test fixtures only</strong><span>Model quantization data and per-chip analog calibration are different. Production chip profiles belong in the provisioning/service store, not source control.</span></div>
+          <div class="tree-note"><strong><code>out/</code> is ignored build output</strong><span>Never mix source with binaries, firmware, model artifacts, board images, traces, or test results. Package them from a reproducible preset and manifest.</span></div>
         </div>
+      </div>
+
+      <h3 class="subheading" id="repository-artifacts">Build output is a versioned handoff, not another source directory</h3>
+      <div class="repository-tree">
+        <div class="code-panel">
+          <header><strong>Illustrative output layout</strong><span>Produced below an ignored <code>out/&lt;preset&gt;/</code> directory or CI artifact store</span></header>
+          <pre><code>out/linux-x86_64-release/
+|-- host/
+|   |-- bin/acim-run
+|   |-- bin/acim-smi
+|   `-- lib/libacim_runtime.so
+|-- kmd/acim_accel.ko
+|-- device/
+|   |-- acim-fw.elf                  # optional programmable controller
+|   |-- acim-fw.bin
+|   |-- acim-fw.map
+|   `-- acim-fw.sym
+|-- generated/protocol-manifest.json
+|-- models/yolo-int8.acx
+|-- packages/acim-sdk.tar.zst
+`-- evidence/build-manifest.json
+
+out/edge-board-release/
+|-- images/sdcard.img
+|-- images/Image
+|-- images/board.dtb
+|-- images/rootfs.ext4
+`-- evidence/bsp-manifest.json</code></pre>
+        </div>
+        <div class="tree-notes">
+          <div class="tree-note"><strong>Host code</strong><span><code>acim-run</code>, <code>acim-smi</code>, and <code>libacim_runtime.so</code> execute on the Linux host CPU. They never execute inside the analog array.</span></div>
+          <div class="tree-note"><strong>Privileged host code</strong><span><code>acim_accel.ko</code> executes in the Linux kernel and owns PCIe, IOMMU, DMA mappings, interrupts, reset, and firmware loading.</span></div>
+          <div class="tree-note"><strong>Device control code</strong><span><code>acim-fw.elf/bin</code> executes on a device controller only when the hardware has a programmable CPU. Keep symbols and the link map for debug.</span></div>
+          <div class="tree-note"><strong>Model executable data</strong><span><code>yolo-int8.acx</code> contains target-specific commands, constants, weight placement, kernel references, metadata, and debug maps; it is loaded by the runtime.</span></div>
+          <div class="tree-note"><strong>Embedded host image</strong><span>The SD/eMMC image contains the host BSP and userspace. It is separate from device firmware and may be absent for a workstation PCIe card.</span></div>
+          <div class="tree-note"><strong>Evidence</strong><span>Every package records source commits, dirty state, compiler/tool versions, schema hashes, target/profile IDs, ABI ranges, and artifact hashes.</span></div>
+        </div>
+      </div>
+
+      <div class="pipeline-flow top-gap" role="group" aria-label="ACiM repository source to deployable artifact flow chart">
+        <div class="pipeline-stage host"><b>1. Select inputs</b><strong><code>spec/ + configs/</code></strong><span>Protocol schemas, chip target, board profile, model manifest, toolchain preset.</span></div>
+        <div class="pipeline-stage host"><b>2. Generate</b><strong><code>tools/codegen/</code></strong><span>Validate schemas; emit C/C++/firmware/RTL definitions, docs, hashes, and compatibility fixtures.</span></div>
+        <div class="pipeline-stage host"><b>3. Build host</b><strong>SDK + UMD + KMD</strong><span>CMake/Ninja builds userspace; Kbuild builds the module; package symbols and manifests.</span></div>
+        <div class="pipeline-stage digital"><b>4. Build device</b><strong>Firmware + kernels</strong><span>Cross-compile, link to the controller memory map, emit ELF/bin/map/symbols and size report.</span></div>
+        <div class="pipeline-stage analog"><b>5. Compile model</b><strong>ONNX to <code>.acx</code></strong><span>Use target and calibration inputs to lower, schedule, place, package, and preserve debug mapping.</span></div>
+        <div class="pipeline-stage host"><b>6. Package + prove</b><strong>Installable set</strong><span>Run contract/smoke tests; assemble host, device, model, optional BSP, and evidence manifests.</span></div>
+      </div>
+
+      <div class="table-wrap top-gap">
+        <table>
+          <thead><tr><th scope="col">Source owner</th><th scope="col">Named output</th><th scope="col">Loader / consumer</th><th scope="col">Validity lifetime</th><th scope="col">Smallest proof</th></tr></thead>
+          <tbody>
+            <tr><th scope="row"><code>spec/ + tools/codegen/</code></th><td><code>acim_protocol_codegen</code>: generated headers, RTL package, docs, protocol manifest</td><td>Compiler for KMD, UMD, firmware, simulator and RTL</td><td>Protocol version</td><td>Regenerate-with-no-diff plus cross-language encode/decode fixture</td></tr>
+            <tr><th scope="row"><code>driver/kmd/</code></th><td>Kbuild <code>modules</code>: <code>acim_accel.ko</code> and debug symbols; or built-in object</td><td>Linux module loader or kernel image link</td><td>Host boot/module load</td><td>Probe, query caps, remove, reprobe, and leak check</td></tr>
+            <tr><th scope="row"><code>firmware/ + kernels/</code></th><td><code>acim_firmware</code>, when present: controller ELF/bin/map and kernel package</td><td>KMD, remoteproc, boot ROM, or JTAG lab flow</td><td>Device boot epoch; kernels may be session resident</td><td>READY handshake plus no-op/admin queue command</td></tr>
+            <tr><th scope="row"><code>runtime/umd/</code></th><td><code>acim_runtime</code>: runtime library and HAL backends</td><td>Application dynamic loader</td><td>Host process/session</td><td>Same buffer/queue test against fake, co-sim, and KMD backends</td></tr>
+            <tr><th scope="row"><code>compiler/</code></th><td><code>acim-compile</code>: <code>.acx</code> executable artifact</td><td>Runtime validates and extracts command/program payloads for firmware</td><td>Target/profile compatibility; then session binding</td><td>Inspect, validate, deserialize, and execute one golden MVM</td></tr>
+            <tr><th scope="row"><code>platforms/embedded/</code></th><td><code>edge_board_image</code>: bootloader, kernel, DTB, rootfs and media image</td><td>Host boot ROM/bootloader</td><td>Embedded host boot/update slot</td><td>QEMU-supported BSP boot or physical serial boot to SDK health check</td></tr>
+            <tr><th scope="row"><code>calibration/fixtures/</code> plus external provisioning store</th><td>Test fixture or production per-device calibration/health profile</td><td>Provisioning tool, runtime and firmware</td><td>Chip, PVT range, age and calibration generation</td><td>Integrity, serial/profile match, known-answer operation, stale-profile rejection</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3 class="subheading" id="repository-boot-flow">Boot flow: code is loaded, then capabilities and mutable state are negotiated</h3>
+      <div class="pipeline-flow" role="group" aria-label="ACiM repository code and data flow during boot">
+        <div class="pipeline-stage host"><b>1. Host boot</b><strong><code>platforms/</code></strong><span>Embedded only: bootloader, Linux, rootfs and DTB. A workstation PCIe flow starts at KMD probe on its supported OS.</span></div>
+        <div class="pipeline-stage host"><b>2. KMD probe</b><strong><code>driver/kmd/pci.c</code></strong><span>Reads PCI IDs/BAR/caps and generated board constants; creates device state; configures DMA, IOMMU, MSI-X, reset and trace.</span></div>
+        <div class="pipeline-stage digital"><b>3. Device control</b><strong><code>driver/kmd/firmware.c</code></strong><span>Works with <code>firmware/boot/</code>; loads firmware when present, checks image/ABI, then starts the controller or verifies fixed RTL control.</span></div>
+        <div class="pipeline-stage digital"><b>4. Admin queues</b><strong><code>driver/kmd/memory.c</code></strong><span>Works with <code>queue.c</code>; allocates rings and exchanges IOVAs, depth, generation, vectors, heartbeat and trace clock.</span></div>
+        <div class="pipeline-stage host"><b>5. Publish UAPI</b><strong><code>driver/kmd/uapi.c</code></strong><span>Works with <code>health.c</code>; exposes the device only after READY and returns capabilities, health, calibration generation and ABI.</span></div>
+        <div class="pipeline-stage host"><b>6. Open runtime</b><strong><code>runtime/umd/device.cpp</code></strong><span>Queries caps; creates context/queue; records run identity; rejects incompatible SDK, firmware or target.</span></div>
+      </div>
+
+      <div class="table-wrap top-gap">
+        <table>
+          <thead><tr><th scope="col">Boot step</th><th scope="col">Executing code</th><th scope="col">Data entering</th><th scope="col">State produced</th><th scope="col">Failure evidence</th></tr></thead>
+          <tbody>
+            <tr><th scope="row">Host boot</th><td>Bootloader and Linux BSP</td><td>Boot image, DTB, rootfs configuration</td><td>PCIe root/platform bus, IOMMU, filesystems, services</td><td>Bootloader/earlycon/kernel serial log</td></tr>
+            <tr><th scope="row">Device discovery</th><td>KMD probe and reset modules</td><td>PCI config, BAR registers, generated board constants and live caps</td><td>Kernel device object, mapped BARs, DMA mask, IRQ vectors</td><td>Kernel tracepoint, AER, IOMMU and probe log</td></tr>
+            <tr><th scope="row">Control-plane start</th><td>Boot ROM, KMD firmware loader, optional controller firmware</td><td>Firmware bytes/hash, entry point, compatibility range</td><td>READY, boot epoch, firmware build/ABI, crash area</td><td>Mailbox stage, ROM UART, JTAG/GDB, crash buffer</td></tr>
+            <tr><th scope="row">Queue negotiation</th><td>KMD queue/memory plus firmware scheduler</td><td>Ring IOVAs, size, generation, MSI-X vector, context limits</td><td>Enabled admin/data queues and heartbeat</td><td>Queue indices, descriptor dump, IRQ cause, timeout stage</td></tr>
+            <tr><th scope="row">Userspace open</th><td>UMD/HAL and KMD UAPI</td><td>Requested API version, process identity and policy</td><td>Context, Buffer Object namespace, queue/event handles</td><td>errno, UAPI trace, negotiated capabilities and reset epoch</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3 class="subheading" id="repository-model-flow">Model flow: separate immutable weights, per-device calibration, session state, and request tensors</h3>
+      <div class="pipeline-flow" role="group" aria-label="ACiM model compilation, session load, and inference data flow">
+        <div class="pipeline-stage host"><b>1. Offline compile</b><strong><code>compiler/</code></strong><span>Inputs: ONNX, target, and model-quantization statistics. Output: commands, constants, placement and debug map in <code>.acx</code>.</span></div>
+        <div class="pipeline-stage host"><b>2. Validate artifact</b><strong><code>artifact.cpp</code></strong><span>Checks hashes, target, ABI, tensor contract, required features, scratch size and fallback variants.</span></div>
+        <div class="pipeline-stage analog"><b>3. Program session</b><strong><code>firmware/analog</code></strong><span>Combines immutable weights with chip calibration/health; programs, verifies and remaps arrays; returns program handle.</span></div>
+        <div class="pipeline-stage host"><b>4. Submit request</b><strong><code>buffer.cpp + queue.cpp</code></strong><span>Per-request input BO and descriptor reference resident program, output BO, deadline and correlation ID.</span></div>
+        <div class="pipeline-stage analog"><b>5. Execute graph</b><strong>DMA + ACiM + digital</strong><span>Moves activations, performs MVM/ADC/reconstruction and digital operators; weights remain resident when legal.</span></div>
+        <div class="pipeline-stage host"><b>6. Complete + inspect</b><strong>CQ + runtime + app</strong><span>Returns output tensor, status, counters and trace IDs; compares selected checkpoints with the golden model.</span></div>
+      </div>
+
+      <div class="table-wrap top-gap">
+        <table>
+          <thead><tr><th scope="col">Data class</th><th scope="col">Examples</th><th scope="col">Owner</th><th scope="col">Lifetime</th><th scope="col">Must invalidate when</th></tr></thead>
+          <tbody>
+            <tr><th scope="row">Executable code</th><td>KMD, host runtime, controller firmware, digital microcode</td><td>Packaging/KMD/boot ROM</td><td>Module, process, boot epoch or kernel version</td><td>ABI, security, target or firmware generation is incompatible</td></tr>
+            <tr><th scope="row">Immutable model data</th><td>Graph commands, weights, scales, constants, debug map</td><td>Compiler artifact and runtime</td><td>Artifact version; may become session resident</td><td>Artifact hash, target, layout or precision contract changes</td></tr>
+            <tr><th scope="row">Per-device state</th><td>Calibration, defect map, remap, temperature/voltage bucket</td><td>Manufacturing/service plus firmware</td><td>Chip/profile generation and valid PVT range</td><td>Serial mismatch, age/temperature threshold, recharacterization or fault update</td></tr>
+            <tr><th scope="row">Per-session state</th><td>Program handle, resident placement, context, queues, mapped BOs</td><td>Runtime, KMD and firmware</td><td>Session and reset generation</td><td>Reset, firmware restart, device loss, remap or calibration generation changes</td></tr>
+            <tr><th scope="row">Per-request data</th><td>Input/output tensors, descriptor, deadline, dependencies, correlation ID</td><td>Application/runtime and queue owners</td><td>Submission through terminal completion</td><td>Completion, abort, timeout or reset releases ownership safely</td></tr>
+            <tr><th scope="row">Evidence data</th><td>Logs, traces, counters, raw ADC samples, tensor checkpoints</td><td>Support/profiling tools</td><td>Run bundle and retention policy</td><td>Never silently reused as current calibration or executable input</td></tr>
+          </tbody>
+        </table>
       </div>
     </section>
 
     <section class="section" id="delivery" data-progress="acim-board-bringup">
       <div class="section-heading">
         <p class="eyebrow">Staged delivery</p>
-        <h2>Reach the board through nine independently testable milestones</h2>
+        <h2>Implement nine vertical slices; verify each in progressively more realistic environments</h2>
         <p class="section-note">
           Each stage preserves the same API and descriptor semantics. Do not begin full YOLO before DMA loopback,
           queue wrap, interrupt loss, reset, and one-operation numerical correlation are boring and repeatable.
@@ -1671,6 +1836,15 @@ readl(adev-&gt;bar0 + ACIM_DEVICE_STATUS);</code></pre>
         <span><abbr class="term" title="Field-Programmable Gate Array">FPGA</abbr> = Field-Programmable Gate Array prototype</span>
         <span><abbr class="term" title="Matrix-Vector Multiplication">MVM</abbr> = Matrix-Vector Multiplication</span>
         <span>Qualification = evidence required before product release</span>
+      </div>
+      <div class="callout top-gap">
+        <p>
+          <strong>Two plans with different jobs:</strong> the <a href="#full-chain">ten-stage verification ladder</a>
+          answers <em>where and at what fidelity</em> a test runs, from native model through silicon. These nine delivery
+          milestones answer <em>which dependency-ordered code slice</em> the team implements. For example, the queue
+          slice should pass first in the fake backend, then QEMU/co-simulation, FPGA, and finally silicon without changing
+          its descriptor semantics.
+        </p>
       </div>
       <div class="progress-panel" aria-live="polite">
         <div class="progress-track"><progress class="progress-bar" data-progress-bar aria-label="Analog CIM board bring-up progress" max="100" value="0">0%</progress></div>
@@ -1686,6 +1860,31 @@ readl(adev-&gt;bar0 + ACIM_DEVICE_STATUS);</code></pre>
         <label class="lab-item"><input type="checkbox" data-step="subgraph"><span><strong>7. Execute a YOLO subgraph</strong><span>Contiguous Conv/activation/route island, device digital fallback, SRAM schedule, one input/output transfer and layer-level differential report.</span></span></label>
         <label class="lab-item"><input type="checkbox" data-step="yolo"><span><strong>8. Qualify end-to-end YOLO</strong><span>Full validation data, mAP delta, latency percentiles, FPS, power/frame, thermal soak, program reuse, fallback and reproducible manifest.</span></span></label>
         <label class="lab-item"><input type="checkbox" data-step="product"><span><strong>9. Harden the product path</strong><span>Multi-process isolation, dma-buf, AER, suspend/resume, hot reset, firmware update, fault injection, security review, packaging and support tools.</span></span></label>
+      </div>
+      <h3 class="subheading" id="delivery-crosswalk">Milestone crosswalk: source, artifact, data, and gate</h3>
+      <div class="table-wrap top-gap">
+        <table>
+          <thead><tr><th scope="col">Milestone</th><th scope="col">Primary source paths</th><th scope="col">Artifact and data crossing the boundary</th><th scope="col">Required automated gate</th></tr></thead>
+          <tbody>
+            <tr><th scope="row">1. Protocol v0</th><td><code>spec/</code>, <code>tools/codegen/</code>, <code>generated/</code>, <code>include/uapi/</code></td><td>Register/queue/UAPI definitions, capability fixture, ABI and schema hashes</td><td><code>contract</code>: regenerate, layout, endian, reserved-field, old/new compatibility</td></tr>
+            <tr><th scope="row">2. PCIe model</th><td><code>sim/pcie_model/</code>, <code>runtime/umd/backends/fake.cpp</code>, <code>runtime/umd/backends/cosim.cpp</code></td><td>Fake BAR state, guest/host memory, SQ/CQ, interrupt and injected-fault records</td><td><code>pcie-model</code>: probe, ring wrap, posted-write order, malformed DMA, reset epoch</td></tr>
+            <tr><th scope="row">3. Enumerate board</th><td><code>driver/kmd/pci.c</code>, <code>driver/kmd/reset.c</code>, <code>driver/kmd/firmware.c</code>, <code>platforms/</code></td><td>KMD module, optional firmware, PCI capabilities, READY/health handshake</td><td><code>enumeration</code>: cold boot, 1000 bind/remove/reset cycles, no leak or host crash</td></tr>
+            <tr><th scope="row">4. DMA loopback</th><td><code>driver/kmd/memory.c</code>, <code>firmware/dma/</code>, <code>tools/acim-memtest/</code></td><td>BO handles, scatterlists, IOVAs, patterned payloads, byte/error counters</td><td><code>dma</code>: exact data across sizes/alignment/segments plus IOMMU fault containment</td></tr>
+            <tr><th scope="row">5. Queues + MSI-X</th><td><code>driver/kmd/queue.c</code>, <code>driver/kmd/irq.c</code>, <code>runtime/umd/queue.cpp</code>, <code>firmware/scheduler/</code></td><td>SQ/CQ descriptors, doorbells, generation, vector, deadline and terminal status</td><td><code>queue</code>: wrap/full, concurrency, polling/IRQ, loss/duplicate, timeout/abort/reset</td></tr>
+            <tr><th scope="row">6. One MVM</th><td><code>compiler/target/</code>, <code>kernels/analog/</code>, <code>firmware/analog/</code>, <code>sim/analog/</code></td><td>Tiny <code>.acx</code>, weights, calibration/health profile, input, raw/reconstructed output</td><td><code>mvm</code>: golden checkpoints, programmed-weight verify, tolerance and first divergence</td></tr>
+            <tr><th scope="row">7. YOLO subgraph</th><td><code>compiler/transforms/</code>, <code>scheduling/</code>, <code>runtime/umd/artifact.cpp</code>, <code>apps/acim-yolo/</code></td><td>Partitioned artifact, resident weights, activation BOs, digital fallback and layer traces</td><td><code>subgraph</code>: boundary tensors, SRAM schedule, one H2D/D2H pair and fallback parity</td></tr>
+            <tr><th scope="row">8. End-to-end YOLO</th><td><code>models/</code>, <code>apps/acim-yolo/</code>, <code>tests/end-to-end/</code>, <code>performance/</code></td><td>Model/run manifest, validation inputs, detections, mAP, latency, power and thermal traces</td><td><code>yolo-e2e</code>: full accuracy set plus cold/warm, throughput, soak and recovery scenarios</td></tr>
+            <tr><th scope="row">9. Product path</th><td><code>packaging/</code>, <code>platforms/</code>, <code>tools/</code>, <code>tests/qualification/</code></td><td>Install packages, firmware/model update set, permissions, diagnostics and support bundle</td><td><code>qualification</code>: platform/kernel matrix, isolation, AER/reset, update/rollback and field triage</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="callout caution top-gap">
+        <p>
+          <strong>One developer entry point:</strong> provide a repository wrapper such as
+          <code>scripts/test/run.py --lane &lt;contract|dma|queue|mvm|yolo-e2e&gt; --backend &lt;fake|cosim|fpga|silicon&gt;</code>.
+          It should select CTest/KUnit/firmware/model tests, capture the build and run manifests, and return a non-zero
+          status on a failed gate. The wrapper orchestrates existing test tools; it must not hide their raw reports.
+        </p>
       </div>
     </section>
 

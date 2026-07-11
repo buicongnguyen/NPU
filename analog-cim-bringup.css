@@ -835,6 +835,10 @@ abbr.term {
   gap: 12px;
 }
 
+.repository-tree.source-tree {
+  grid-template-columns: minmax(520px, 1.25fr) minmax(0, 0.75fr);
+}
+
 .tree-notes {
   display: grid;
   gap: 8px;
@@ -926,6 +930,7 @@ abbr.term {
   .verdict-banner,
   .bar-map,
   .repository-tree,
+  .repository-tree.source-tree,
   .requirements-grid {
     grid-template-columns: 1fr;
   }
