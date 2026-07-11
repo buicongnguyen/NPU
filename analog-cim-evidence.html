@@ -6,7 +6,7 @@
   <meta name="description" content="A source-critical review of analog compute-in-memory accuracy claims, including Nature papers, measured silicon, remaining issues, mitigation costs, and a verdict on whether accuracy is solved.">
   <title>Is Analog CIM Accuracy Solved? Evidence &amp; Issues | NPU Study Guide</title>
   <link rel="stylesheet" href="analog-cim.css">
-  <script src="analog-cim-evidence.js" defer></script>
+  <script src="analog-cim-evidence.js?v=20260711-2" defer></script>
 </head>
 <body>
   <header class="site-header">
@@ -92,6 +92,7 @@
       <div class="legend" aria-label="Evidence level legend">
         <span class="status-pill status-measured">Measured silicon</span>
         <span class="status-pill status-partial">Partial / hybrid</span>
+        <span class="status-pill status-conditional">Modeled / preprint</span>
         <span class="status-pill status-open">Open problem review</span>
         <span class="status-pill status-vendor">Vendor claim</span>
       </div>
@@ -108,6 +109,18 @@
           </thead>
           <tbody id="evidence-body"></tbody>
         </table>
+      </div>
+      <div class="callout" style="margin-top:12px">
+        <h3>Two added deep reads</h3>
+        <p>
+          The co-design study now audits a measured gradient-based PCM programming method and a June 2026
+          heterogeneous GPT-2 mapping preprint. Their evidence levels are different, so the implementation result and
+          the compiler hypothesis are reviewed separately.
+        </p>
+        <div class="hero-actions">
+          <a class="button secondary" href="analog-cim-hardware-software-codesign.html#gdp-deep-read">Read the measured programming study</a>
+          <a class="button secondary" href="analog-cim-hardware-software-codesign.html#mapping-deep-read">Read the mapping workflow study</a>
+        </div>
       </div>
     </section>
 

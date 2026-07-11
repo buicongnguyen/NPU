@@ -279,6 +279,26 @@
       "sourceIds": ["accuracy-review-2026", "synapse-review-2026", "neurram", "ibm-speech"]
     },
     {
+      "id": "programming-01",
+      "topic": "Programming and calibration",
+      "difficulty": "Advanced",
+      "prompt": "Why can gradient descent-based programming intentionally leave a PCM cell farther from its nominal target conductance?",
+      "choices": ["It minimizes the measured array-level MVM error, so a conductance offset can compensate small peripheral nonlinearities", "Nominal weights are never used by a neural network", "A farther conductance always consumes zero energy", "It converts every analog operation into FP64 software"],
+      "answer": 0,
+      "explanation": "The programming objective is functional MVM accuracy rather than independent cell accuracy. The measured array can therefore implement the target operator better with physical values that compensate part of its static nonlinearity.",
+      "sourceIds": ["gdp-programming"]
+    },
+    {
+      "id": "mapping-01",
+      "topic": "Compiler and mapping",
+      "difficulty": "Advanced",
+      "prompt": "What is the main lesson of the 2026 GPT-2 AIMC sensitivity preprint for compiler granularity?",
+      "choices": ["Profile and map individual transformer projections because sensitivity can differ sharply inside the same decoder block", "Always place every first and last block in analog", "Map each individual scalar weight through a separate NoC", "Treat all projections as equally sensitive"],
+      "answer": 0,
+      "explanation": "The modeled profile found a highly sensitive internal attention-output projection while many middle-block projections were tolerant. Projection-level mapping is finer than block-level placement without requiring weight-level routing.",
+      "sourceIds": ["heterogeneous-mapping-2026"]
+    },
+    {
       "id": "interview-01",
       "topic": "Interview design",
       "difficulty": "Intermediate",
@@ -327,6 +347,8 @@
     "albert-2025": {"title": "ALBERT on a 14-nm Analog AI Chip", "url": "https://doi.org/10.1038/s41467-025-63794-4"},
     "adaptive-adc": {"title": "Adaptive Memristor ADC", "url": "https://doi.org/10.1038/s41467-025-65233-w"},
     "fault-free-2026": {"title": "Fault-free Analogue Computing", "url": "https://doi.org/10.1038/s41928-026-01638-9"},
+    "gdp-programming": {"title": "Gradient Descent-based AIMC Programming", "url": "https://doi.org/10.1109/IEDM45625.2022.10019486"},
+    "heterogeneous-mapping-2026": {"title": "Heterogeneous AIMC Mapping Workflow", "url": "https://arxiv.org/abs/2606.02672"},
     "accuracy-review-2026": {"title": "High-accuracy Memristor AIMC Review", "url": "https://doi.org/10.1038/s41563-026-02600-y"},
     "synapse-review-2026": {"title": "Non-idealities in Artificial Synapses", "url": "https://doi.org/10.1038/s42254-026-00957-2"}
   }

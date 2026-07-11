@@ -4,7 +4,7 @@
   var levelLabels = {
     measured: 'Measured silicon',
     partial: 'Partial / hybrid',
-    conditional: 'Conditional',
+    conditional: 'Modeled / preprint',
     open: 'Open problem review',
     vendor: 'Vendor claim'
   };

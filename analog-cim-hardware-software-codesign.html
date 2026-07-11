@@ -308,6 +308,16 @@
           <p class="paper-boundary"><strong>Boundary:</strong> FPGA supplied intermediate buffers and partial sums; peak array efficiency excludes intermediate transfer.</p>
         </article>
 
+        <article class="paper-card" data-domain="pcm software component">
+          <span class="status-pill status-partial">Measured programming method</span>
+          <h3><a href="https://doi.org/10.1109/IEDM45625.2022.10019486">Gradient descent-based PCM programming</a></h3>
+          <p><strong>Problem:</strong> cell-wise write-verify depends on precise low-current reads and can miss array nonlinearities that determine the actual MVM result.</p>
+          <p><strong>Hardware:</strong> two 14-nm PCM cores, each with a 256 x 256 array, execute random-probe MVMs during deployment calibration.</p>
+          <p><strong>Software:</strong> gradient descent minimizes measured MVM error and adjusts programming pulses, even when the best physical conductances differ from nominal weight targets.</p>
+          <p><strong>Evidence:</strong> a scaled ResNet-9 hardware run improved from 84.75% to 86.01% CIFAR-10 accuracy; the programming-error advantage persisted for 24 hours.</p>
+          <p class="paper-boundary"><strong>Boundary:</strong> digital gradient calculation and non-MVM work remained off-array; repeated writes cost time and endurance, and each method received one complete inference run.</p>
+        </article>
+
         <article class="paper-card" data-domain="pcm mixed">
           <span class="status-pill status-measured">Integrated mixed-signal chip</span>
           <h3><a href="https://doi.org/10.1038/s41928-023-01010-1">64-core PCM inference chip</a></h3>
@@ -387,6 +397,127 @@
           <p><strong>Evidence:</strong> many evaluated models recovered floating-point iso-accuracy in simulation; input/output noise was often more damaging than weight noise.</p>
           <p class="paper-boundary"><strong>Boundary:</strong> simulation evidence depends on model fidelity and does not replace silicon population and lifetime testing.</p>
         </article>
+
+        <article class="paper-card" data-domain="pcm software mixed">
+          <span class="status-pill status-conditional">June 2026 preprint and modeled GPT-2 study</span>
+          <h3><a href="https://arxiv.org/abs/2606.02672">Unified heterogeneous AIMC mapping workflow</a></h3>
+          <p><strong>Problem:</strong> analog/digital assignment is combinatorial, existing methods use incompatible assumptions, and coarse first/last-layer rules do not capture decoder-transformer sensitivity.</p>
+          <p><strong>Hardware abstraction:</strong> PCM-calibrated noise, 512 x 512 tiling, roughly 8-bit converters, digital compute units, memory, interconnect, and maintenance costs.</p>
+          <p><strong>Software:</strong> characterize hardware, profile projection sensitivity, optimize architecture-aware mapping, then validate the complete system.</p>
+          <p><strong>Evidence:</strong> four of 49 GPT-2-small projections dominated marginal sensitivity; 40 had modeled perplexity increase below 3 and became analog candidates.</p>
+          <p class="paper-boundary"><strong>Boundary:</strong> only workflow stages 1-2 were executed; no joint mapping, measured chip, runtime drift response, or end-to-end energy and latency result was produced.</p>
+        </article>
+      </div>
+    </section>
+
+    <section class="section" id="gdp-deep-read">
+      <div class="section-heading">
+        <p class="eyebrow">Deep read 1 | measured IBM PCM hardware</p>
+        <h2>Program the measured function, not each cell in isolation</h2>
+        <p class="section-note">
+          This IEDM paper is the stronger of the two additions because it evaluates the method on fabricated 14-nm
+          PCM cores. Its central lesson belongs in deployment firmware and the compiler/runtime contract.
+        </p>
+      </div>
+      <div class="callout verdict">
+        <p>
+          <strong>New idea:</strong> conventional write-verify tries to make every read conductance equal its nominal
+          target. Gradient descent-based programming instead minimizes the error of the complete on-chip MVM. It can
+          intentionally leave individual readout weights farther from their nominal values when that compensates
+          peripheral nonlinearity and improves the function the application actually consumes.
+        </p>
+      </div>
+      <div class="solution-rows" style="margin-top:12px">
+        <div><strong>1. Initialize</strong><span>Roughly program the target matrix with a short iterative sequence or one-shot pulses.</span></div>
+        <div><strong>2. Probe</strong><span>Generate synthetic random vectors and execute a batch of MVMs on the physical array; no application dataset is required.</span></div>
+        <div><strong>3. Measure loss</strong><span>Compare measured outputs with the ideal target-matrix outputs and minimize normalized MVM error rather than individual-cell error.</span></div>
+        <div><strong>4. Update pulses</strong><span>Compute the gradient digitally, convert it into bounded SET/RESET pulse changes, program selected cells, and repeat.</span></div>
+      </div>
+      <div class="metric-grid" style="margin-top:12px">
+        <article class="metric"><strong>2</strong><span>fabricated PCM cores</span><small>14-nm, measured</small></article>
+        <article class="metric"><strong>256 x 256</strong><span>unit cells per core</span><small>four PCM devices per signed cell</small></article>
+        <article class="metric"><strong>84.75% to 86.01%</strong><span>CIFAR-10 accuracy</span><small>one scaled ResNet-9 run per method</small></article>
+        <article class="metric"><strong>24 h</strong><span>drift observation</span><small>programming-error advantage retained</small></article>
+      </div>
+      <div class="claim-boundary" style="margin-top:12px">
+        <section class="supports">
+          <h3>What the result establishes</h3>
+          <ul class="note-list">
+            <li>Accurate single-device reads are not required when the array can execute MVM probes during programming.</li>
+            <li>Function-level optimization can absorb small static nonlinearities that cell-wise conductance matching ignores.</li>
+            <li>Random inputs generalized across tested input distributions and sparsity levels.</li>
+            <li>Batch sizes of at least 64 beat the baseline; 256 or more performed best in the reported sweep.</li>
+          </ul>
+        </section>
+        <section class="limits">
+          <h3>What remains unresolved</h3>
+          <ul class="note-list">
+            <li>Digital gradient computation scales with probe batch, rows, and columns and adds deployment time.</li>
+            <li>Repeated programming pulses consume energy and endurance; the paper does not provide a product lifetime budget.</li>
+            <li>The experiment does not remove random read noise, ADC energy, saturation, PVT variation, or unsupported digital operators.</li>
+            <li>One network and one complete inference run per programming method are not population-level qualification.</li>
+          </ul>
+        </section>
+      </div>
+      <div class="hero-actions" style="margin-top:12px">
+        <a class="button secondary" href="https://doi.org/10.1109/IEDM45625.2022.10019486">IEEE publication</a>
+        <a class="button secondary" href="https://arxiv.org/abs/2305.16647">arXiv manuscript</a>
+        <a class="button secondary" href="https://www.researchgate.net/publication/371124197_Gradient_descent-based_programming_of_analog_in-memory_computing_cores">ResearchGate record</a>
+      </div>
+    </section>
+
+    <section class="section" id="mapping-deep-read">
+      <div class="section-heading">
+        <p class="eyebrow">Deep read 2 | June 2026 architecture preprint</p>
+        <h2>Profile transformer projections before searching the analog/digital mapping</h2>
+        <p class="section-note">
+          This paper is current and directly relevant to the software stack, but its GPT-2 result is modeled rather
+          than measured. The useful contribution is a disciplined workflow and a finer mapping granularity.
+        </p>
+      </div>
+      <div class="callout">
+        <p>
+          <strong>New idea:</strong> a decoder transformer should not be mapped by a blanket first/last-layer rule or
+          by assigning an entire block to one engine. Sensitivity can differ sharply among Q/K/V, attention-output,
+          and FFN projections in the same block. Projection-level profiling first reduces the search space, after
+          which a hardware-specific optimizer can choose the actual analog/digital assignment.
+        </p>
+      </div>
+      <div class="codesign-flow" style="margin-top:12px" aria-label="Four-stage heterogeneous Analog CIM mapping workflow">
+        <article class="flow-step"><b>1. Characterize</b><strong>Hardware</strong><span>Tiles, ADC/DAC, noise, digital units, memory, interconnect, drift</span></article>
+        <article class="flow-step"><b>2. Profile</b><strong>Model sensitivity</strong><span>Perturb one projection, repeat noise trials, rank accuracy or perplexity loss</span></article>
+        <article class="flow-step"><b>3. Map</b><strong>Architecture-aware search</strong><span>Assign analog/digital paths and produce an accuracy-energy-latency Pareto set</span></article>
+        <article class="flow-step"><b>4. Validate</b><strong>Complete system</strong><span>Measure task accuracy, analog coverage, latency, energy, and search cost</span></article>
+      </div>
+      <div class="metric-grid" style="margin-top:12px">
+        <article class="metric"><strong>49</strong><span>GPT-2 projections</span><small>tested one at a time</small></article>
+        <article class="metric"><strong>4</strong><span>dominant projections</span><small>localized modeled sensitivity</small></article>
+        <article class="metric"><strong>40 / 49</strong><span>analog candidates</span><small>about 82% under a delta-perplexity threshold of 3</small></article>
+        <article class="metric"><strong>490</strong><span>forward passes</span><small>49 projections x 10 noise realizations</small></article>
+      </div>
+      <div class="claim-boundary" style="margin-top:12px">
+        <section class="supports">
+          <h3>What is genuinely useful</h3>
+          <ul class="note-list">
+            <li>The four-stage workflow prevents sensitivity profiling from being confused with final system mapping.</li>
+            <li>GPT-2 sensitivity was concentrated, and the largest outlier was an internal block-0 attention-output projection.</li>
+            <li>Projection granularity aligns with transformer datapaths while avoiding weight-level routing complexity.</li>
+            <li>The profile can seed heuristic, analytical, or trainable Stage 3 mapping algorithms.</li>
+          </ul>
+        </section>
+        <section class="limits">
+          <h3>What must happen next</h3>
+          <ul class="note-list">
+            <li>Run Stage 3 jointly: one-at-a-time perturbation does not capture interacting errors from many analog projections.</li>
+            <li>Run Stage 4 on a concrete accelerator and count converters, KV cache, memory, communication, latency, and energy.</li>
+            <li>Validate the ranking on silicon, across PCM, ReRAM, and SRAM models, and after time-dependent drift.</li>
+            <li>Repeat on larger decoder models; GPT-2-small does not prove that the same four projections dominate at scale.</li>
+          </ul>
+        </section>
+      </div>
+      <div class="hero-actions" style="margin-top:12px">
+        <a class="button secondary" href="https://arxiv.org/abs/2606.02672">arXiv manuscript</a>
+        <a class="button secondary" href="https://www.researchgate.net/publication/405853646_Heterogeneous_Mapping_for_Analog_In-Memory_Computing_Accelerators_A_Unified_Workflow">ResearchGate record</a>
       </div>
     </section>
 
@@ -409,10 +540,10 @@
           <span class="status-pill status-open">Static and programmed state</span>
           <h3>The written conductance is not the requested weight</h3>
           <div class="solution-rows">
-            <div><strong>Hardware layer</strong><span>Iterative write-verify, accurate row-wise programming, multi-device weights, reference cells, spare rows/columns, and defect characterization.</span></div>
-            <div><strong>Compiler and training</strong><span>Differential/offset encoding, defect-aware placement, optimized programming targets, post-deployment training, and matrix factorization for severe static faults.</span></div>
-            <div><strong>Runtime</strong><span>Bind the executable to a device fault map, verify programming, reject weak arrays, and preserve programming provenance.</span></div>
-            <div><strong>Tradeoff</strong><span>More devices, programming reads, arrays, optimization time, artifact state, and endurance consumption.</span></div>
+            <div><strong>Hardware layer</strong><span>Iterative write-verify, array-level random-probe MVMs, multi-device weights, reference cells, spare rows/columns, and defect characterization.</span></div>
+            <div><strong>Compiler and training</strong><span>Differential/offset encoding, defect-aware placement, function-level programming loss, optimized pulse targets, post-deployment training, and matrix factorization for severe static faults.</span></div>
+            <div><strong>Runtime</strong><span>Bind the executable to a device fault map, run cell-wise verification or gradient-based MVM calibration, reject weak arrays, and preserve programming provenance.</span></div>
+            <div><strong>Tradeoff</strong><span>More devices, probes, digital optimization, programming pulses, artifact state, deployment time, and endurance consumption.</span></div>
           </div>
         </article>
 
@@ -502,7 +633,7 @@
         <article class="flow-step"><b>3. Partition</b><strong>Graph compiler</strong><span>Analog, SRAM, digital, CPU, rejection, conversion cost</span></article>
         <article class="flow-step"><b>4. Map</b><strong>Physical lowering</strong><span>Arrays, signed encoding, slices, ADC range, faults, schedule</span></article>
         <article class="flow-step"><b>5. Package</b><strong>Executable artifact</strong><span>Code, weights, programming plan, calibration schema, debug map</span></article>
-        <article class="flow-step"><b>6. Deploy</b><strong>Runtime</strong><span>Write-verify, calibrate, bind state, execute, trace, recover</span></article>
+        <article class="flow-step"><b>6. Deploy</b><strong>Runtime</strong><span>Write-verify or MVM-optimize, calibrate, bind state, execute, trace, recover</span></article>
         <article class="flow-step"><b>7. Maintain</b><strong>Fleet loop</strong><span>Health vectors, drift, refresh, fallback, rollback, evidence</span></article>
       </div>
 
@@ -531,7 +662,8 @@
           <h3>Runtime, firmware, and driver</h3>
           <ul class="note-list">
             <li>Discover device revision, array health, fault map, calibration age, firmware ABI, and precision modes.</li>
-            <li>Program and verify weights transactionally, with recovery from partial writes and power loss.</li>
+            <li>Program weights transactionally, then select cell-wise write-verify or random-probe MVM optimization from the target capability and deployment budget.</li>
+            <li>Record programming loss, iteration count, pulse count, endurance use, and the final measured operator state.</li>
             <li>Store per-chip scale, offset, fault, temperature, age, and refresh data separately from portable model content.</li>
             <li>Monitor saturation, read variance, temperature, drift, timeouts, and device loss during execution.</li>
             <li>Support recalibration, selective refresh, remapping, digital fallback, rollback, quarantine, and replacement devices.</li>
@@ -594,7 +726,7 @@
         <table>
           <thead><tr><th scope="col">Observed failure</th><th scope="col">First hardware response</th><th scope="col">First software response</th><th scope="col">Escalation</th></tr></thead>
           <tbody>
-            <tr><th scope="row">Random programming spread</th><td>Closed-loop write-verify and stable conductance range.</td><td>Optimized programming targets plus HWA training.</td><td>Multi-device expansion, remap, or digital placement.</td></tr>
+            <tr><th scope="row">Random programming spread</th><td>Closed-loop write-verify, random-probe MVM support, and a stable conductance range.</td><td>Function-level programming optimization plus HWA training.</td><td>Multi-device expansion, remap, or digital placement.</td></tr>
             <tr><th scope="row">Many stuck devices</th><td>Characterize fault map; spares where cheap.</td><td>Defect-aware placement or adaptive matrix factorization.</td><td>Reject/quarantine array when extra MVM stages lose value.</td></tr>
             <tr><th scope="row">ADC saturation or code waste</th><td>Gain/offset control, precision modes, adaptive thresholds.</td><td>Representative calibration, per-layer range, clipping, outlier split.</td><td>More phases/bits or move the region to digital compute.</td></tr>
             <tr><th scope="row">Read noise and nonlinear error</th><td>Linear read region, better sensing, differential/AB, references.</td><td>Measured-noise HWA training and sensitivity routing.</td><td>Average, expand weights, chip-in-loop tune, or fall back.</td></tr>
@@ -679,7 +811,9 @@
         <article class="source-card"><a href="https://doi.org/10.1038/s41467-025-63794-4">ALBERT on PCM hardware</a><span>Nature Communications 2025 | transformer mapping, HWA fine-tuning, calibration, drift and hybrid boundary</span></article>
         <article class="source-card"><a href="https://doi.org/10.1038/s41467-025-57183-0">Full-stack memristor CIM system</a><span>Nature Communications 2025 | compiler, CIM IR, optimizer, simulator, automatic deployment, eight-chip hardware</span></article>
         <article class="source-card"><a href="https://github.com/Tsinghua-LEMON-Lab/OpenCIMTC">OpenCIMTC source</a><span>Compiler, optimizer, simulator, trainable modules, examples, and paper artifacts</span></article>
+        <article class="source-card"><a href="https://doi.org/10.1109/IEDM45625.2022.10019486">Gradient descent-based AIMC programming</a><span>IEEE IEDM 2022 | measured 14-nm PCM cores, random-probe MVM loss, pulse optimization, 24-hour drift, and ResNet-9 evaluation</span></article>
         <article class="source-card"><a href="https://doi.org/10.1038/s41467-023-40770-4">Hardware-aware training study</a><span>Nature Communications 2023 | realistic crossbar model across CNN, recurrent, and transformer workloads</span></article>
+        <article class="source-card"><a href="https://arxiv.org/abs/2606.02672">Unified heterogeneous AIMC mapping workflow</a><span>June 2026 preprint | mapping-method taxonomy, four-stage workflow, and marginal GPT-2 projection sensitivity; no completed hardware mapping</span></article>
         <article class="source-card"><a href="https://arxiv.org/abs/2505.09663">Analog Foundation Models</a><span>NeurIPS 2025 | LLM distillation, static 8-bit analog boundaries, clipping, noise injection, and limits of off-the-shelf quantized models</span></article>
         <article class="source-card"><a href="https://doi.org/10.1038/s41467-022-31405-1">Optimized analog weight programming</a><span>Nature Communications 2022 | HWA training plus multi-device programming optimization and drift modeling</span></article>
         <article class="source-card"><a href="https://doi.org/10.1038/s41467-025-65233-w">Adaptive memristor ADC</a><span>Nature Communications 2025 | programmable thresholds, Lloyd-Max optimization, super-resolution, converter tradeoffs</span></article>

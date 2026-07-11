@@ -63,6 +63,20 @@
       "sourceUrl": "https://doi.org/10.1038/s41586-022-04992-8"
     },
     {
+      "id": "gdp-programming-2022",
+      "year": 2022,
+      "title": "Gradient descent-based programming of analog in-memory computing cores",
+      "venue": "IEEE IEDM",
+      "technology": "Two 14-nm PCM AIMC cores with 256 x 256 unit-cell arrays",
+      "scope": "Array-level programming, 24-hour drift observation, and a scaled ResNet-9 on CIFAR-10",
+      "evidenceLevel": "partial",
+      "reportedResult": "Gradient descent-based programming improved one measured ResNet-9 run from 84.75% to 86.01% accuracy, reduced MVM error relative to cell-wise iterative programming, and retained its programming-error advantage over 24 hours.",
+      "whatItShows": "Optimizing the measured MVM function with random probes can choose physical conductances that compensate small array nonlinearities, while avoiding accurate reads of individual low-current devices.",
+      "whatItDoesNotShow": "A full SoC, broad model generality, population statistics, long-term retention, or a free correction: gradients were computed digitally, non-MVM operations ran in software, and repeated programming consumes time and endurance.",
+      "verdict": "A strong measured argument for function-level deployment calibration, not a solution to every read, converter, drift, or system error.",
+      "sourceUrl": "https://doi.org/10.1109/IEDM45625.2022.10019486"
+    },
+    {
       "id": "hermes-2023",
       "year": 2023,
       "title": "A 64-core mixed-signal in-memory compute chip based on phase-change memory",
@@ -173,6 +187,20 @@
       "whatItDoesNotShow": "A universal error-free device or a cost-free correction method.",
       "verdict": "The most current review evidence says the core reliability questions remain active.",
       "sourceUrl": "https://doi.org/10.1038/s42254-026-00957-2"
+    },
+    {
+      "id": "heterogeneous-mapping-2026",
+      "year": 2026,
+      "title": "Heterogeneous Mapping for Analog In-Memory Computing Accelerators: A Unified Workflow",
+      "venue": "IEEE Computer Architecture Letters manuscript / arXiv preprint",
+      "technology": "Modeled PCM-calibrated AIMC tiles plus digital compute units",
+      "scope": "Survey of nine mapping methods and Stage 1-2 sensitivity analysis of GPT-2-small",
+      "evidenceLevel": "conditional",
+      "reportedResult": "Four of 49 GPT-2 projections dominated modeled sensitivity; 40 projections had a perplexity increase below 3 when perturbed individually, suggesting about 82% projection-level analog candidacy under the paper's threshold.",
+      "whatItShows": "Projection-level sensitivity profiling can prune an otherwise combinatorial analog/digital mapping search, and a first/last-layer rule misses a highly sensitive internal projection in decoder transformers.",
+      "whatItDoesNotShow": "A completed Stage 3 mapping, joint multi-layer error, measured hardware, end-to-end energy or latency, drift-aware runtime adaptation, or validation on billion-parameter LLMs and other memory technologies.",
+      "verdict": "A useful and current compiler workflow hypothesis; its GPT-2 mapping conclusions still require system-level optimization and silicon validation.",
+      "sourceUrl": "https://arxiv.org/abs/2606.02672"
     }
   ],
   "issues": [
