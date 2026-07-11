@@ -34,7 +34,7 @@
   <main>
     <section class="hero">
       <div class="hero-copy">
-        <p class="eyebrow">Applied architecture study | research snapshot 2026-07-11</p>
+        <p class="eyebrow">Applied architecture study | research snapshot 2026-07-12</p>
         <h1>Learning Tenstorrent Patterns for an Analog CIM NPU</h1>
         <p class="lede">
           Trace a real open-source accelerator stack, extract the engineering ideas that survive a hardware change,
@@ -43,6 +43,7 @@
         </p>
         <div class="hero-actions">
           <a class="button" href="#transfer-map">Open the learning map</a>
+          <a class="button secondary" href="#performance-translation">Map TT-Metal performance patterns</a>
           <a class="button secondary" href="#architecture-choices">Compare architecture choices</a>
           <a class="button secondary" href="#poc">Start the implementation labs</a>
           <a class="button secondary" href="accelerator-repository-blueprint.html">Design the repository</a>
@@ -86,6 +87,11 @@
           <strong>New: architecture translation</strong>
           <span>Convert each Tenstorrent pattern into an explicit ACiM compiler, runtime, or device concept.</span>
           <a href="#transfer-map">Open the translation map</a>
+        </article>
+        <article class="scope-item new">
+          <strong>New: performance dataflow</strong>
+          <span>Decide where buffering, prefetch, dispatch, caching, multicast, tracing, and concurrency still help.</span>
+          <a href="#performance-translation">Follow the optimized ACiM flow</a>
         </article>
         <article class="scope-item new">
           <strong>New: choice guide</strong>
@@ -281,6 +287,206 @@
             <div class="contract-cell"><strong>Proof</strong><span>Population statistics support the product SLA rather than one favorable chip or one benchmark run.</span></div>
           </div>
         </article>
+      </div>
+    </section>
+
+    <section class="section" id="performance-translation">
+      <div class="section-heading">
+        <p class="eyebrow">TT-Metal performance patterns translated</p>
+        <h2>Keep the dataflow machinery, but move it around resident analog weights</h2>
+        <p class="section-note">
+          TT-Metal optimizes a digital machine whose operands move through DRAM, local SRAM, circular buffers, a NoC,
+          and compute engines. ACiM removes most steady-state weight traffic when conductances remain programmed, but
+          it still has commands, activations, converter traffic, partial sums, digital epilogues, and outputs to move.
+          The useful abstraction is therefore not "no data movement"; it is "weight-stationary dataflow with explicit
+          movement and synchronization around the array."
+        </p>
+      </div>
+
+      <div class="performance-verdict-grid" role="group" aria-label="Performance translation verdicts">
+        <article><span class="status-pill decision-reuse">Keep</span><strong>Double buffering</strong><p>Ping-pong activation ingress and digitized-result egress so DMA and digital work can overlap array execution.</p></article>
+        <article><span class="status-pill decision-adapt">Adapt</span><strong>Prefetch</strong><p>Prefetch commands and activations every run. Stage weights only before planned program/verify work; do not page conductances per token.</p></article>
+        <article><span class="status-pill decision-reuse">Keep</span><strong>Fast dispatch</strong><p>Let a device controller consume queued descriptors without waiting for one host call per layer or array firing.</p></article>
+        <article><span class="status-pill decision-adapt">Extend</span><strong>Program cache</strong><p>Cache schedules and digital kernels, but bind every hit to the target, weight map, calibration, health, and ABI epochs.</p></article>
+      </div>
+
+      <div class="term-strip" aria-label="Terms used in the performance dataflow">
+        <span><abbr title="Circular Buffer">CB</abbr>: bounded producer-consumer storage</span>
+        <span><abbr title="Command Queue">CQ</abbr>: ordered device work stream</span>
+        <span><abbr title="Direct Memory Access">DMA</abbr>: transfer engine without CPU copying</span>
+        <span><abbr title="Network on Chip">NoC</abbr>: on-chip packet network</span>
+        <span><abbr title="Digital-to-Analog Converter">DAC</abbr>: optional multi-level input converter</span>
+        <span><abbr title="Analog-to-Digital Converter">ADC</abbr>: sensed analog result to digital code</span>
+        <span><abbr title="Matrix-Vector Multiplication">MVM</abbr>: array compute primitive</span>
+      </div>
+
+      <figure class="acim-flow-figure" aria-labelledby="acim-flow-caption">
+        <figcaption id="acim-flow-caption"><strong>Recommended ACiM execution flow</strong><span>Control, persistent physical state, and per-inference tensor traffic remain separate.</span></figcaption>
+        <div class="flow-lane control-lane">
+          <b class="flow-lane-label">Control</b>
+          <div class="flow-node"><strong>Host SDK</strong><span>Bind buffers and enqueue</span></div>
+          <div class="flow-node"><strong>CQ + events</strong><span>Dependencies and fences</span></div>
+          <div class="flow-node"><strong>Device dispatcher</strong><span>Validate and issue</span></div>
+          <div class="flow-node"><strong>Resident program</strong><span>Trace or command template</span></div>
+          <div class="flow-node"><strong>Array scheduler</strong><span>Converters, power, hazards</span></div>
+        </div>
+        <div class="flow-lane state-lane">
+          <b class="flow-lane-label">State</b>
+          <div class="flow-node"><strong>Weight package</strong><span>Logical tensors and scales</span></div>
+          <div class="flow-node"><strong>Program + verify</strong><span>Rare load or remap path</span></div>
+          <div class="flow-node emphasized"><strong>Resident weight handle</strong><span>Arrays and conductance map</span></div>
+          <div class="flow-node"><strong>Bind device state</strong><span>Calibration, defects, health</span></div>
+          <div class="flow-node"><strong>Validated binding</strong><span>Weight, profile, and health epochs</span></div>
+        </div>
+        <div class="flow-lane data-lane">
+          <b class="flow-lane-label">Data</b>
+          <div class="flow-node"><strong>Input source</strong><span>Host, camera, or LPDDR</span></div>
+          <div class="flow-node emphasized"><strong>Ingress CB A/B</strong><span>Activation prefetch</span></div>
+          <div class="flow-node"><strong>Input encode / drive</strong><span>Bits, pulses, or DAC levels</span></div>
+          <div class="flow-node"><strong>Array MVM</strong><span>Resident weights</span></div>
+          <div class="flow-node"><strong>ADC / rebuild</strong><span>Digitize and combine slices</span></div>
+          <div class="flow-node emphasized"><strong>Egress CB A/B</strong><span>Result ping-pong</span></div>
+          <div class="flow-node"><strong>Digital epilogue</strong><span>Bias, scale, activation, reduce</span></div>
+          <div class="flow-node"><strong>Output DMA</strong><span>Next layer or host</span></div>
+        </div>
+      </figure>
+
+      <div class="callout verdict space-top">
+        <h3>The bottleneck moves; it does not disappear</h3>
+        <p>
+          In steady state, an ACiM layer should not stream its full weight matrix from DRAM. The likely critical path is
+          activation delivery, input encoding, row/word-line drive, optional DAC conversion, array settle time, ADC conversion, bit-slice
+          reconstruction, digital reduction, and output movement. Once the pipeline is filled, its ideal tile interval is
+          approximately <code>max(Tin, Tfront_end + Tmvm + Tadc, Tepilogue, Tout)</code>, but only stages backed by independent
+          hardware can overlap. Shared converters, power rails, thermal limits, or SRAM banks must be modeled as one
+          serialized resource even when software exposes several queues.
+        </p>
+      </div>
+
+      <div class="subsection-heading section-heading">
+        <p class="eyebrow">Ping-pong schedule</p>
+        <h3>Double buffering is still useful on both sides of the array</h3>
+        <p class="section-note">The diagram shows a legal overlap only when input DMA, analog execution, digital epilogue, and output DMA use independent resources.</p>
+      </div>
+      <figure class="pipeline-schedule" aria-labelledby="pipeline-schedule-caption">
+        <figcaption id="pipeline-schedule-caption">Three activation tiles moving through two ingress and two egress slots</figcaption>
+        <div class="schedule-row schedule-head"><b>Engine</b><span>t0</span><span>t1</span><span>t2</span><span>t3</span><span>t4</span><span>t5</span></div>
+        <div class="schedule-row"><b>Input DMA</b><span class="slot input">A0</span><span class="slot input">A1</span><span class="slot input">A2</span><span></span><span></span><span></span></div>
+        <div class="schedule-row"><b>Encode/drive + MVM + ADC</b><span></span><span class="slot analog">A0</span><span class="slot analog">A1</span><span class="slot analog">A2</span><span></span><span></span></div>
+        <div class="schedule-row"><b>Digital epilogue</b><span></span><span></span><span class="slot digital">A0</span><span class="slot digital">A1</span><span class="slot digital">A2</span><span></span></div>
+        <div class="schedule-row"><b>Output DMA</b><span></span><span></span><span></span><span class="slot output">A0</span><span class="slot output">A1</span><span class="slot output">A2</span></div>
+      </figure>
+
+      <div class="table-wrap space-top">
+        <table class="buffer-plan-table">
+          <thead><tr><th scope="col">Storage</th><th scope="col">Producer to consumer</th><th scope="col">Initial policy</th><th scope="col">ACiM-specific rule</th></tr></thead>
+          <tbody>
+            <tr><th scope="row">Command ring</th><td>Host runtime to device dispatcher</td><td>Enough descriptors to keep the device ahead of the host; use sequence numbers and completion fences.</td><td>Descriptors reference immutable weight handles and explicit calibration/profile epochs.</td></tr>
+            <tr><th scope="row">Ingress CB</th><td>DMA or sensor to encoder/DAC</td><td>Two activation macro-tiles, banked as ping and pong.</td><td>Layout must match row drive, bit-plane order, scale group, and multicast destinations.</td></tr>
+            <tr><th scope="row">Weight residency table</th><td>Programmer to array scheduler</td><td>Metadata and handles, not a per-inference copy of the weight bytes.</td><td>Invalidate on reprogram, remap, failed verify, incompatible calibration, or device replacement.</td></tr>
+            <tr><th scope="row">Egress CB</th><td>ADC/reconstruction to digital epilogue</td><td>Two result blocks; use more only after a measured consumer-jitter problem.</td><td>Entries carry ADC mode, saturation flags, slice count, and uncertainty or retry status.</td></tr>
+            <tr><th scope="row">Partial-sum scratch</th><td>Array slices or chips to reduction</td><td>Keep local until all slices are combined; avoid round-tripping through external memory.</td><td>Accumulator width and reduction order are part of the numerical contract.</td></tr>
+            <tr><th scope="row">Calibration cache</th><td>Calibration service to array and digital stages</td><td>Pin the active profile and publish an immutable epoch during execution.</td><td>A profile change drains dependent queues before replacing scales, ranges, or trims.</td></tr>
+            <tr><th scope="row">Output ring</th><td>Digital epilogue to next layer, CPU, or host</td><td>Use events or credits so a producer never overwrites unread output.</td><td>Prefer direct layer-to-layer routing; host readback is a graph boundary, not a default after every MVM.</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="subsection-heading section-heading">
+        <p class="eyebrow">Cache lifetime model</p>
+        <h3>Reuse three different objects without confusing their validity</h3>
+      </div>
+      <div class="cache-lifetime-grid" role="group" aria-label="ACiM cache lifetime model">
+        <article>
+          <b>1. Kernel binary cache</b>
+          <strong>Compiler and ISA lifetime</strong>
+          <span>Stores DSP/vector kernels and firmware fragments. Key by source or IR, compiler flags/version, ISA, target revision, and firmware ABI.</span>
+          <em>Invalidated by code generation or binary compatibility changes.</em>
+        </article>
+        <article>
+          <b>2. Program template cache</b>
+          <strong>Structural schedule lifetime</strong>
+          <span>Stores placement, CB plan, engine sequence, synchronization, and parameter slots. Mutable addresses and state handles remain runtime arguments.</span>
+          <em>Invalidated by shape, layout, precision, topology, mapping, resource, or ABI changes.</em>
+        </article>
+        <article>
+          <b>3. Bound trace / residency cache</b>
+          <strong>Device-state lifetime</strong>
+          <span>Stores replayable descriptors bound to concrete buffers, programmed weights, calibration, health, and stable dependencies on one device.</span>
+          <em>Invalidated by address movement, reprogram/remap, profile update, drift/health epoch, reset, or replacement device.</em>
+        </article>
+      </div>
+
+      <div class="subsection-heading section-heading">
+        <p class="eyebrow">Technique-by-technique decision</p>
+        <h3>What survives the architecture change</h3>
+        <p class="section-note">"Keep" means the mechanism transfers directly. "Adapt" preserves the pattern with a different cache key, tile, or producer. "Conditional" requires measured independence or a specific workload. "Replace" rejects the literal Tensix assumption.</p>
+      </div>
+      <div class="table-wrap technique-table-wrap">
+        <table class="technique-table">
+          <thead><tr><th scope="col">TT-Metal technique</th><th scope="col">Decision</th><th scope="col">ACiM implementation</th><th scope="col">Evidence before enabling it</th></tr></thead>
+          <tbody>
+            <tr><th scope="row"><a href="https://docs.tenstorrent.com/tt-metal/latest/tt-metalium/tt_metal/examples/matmul_single_core.html">Reader / compute / writer pipeline</a></th><td><span class="status-pill decision-adapt">Adapt</span></td><td>Use activation-ingest, array-sequencer, and result-drain roles. Keep explicit producer/consumer ownership, but do not require a Tensix-style RISC-V core for every role.</td><td>Timeline shows each role executing independently and queue starvation has an attributable owner.</td></tr>
+            <tr><th scope="row"><a href="https://docs.tenstorrent.com/tt-metal/latest/tt-metalium/tt_metal/examples/matmul_single_core.html">Two-page CB / double buffering</a></th><td><span class="status-pill decision-reuse">Keep</span></td><td>Start with two activation slots and two ADC-result slots. Alternate ownership with credits or semaphores while the array works on the other slot.</td><td>Lower ingress/egress stall cycles without violating SRAM, power, thermal, or numerical limits.</td></tr>
+            <tr><th scope="row">Deeper circular buffers</th><td><span class="status-pill decision-study">Conditional</span></td><td>Add a third or deeper slot only for bursty DMA, variable ADC retries, multicast skew, or digital-consumer jitter.</td><td>Queue-depth histogram reaches two and deeper storage improves end-to-end throughput enough to justify SRAM cost.</td></tr>
+            <tr><th scope="row"><a href="https://docs.tenstorrent.com/tt-metal/latest/tt-metalium/tt_metal/apis/kernel_apis/data_movement/device_api_migration_guide.html">Async DMA and retained transfer state</a></th><td><span class="status-pill decision-reuse">Keep</span></td><td>Preprogram common source, destination, stride, page, route, and format state, then issue compact descriptors for repeated activation blocks and outputs.</td><td>Descriptor and firmware overhead falls; explicit barriers still prove descriptor, payload, and completion ordering.</td></tr>
+            <tr><th scope="row"><a href="https://github.com/tenstorrent/tt-metal/blob/main/models/tt_transformers/tt/prefetcher.py">DRAM prefetcher + global CB</a></th><td><span class="status-pill decision-adapt">Adapt</span></td><td>Use a persistent producer for activation streams. Weight prefetch means staging bytes before rare program/verify work; frequently used layers or experts should occupy separate resident arrays or chiplets.</td><td>The plan includes program/verify latency, endurance, and eviction cost. It never assumes that changing conductance is as cheap as filling SRAM.</td></tr>
+            <tr><th scope="row"><a href="https://github.com/tenstorrent/tt-metal/blob/main/METALIUM_GUIDE.md">Fast dispatch</a></th><td><span class="status-pill decision-reuse">Keep</span></td><td>Place descriptor validation, dependency tracking, and engine issue in device firmware. The host submits graphs or batches, not one blocking command per layer.</td><td><code>queue_empty_cycles</code> approach zero and host scheduling gaps disappear from the device timeline.</td></tr>
+            <tr><th scope="row"><a href="https://github.com/tenstorrent/tt-metal/blob/main/tt_metal/api/tt-metalium/program_cache.hpp">Program cache</a></th><td><span class="status-pill decision-adapt">Two-level reuse</span></td><td>Cache structural command templates, placements, buffer plans, and digital kernels under an exact canonical key. Bind mutable addresses, weight handles, and profile handles as checked runtime arguments.</td><td>The structural key includes op, shape, layout, precision, target revision, ISA/firmware/ABI, macro-tile, converter topology, mapping version, and power mode. Submission separately rejects stale residency, calibration, or health epochs.</td></tr>
+            <tr><th scope="row"><a href="https://github.com/tenstorrent/tt-metal/blob/main/tt_metal/api/tt-metalium/experimental/kernel_cache.hpp">Kernel compilation cache</a></th><td><span class="status-pill decision-reuse">Keep narrowly</span></td><td>Reuse binaries for DSP/vector kernels, device firmware fragments, and format converters. Keep this distinct from physical weight and calibration state.</td><td>A cache clear and cold compile are testable; binary compatibility is tied to compiler, ISA, and firmware versions.</td></tr>
+            <tr><th scope="row"><a href="https://github.com/tenstorrent/tt-metal/blob/main/tech_reports/AdvancedPerformanceOptimizationsForModels/AdvancedPerformanceOptimizationsForModels.md">Metal Trace-style replay</a></th><td><span class="status-pill decision-adapt">High value</span></td><td>Capture a static graph's already-validated descriptors on device and replay them against stable buffers, resident weights, and profile bindings. Build trace families for bounded dynamic shapes.</td><td>Commands, addresses, weight handles, calibration/health epochs, and dependencies still match. A changed binding invalidates or patches the trace through a defined validation path.</td></tr>
+            <tr><th scope="row"><a href="https://github.com/tenstorrent/tt-metal/blob/main/tech_reports/AdvancedPerformanceOptimizationsForModels/AdvancedPerformanceOptimizationsForModels.md">Multiple CQs + events</a></th><td><span class="status-pill decision-study">Conditional</span></td><td>Use one queue for input/output transfers and another for execution, or independent queues for resource-disjoint array groups. Synchronize with device-visible events.</td><td>The queues use independent DMA/array/converter resources; concurrent execution improves throughput instead of overloading shared ADCs, NoC, or power delivery.</td></tr>
+            <tr><th scope="row"><a href="https://docs.tenstorrent.com/tt-metal/latest/ttnn/ttnn/tensor.html">Tensor sharding</a></th><td><span class="status-pill decision-adapt">Essential</span></td><td>Shard output channels, input rows, bit slices, experts, or batches across physical arrays. Placement must include converter groups, spare rows/columns, and calibrated quality.</td><td>Mapping report predicts utilization, cross-shard reductions, converter occupancy, defects, communication bytes, and error impact.</td></tr>
+            <tr><th scope="row"><a href="https://docs.tenstorrent.com/tt-metal/latest/tt-metalium/tt_metal/labs/matmul/lab3/lab3.html">Multicast + semaphores</a></th><td><span class="status-pill decision-reuse">Keep</span></td><td>Broadcast one activation block to several arrays that hold different output-channel weights. Use receiver-ready credits before overwriting the source slot.</td><td>One injected copy replaces many unicasts, receivers do not starve, and skew does not force excessive buffering.</td></tr>
+            <tr><th scope="row"><a href="https://docs.tenstorrent.com/tt-metal/latest/tt-metalium/tt_metal/examples/matmul_multi_core_optimized.html">Block reuse + intermediate CB</a></th><td><span class="status-pill decision-reuse">Keep</span></td><td>Retain activation blocks, scales, and partial sums near the arrays across output blocks or slices. Choose an array-native macro-tile rather than the literal 32x32 TT tile.</td><td>External and NoC bytes fall, local capacity remains legal, and the numerical reduction order remains reproducible.</td></tr>
+            <tr><th scope="row"><a href="https://docs.tenstorrent.com/tt-metal/latest/tt-metalium/tt_metal/examples/matmul_multi_core_optimized.html">Fused bias and activation</a></th><td><span class="status-pill decision-reuse">Keep</span></td><td>Fuse scale, offset, bias, clamp, quantize, and supported activation into the post-ADC digital path before storing the tensor.</td><td>Fusion removes a materialized tensor and preserves the reference result within the declared tolerance.</td></tr>
+            <tr><th scope="row"><a href="https://github.com/tenstorrent/tt-metal/blob/main/tech_reports/SubDevices/SubDevices.md">SubDevices + persistent programs</a></th><td><span class="status-pill decision-study">Conditional</span></td><td>Partition array groups, SRAM, queues, and digital engines into independently scheduled regions; reserve one region for a persistent sensor or prefetch pipeline.</td><td>The target descriptor proves that converters, routes, calibration state, power, reset, and fault domains are separable. Shared resources remain globally arbitrated.</td></tr>
+            <tr><th scope="row"><a href="https://docs.tenstorrent.com/tt-metal/latest/tt-metalium/tt_metal/apis/kernel_apis/data_movement/ordering.html">NoC ordering and barriers</a></th><td><span class="status-pill decision-reuse">Keep</span></td><td>Define ordering for payloads, descriptors, doorbells, multicast, and completion writes. Batch barriers where legal, but never infer cross-route ordering.</td><td>Litmus and stress tests cover wraparound, multiple producers, reset, timeout, and weakly ordered transport behavior.</td></tr>
+            <tr><th scope="row">TT 32x32 tile and core coordinates</th><td><span class="status-pill decision-replace">Replace literal form</span></td><td>Expose an ACiM macro-tile derived from physical rows, columns, bit slices, ADC grouping, local SRAM, and digital reduction width.</td><td>The tile is generated from a versioned target descriptor and changes legally across device revisions.</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="subsection-heading section-heading">
+        <p class="eyebrow">Runtime decision graph</p>
+        <h3>Choose an optimization from observable hardware facts</h3>
+      </div>
+      <div class="optimization-decisions" role="group" aria-label="ACiM performance optimization decisions">
+        <article><b>1</b><strong>Are the required weights programmed and valid?</strong><span><em>Yes</em> - use the resident handle; do not prefetch weights. <em>No</em> - enqueue program/verify or page replacement before execution.</span></article>
+        <article><b>2</b><strong>Can DMA overlap converter and array use?</strong><span><em>Yes</em> - allocate ingress ping-pong buffers. <em>No</em> - keep the queue contract, but do not claim hidden latency.</span></article>
+        <article><b>3</b><strong>Do arrays share ADCs, input drivers/DACs, SRAM banks, routes, or power?</strong><span><em>Yes</em> - model tokens for each shared resource and cap concurrency. <em>No</em> - schedule independent array groups in parallel.</span></article>
+        <article><b>4</b><strong>Are shape, addresses, weights, and profile epochs stable?</strong><span><em>Yes</em> - replay a resident trace. <em>No</em> - use a cached parameterized program template or compile a new variant.</span></article>
+        <article><b>5</b><strong>Does one activation feed several resident weight shards?</strong><span><em>Yes</em> - multicast once and synchronize receivers. <em>No</em> - use local or unicast delivery.</span></article>
+      </div>
+
+      <div class="subsection-heading section-heading">
+        <p class="eyebrow">Software ownership</p>
+        <h3>Organize the implementation around the optimized flow</h3>
+      </div>
+      <div class="performance-module-grid">
+        <article><code>compiler/schedule/</code><strong>Pipeline and resource planner</strong><span>Chooses macro-tiles, CB depth, multicast groups, converter tokens, fusion, and overlap.</span></article>
+        <article><code>runtime/cache/</code><strong>Three cache lifetimes</strong><span>Separates kernel binaries, structural program templates, and device-bound traces or residency bindings.</span></article>
+        <article><code>runtime/queue/</code><strong>CQs, events, and trace replay</strong><span>Owns enqueue, dependency, capture, replay, completion, timeout, and cancellation semantics.</span></article>
+        <article><code>runtime/residency/</code><strong>Weight and profile handles</strong><span>Tracks what is programmed, verified, calibrated, pinned, stale, remapped, or evictable.</span></article>
+        <article><code>firmware/dispatch/</code><strong>Command prefetch and validation</strong><span>Consumes rings, validates epochs and ranges, resolves handles, and feeds the scheduler.</span></article>
+        <article><code>firmware/dataflow/</code><strong>Ingress, array, and egress stages</strong><span>Implements DMA, CB credits, input encoding, array firing, ADC drain, reconstruction, and barriers.</span></article>
+        <article><code>firmware/resources/</code><strong>Physical arbitration</strong><span>Owns ADC/DAC groups, SRAM banks, routes, power envelopes, thermal throttling, and reset domains.</span></article>
+        <article><code>tools/profiler/</code><strong>One correlated timeline</strong><span>Joins graph, command, buffer, array, converter, DMA, digital, calibration, power, and accuracy events.</span></article>
+      </div>
+
+      <div class="table-wrap space-top">
+        <table class="priority-table">
+          <thead><tr><th scope="col">Order</th><th scope="col">Implement</th><th scope="col">Required counters and tests</th><th scope="col">Acceptance condition</th></tr></thead>
+          <tbody>
+            <tr><th scope="row">P0</th><td>Resident weight handles, one CQ, device dispatch, ingress/egress ping-pong CBs, async DMA, events, local post-ADC epilogue.</td><td>Queue-empty cycles, every engine's busy/stall cycles, CB occupancy, bytes, saturation/retry flags, accuracy delta, timeout/reset tests.</td><td>One static MVM stream runs continuously, matches the reference tolerance, and attributes every idle interval.</td></tr>
+            <tr><th scope="row">P1</th><td>Program cache, trace replay, activation multicast, array sharding, partial-sum locality, fusion, and two-queue I/O overlap.</td><td>Cache hit/miss reason, trace replay count, multicast fanout/bytes, reduction bytes, queue event latency, power and thermal counters.</td><td>Each feature improves end-to-end latency, throughput, or energy on a named workload without changing accepted accuracy.</td></tr>
+            <tr><th scope="row">P2</th><td>Global streaming CB, persistent prefetch program, deeper buffers, subdevice concurrency, weight paging, and multi-chip scheduling.</td><td>Prefetch usefulness, eviction/program time, cross-partition contention, fairness, tail latency, fault injection, recovery, and profile-epoch transitions.</td><td>Measured workload demand justifies the added state and concurrency; recovery remains deterministic.</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="callout caution space-top">
+        <p><strong>Optimization rule:</strong> never approve a technique from array utilization alone. Record end-to-end latency, throughput, joules per inference or token, task accuracy, converter saturation/retries, temperature, and tail behavior. A schedule that drives every array at once can be slower or less accurate when it overloads shared ADCs, the NoC, the power network, or the digital reconstruction path.</p>
       </div>
     </section>
 
@@ -518,6 +724,14 @@
         <article class="source-card"><a href="https://github.com/tenstorrent/tt-forge">Tenstorrent TT-Forge</a><span>Current compiler-stack organization, TT-XLA, TT-Forge-ONNX, TT-MLIR, TT-Lang, and model corpus</span></article>
         <article class="source-card"><a href="https://docs.tenstorrent.com/tt-mlir/overview.html">TT-MLIR overview</a><span>TTNN, D2M, and TTKernel dialect responsibilities and their mapping to Tenstorrent execution</span></article>
         <article class="source-card"><a href="https://github.com/tenstorrent/tt-metal/blob/main/METALIUM_GUIDE.md">TT-Metalium programming guide</a><span>Tensix cores, RISC-V processors, SRAM, tiles, NoC, kernels, circular buffers, and host workflow</span></article>
+        <article class="source-card"><a href="https://docs.tenstorrent.com/tt-metal/latest/tt-metalium/tt_metal/examples/matmul_single_core.html">TT-Metalium single-core MatMul</a><span>Reader/compute/writer pipeline and two-page circular buffers used for overlapped data movement and compute</span></article>
+        <article class="source-card"><a href="https://docs.tenstorrent.com/tt-metal/latest/tt-metalium/tt_metal/examples/matmul_multi_core_optimized.html">TT-Metalium optimized multi-core MatMul</a><span>Block reuse, intermediate circular buffers, multicast, semaphores, and fused bias/activation patterns</span></article>
+        <article class="source-card"><a href="https://docs.tenstorrent.com/tt-metal/latest/tt-metalium/tt_metal/apis/kernel_apis/data_movement/device_api_migration_guide.html">TT-Metalium Device 2.0 data movement</a><span>Asynchronous reads/writes, retained transfer state, multicast endpoints, circular buffers, semaphores, and barriers</span></article>
+        <article class="source-card"><a href="https://github.com/tenstorrent/tt-metal/blob/main/tech_reports/AdvancedPerformanceOptimizationsForModels/AdvancedPerformanceOptimizationsForModels.md">Metal Trace and multiple command queues</a><span>On-device command replay, static-address constraints, event synchronization, and I/O/compute overlap</span></article>
+        <article class="source-card"><a href="https://github.com/tenstorrent/tt-metal/blob/main/tt_metal/api/tt-metalium/program_cache.hpp">TT-Metal program cache source</a><span>Device-tied cached programs, runtime-argument overrides, and exact canonical keys alongside 64-bit hashes</span></article>
+        <article class="source-card"><a href="https://github.com/tenstorrent/tt-metal/blob/main/models/tt_transformers/tt/prefetcher.py">TT transformer DRAM prefetcher source</a><span>Asynchronous weight prefetch into a global circular buffer using DRAM sharding, sender/receiver mappings, and subdevices</span></article>
+        <article class="source-card"><a href="https://github.com/tenstorrent/tt-metal/blob/main/tech_reports/SubDevices/SubDevices.md">TT-Metal SubDevices report</a><span>Resource partitioning, independent execution state, persistent programs, global semaphores, and cross-program circular buffers</span></article>
+        <article class="source-card"><a href="https://docs.tenstorrent.com/tt-metal/latest/ttnn/ttnn/tensor.html">TT-NN tensor and sharding reference</a><span>Explicit tensor layouts, DRAM/L1 placement, shard specifications, and core-local ownership</span></article>
         <article class="source-card"><a href="https://docs.tenstorrent.com/tt-metal/latest/ttnn/index.html">TT-NN documentation</a><span>Tenstorrent tensor library and device operation surface</span></article>
         <article class="source-card"><a href="https://openxla.org/stablehlo/spec">StableHLO specification</a><span>High-level model operation semantics and the framework-to-compiler portability boundary</span></article>
         <article class="source-card"><a href="https://mlir.llvm.org/docs/DialectConversion/">MLIR dialect conversion</a><span>Conversion targets, legality, rewrite patterns, type conversion, and partial/full analysis modes</span></article>
