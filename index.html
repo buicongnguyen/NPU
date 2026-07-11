@@ -143,11 +143,11 @@
     <section id="analog-cim" class="section">
       <div class="section-heading">
         <p class="eyebrow">Analog compute-in-memory case study</p>
-        <h2>Mythic Architecture, Accuracy Evidence, Reuse Decisions, and Interview Study</h2>
+        <h2>Mythic Architecture, Accuracy Evidence, Acquisition Strategy, and NPU Engineering</h2>
         <p class="section-note">
           A separate learning path traces Mythic's flash-based matrix engine from device physics through ADCs,
           tile dataflow, quantization, and graph compilation. It also audits Nature-family accuracy claims and keeps
-          measured results distinct from vendor roadmap statements.
+          measured results distinct from vendor roadmap statements, including the 2026 Videantis acquisition.
         </p>
       </div>
       <div class="evidence-grid compact">
@@ -162,6 +162,18 @@
           <h3>Is analog accuracy solved?</h3>
           <p>No as a universal claim. Compare measured NeuRRAM, IBM PCM, mixed-CIM, ALBERT, adaptive-ADC, and 2026 fault-tolerance results with their real boundaries.</p>
           <a href="analog-cim-evidence.html">Open evidence and issues</a>
+        </article>
+        <article>
+          <span>Hardware/software co-design</span>
+          <h3>How does Analog CIM execute, and where does it bottleneck?</h3>
+          <p>Trace the compile, deployment, inference, and maintenance flow plus a five-lane request sequence, then map converter, precision, movement, utilization, drift, and lifecycle bottlenecks to hardware and software fixes.</p>
+          <a href="analog-cim-hardware-software-codesign.html">Open hardware/software solutions</a>
+        </article>
+        <article>
+          <span>Industry case study</span>
+          <h3>Why did Mythic acquire Videantis?</h3>
+          <p>Audit Mythic's disclosed accuracy techniques, identify what Videantis adds to the digital half, score the build-versus-buy decision, and define the evidence still needed.</p>
+          <a href="analog-cim-mythic-videantis.html">Open Mythic and Videantis study</a>
         </article>
         <article>
           <span>Reuse decision</span>

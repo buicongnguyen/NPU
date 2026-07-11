@@ -1,0 +1,315 @@
+.evidence-key {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 14px 0 0;
+}
+
+.top-gap {
+  margin-top: 16px;
+}
+
+.evidence-key span,
+.evidence-label {
+  display: inline-flex;
+  align-items: center;
+  min-height: 26px;
+  padding: 4px 9px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--surface-2);
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.evidence-key .company,
+.evidence-label.company {
+  border-color: color-mix(in srgb, var(--blue) 62%, var(--line));
+  color: var(--blue);
+}
+
+.evidence-key .independent,
+.evidence-label.independent {
+  border-color: color-mix(in srgb, var(--teal) 62%, var(--line));
+  color: var(--teal);
+}
+
+.evidence-key .inference,
+.evidence-label.inference {
+  border-color: color-mix(in srgb, var(--amber) 65%, var(--line));
+  color: var(--amber);
+}
+
+.case-verdict-grid,
+.acquisition-score,
+.contract-grid,
+.proof-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.case-verdict-grid article,
+.acquisition-score article,
+.contract-grid article,
+.proof-grid article,
+.timeline article {
+  min-width: 0;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+}
+
+.case-verdict-grid strong,
+.acquisition-score strong,
+.contract-grid strong,
+.proof-grid strong,
+.timeline strong {
+  display: block;
+  margin: 6px 0;
+  color: var(--ink);
+  font-size: 17px;
+}
+
+.case-verdict-grid p,
+.acquisition-score p,
+.contract-grid p,
+.proof-grid p,
+.timeline p {
+  margin-bottom: 0;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.timeline {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1px;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--line);
+}
+
+.timeline article {
+  border: 0;
+  border-radius: 0;
+}
+
+.timeline time {
+  color: var(--teal);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.hybrid-flow {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.hybrid-flow article {
+  position: relative;
+  min-width: 0;
+  min-height: 142px;
+  padding: 13px;
+  border: 1px solid var(--line);
+  border-top: 4px solid var(--blue);
+  border-radius: 8px;
+  background: var(--surface);
+}
+
+.hybrid-flow article:nth-child(3),
+.hybrid-flow article:nth-child(4) {
+  border-top-color: var(--amber);
+}
+
+.hybrid-flow article:nth-child(5),
+.hybrid-flow article:nth-child(6) {
+  border-top-color: var(--teal);
+}
+
+.hybrid-flow article:last-child {
+  border-top-color: var(--red);
+}
+
+.hybrid-flow b,
+.hybrid-flow strong,
+.hybrid-flow span {
+  display: block;
+}
+
+.hybrid-flow b {
+  color: var(--muted);
+  font-size: 12px;
+  text-transform: uppercase;
+}
+
+.hybrid-flow strong {
+  margin: 7px 0;
+  font-size: 16px;
+}
+
+.hybrid-flow span {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.mythic-table {
+  width: 100%;
+  border-collapse: collapse;
+  border: 1px solid var(--line);
+  background: var(--surface);
+}
+
+.table-shell {
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+.mythic-table th,
+.mythic-table td {
+  padding: 12px;
+  border-bottom: 1px solid var(--line);
+  text-align: left;
+  vertical-align: top;
+}
+
+.mythic-table th {
+  background: var(--surface-2);
+  color: var(--ink);
+  font-size: 13px;
+}
+
+.mythic-table td {
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.mythic-table td:first-child {
+  color: var(--ink);
+  font-weight: 750;
+}
+
+.mythic-table tr:last-child td {
+  border-bottom: 0;
+}
+
+.score-value {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  padding: 4px 9px;
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--teal) 16%, var(--surface-2));
+  color: var(--teal);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.score-value.medium {
+  background: color-mix(in srgb, var(--amber) 16%, var(--surface-2));
+  color: var(--amber);
+}
+
+.score-value.low {
+  background: color-mix(in srgb, var(--red) 16%, var(--surface-2));
+  color: var(--red);
+}
+
+.boundary-band {
+  display: grid;
+  grid-template-columns: minmax(180px, 0.7fr) minmax(0, 2fr);
+  gap: 18px;
+  margin-top: 14px;
+  padding: 18px 0;
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+}
+
+.boundary-band h3,
+.boundary-band p {
+  margin-bottom: 0;
+}
+
+.boundary-band p {
+  color: var(--muted);
+}
+
+.claim-card[data-domain~="company"] {
+  border-top-color: var(--blue);
+}
+
+.claim-card[data-domain~="independent"] {
+  border-top-color: var(--teal);
+}
+
+.claim-card[data-domain~="inference"] {
+  border-top-color: var(--amber);
+}
+
+.contract-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.contract-grid code {
+  color: var(--teal);
+  font-size: 13px;
+}
+
+.proof-grid {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+@media (max-width: 1120px) {
+  .hybrid-flow {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .proof-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 760px) {
+  .case-verdict-grid,
+  .acquisition-score,
+  .timeline,
+  .contract-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .hybrid-flow {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .boundary-band {
+    grid-template-columns: 1fr;
+  }
+
+  .mythic-table {
+    min-width: 720px;
+  }
+}
+
+@media (max-width: 480px) {
+  .hybrid-flow,
+  .proof-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .hybrid-flow article {
+    min-height: 0;
+  }
+}
+
+@media print {
+  .segmented,
+  .progress-panel,
+  .lab-list {
+    display: none;
+  }
+}

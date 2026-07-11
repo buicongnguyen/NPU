@@ -1,0 +1,624 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="A source-critical study of Mythic's analog-flash accuracy techniques, execution flow, proposed Mythic-Videantis request sequence, CIM bottlenecks, the 2026 acquisition, and the evidence still needed to prove the combined architecture.">
+  <title>Mythic and Videantis Acquisition Case Study | NPU Study Guide</title>
+  <link rel="stylesheet" href="analog-cim.css">
+  <link rel="stylesheet" href="npu-engineering.css">
+  <link rel="stylesheet" href="analog-cim-codesign.css">
+  <link rel="stylesheet" href="analog-cim-mythic.css">
+  <script src="npu-engineering.js" defer></script>
+</head>
+<body>
+  <header class="site-header">
+    <a class="brand" href="index.html" aria-label="NPU Study Guide home">
+      <img src="https://avatars.githubusercontent.com/u/72680210?v=4" alt="Bui Cong Nguyen avatar">
+      <span>NPU Study Guide</span>
+    </a>
+    <nav class="site-nav" aria-label="Analog CIM learning path">
+      <a href="analog-cim-architecture.html">Architecture</a>
+      <a href="analog-cim-evidence.html">Evidence</a>
+      <a href="analog-cim-hardware-software-codesign.html">Co-design</a>
+      <a href="analog-cim-tenstorrent-reuse.html">Reuse</a>
+      <a href="analog-cim-interview.html">Interview</a>
+      <a href="analog-cim-quiz.html">MCQ Lab</a>
+    </nav>
+  </header>
+
+  <main>
+    <section class="hero">
+      <div class="hero-copy">
+        <p class="eyebrow">Company case study | research snapshot 2026-07-11</p>
+        <h1>Mythic and Videantis: What the Acquisition Solves</h1>
+        <p class="lede">
+          Mythic acquired Videantis GmbH on May 19, 2026. The deal adds a production-proven digital processor
+          architecture and software stack to Mythic's analog compute-in-memory platform. That can make the system
+          complete and create a digital path for sensitive operations, but it is not evidence that flash-cell error,
+          converter error, drift, aging, or analog effective precision has been eliminated.
+        </p>
+        <div class="hero-actions">
+          <a class="button" href="#verdict">Read the verdict</a>
+          <a class="button secondary" href="#accuracy">Trace the accuracy stack</a>
+          <a class="button secondary" href="#mythic-execution">Trace hybrid execution</a>
+          <a class="button secondary" href="#acquisition">Audit the acquisition</a>
+        </div>
+        <div class="summary-strip" aria-label="Mythic and Videantis case summary">
+          <div><strong>Mythic</strong><span>Analog flash for dense matrix operations</span></div>
+          <div><strong>Videantis</strong><span>Programmable digital processing and mature tools</span></div>
+          <div><strong>Strategic value</strong><span>Complete hybrid execution and faster productization</span></div>
+          <div><strong>Evidence gap</strong><span>No public post-deal silicon accuracy benchmark yet</span></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="verdict">
+      <div class="section-heading">
+        <p class="eyebrow">Research verdict</p>
+        <h2>A strong system acquisition, not a demonstrated cure for analog error</h2>
+      </div>
+      <div class="callout verdict">
+        <p>
+          <strong>The best-supported interpretation is build-versus-buy for the digital half of a hybrid computer.</strong>
+          Mythic already used digital SRAM, SIMD, RISC-V control, routing, conversion, calibration, and compilation
+          around analog matrix engines. Videantis adds a much broader VLIW/SIMD processor, explicit memory control,
+          complete-network execution, a compiler/SDK, simulation and debug tools, and automotive production experience.
+          This can contain accuracy-sensitive work in digital execution, but the companies have not published the
+          partition policy, numerical contract, calibration interface, or measured post-acquisition results.
+        </p>
+      </div>
+      <div class="case-verdict-grid">
+        <article>
+          <span class="evidence-label company">Confirmed disclosure</span>
+          <strong>Hybrid architecture is intentional</strong>
+          <p>Mythic says analog will execute efficient matrix operations while Videantis digital cores handle control, attention, non-max suppression, codecs, SLAM, and other high-performance work.</p>
+        </article>
+        <article>
+          <span class="evidence-label inference">Engineering inference</span>
+          <strong>Digital fallback can protect accuracy</strong>
+          <p>A compiler could route sensitive layers or unsupported operators to deterministic digital cores. The public announcement does not confirm that this sensitivity-based policy exists.</p>
+        </article>
+        <article>
+          <span class="evidence-label independent">Not yet demonstrated</span>
+          <strong>The combined accuracy claim remains open</strong>
+          <p>No public report gives same-model digital-INT8 versus hybrid accuracy across multiple chips, temperature, voltage, calibration age, device age, and analog coverage.</p>
+        </article>
+      </div>
+      <div class="evidence-key" aria-label="Evidence labels used on this page">
+        <span class="company">Company disclosure</span>
+        <span class="independent">Independent or academic source</span>
+        <span class="inference">Engineering inference</span>
+      </div>
+      <div class="boundary-band">
+        <h3>Public paper boundary</h3>
+        <p>
+          As of July 11, 2026, this review found Mythic architecture presentations, product documentation, software
+          documentation, demonstrations, press releases, and trade reporting, but no peer-reviewed Mythic silicon paper
+          publishing end-to-end model accuracy across chip populations, PVT corners, calibration age, and device aging.
+          Related flash-CIM papers explain plausible techniques, but they are not proof of Mythic's proprietary design.
+        </p>
+      </div>
+    </section>
+
+    <section class="section" id="mythic-execution">
+      <div class="section-heading">
+        <p class="eyebrow">Mythic execution flow chart</p>
+        <h2>Separate the disclosed analog-flash path from the proposed hybrid platform</h2>
+        <p class="section-note">
+          Mythic has disclosed graph conversion, analog-aware optimization, flash weight programming, analog MVM,
+          ADC readout, and digital tile support. The acquisition announcement discloses the intent to combine those
+          engines with Videantis cores. It does not disclose the unified runtime, partition cost model, or recovery
+          protocol drawn below.
+        </p>
+      </div>
+
+      <div class="diagram-key" aria-label="Mythic execution flow legend">
+        <span><i class="key-model"></i>Disclosed model and compiler path</span>
+        <span><i class="key-device"></i>Flash programming and calibration</span>
+        <span><i class="key-data"></i>Proposed hybrid inference</span>
+        <span><i class="key-control"></i>Required health and fallback loop</span>
+      </div>
+
+      <div class="cim-system-flow" aria-label="Mythic disclosed deployment flow and proposed Mythic Videantis hybrid execution flow chart">
+        <section class="flow-band flow-offline">
+          <header><b>Disclosed</b><strong>Prepare the Mythic model</strong><span>Public workflow material describes a mostly offline graph-to-analog deployment path.</span></header>
+          <ol class="flow-track six">
+            <li><b>1</b><strong>Import graph</strong><span>Framework or ONNX model and reference accuracy</span></li>
+            <li><b>2</b><strong>Set ranges</strong><span>Quantization, clipping, calibration data, ANA8 target</span></li>
+            <li><b>3</b><strong>Analog-aware adapt</strong><span>Retraining for supported analog execution</span></li>
+            <li><b>4</b><strong>Map graph</strong><span>Analog matrices, digital tile work, tensor layout</span></li>
+            <li><b>5</b><strong>Pack and generate</strong><span>Weight image, commands, code, deployment artifact</span></li>
+            <li><b>6</b><strong>Qualify</strong><span>Compare converted model with the named digital baseline</span></li>
+          </ol>
+        </section>
+
+        <div class="flow-transition" aria-hidden="true"><span>Bind to physical flash and converters</span></div>
+
+        <section class="flow-band flow-deploy">
+          <header><b>Partly disclosed</b><strong>Program and calibrate</strong><span>Programming, stored truth, refresh, and internal calibration are described; their detailed contract is proprietary.</span></header>
+          <ol class="flow-track five">
+            <li><b>1</b><strong>Select tiles</strong><span>Capacity, supported matrix shapes, healthy resources</span></li>
+            <li><b>2</b><strong>Program flash</strong><span>Map weights into multilevel conductance targets</span></li>
+            <li><b>3</b><strong>Verify or refresh</strong><span>Compare physical state with stored digital truth</span></li>
+            <li><b>4</b><strong>Calibrate</strong><span>Analog/digital correction, converter range, PVT state</span></li>
+            <li><b>5</b><strong>Bind artifact</strong><span>Device identity, programmed image, calibration version</span></li>
+          </ol>
+        </section>
+
+        <div class="flow-transition" aria-hidden="true"><span>Proposed post-acquisition steady state</span></div>
+
+        <section class="flow-band flow-inference">
+          <header><b>Proposed integration</b><strong>Execute one hybrid region</strong><span>This is the software contract the combined platform needs, not a published implementation.</span></header>
+          <ol class="flow-track six">
+            <li><b>1</b><strong>Digital prepare</strong><span>Videantis control, normalization, layout, scale, routing</span></li>
+            <li><b>2</b><strong>Choose target</strong><span>Analog coverage, sensitivity, deadline, locality, health</span></li>
+            <li><b>3</b><strong>Drive inputs</strong><span>Range-controlled activation bits or phases enter the tile</span></li>
+            <li><b>4</b><strong>Flash MVM and ADC</strong><span>Conductance MAC, integration, conversion, status</span></li>
+            <li><b>5</b><strong>Digital finish</strong><span>Accumulate, attention, nonlinear, codec, SLAM, control</span></li>
+            <li><b>6</b><strong>Apply policy</strong><span>Accept, repeat, recalibrate, refresh, or run digitally</span></li>
+          </ol>
+        </section>
+
+        <div class="flow-feedback">
+          <strong>Required closed loop</strong>
+          <span>Converter and tile telemetry &rarr; accuracy/health policy &rarr; calibration or flash refresh &rarr; sensitivity-aware digital fallback &rarr; auditable device-state update</span>
+        </div>
+      </div>
+
+      <div class="callout caution" style="margin-top:14px">
+        <p>
+          <strong>Evidence boundary:</strong> the individual Mythic and Videantis building blocks are disclosed, and
+          the acquisition announcement states the hybrid intent. The sequence below is a testable engineering model
+          for integration. Until Mythic publishes the unified compiler/runtime and measured combined silicon, it must
+          not be cited as the behavior of a shipping product.
+        </p>
+      </div>
+
+      <div class="sequence-heading">
+        <p class="eyebrow">Proposed Mythic-Videantis sequence diagram</p>
+        <h3>One request needs one owner for analog accuracy and digital fallback</h3>
+        <p>The critical interface is not only a command queue. It carries numerical ranges, calibration identity, health state, placement rationale, and the cost of crossing from analog to digital execution.</p>
+      </div>
+
+      <div class="diagram-scroll" tabindex="0" aria-label="Scrollable proposed Mythic Videantis inference sequence diagram">
+        <div class="cim-sequence">
+          <div class="sequence-header" aria-label="Sequence participants">
+            <div><b>Application</b><span>Model and request</span></div>
+            <div><b>Unified runtime</b><span>Proposed owner</span></div>
+            <div><b>Videantis cores</b><span>Digital execution</span></div>
+            <div><b>Mythic tile</b><span>Flash MVM and ADC</span></div>
+            <div><b>Calibration control</b><span>Device-bound state</span></div>
+          </div>
+          <ol class="sequence-body">
+            <li class="sequence-phase"><span>Load, program, and bind</span></li>
+            <li class="sequence-row"><div class="sequence-event event-1-2" aria-label="Application to unified runtime: load compiled hybrid artifact and reference policy"><span>Load hybrid artifact and reference policy</span></div></li>
+            <li class="sequence-row"><div class="sequence-event event-2-5" aria-label="Unified runtime to calibration control: query device identity, programmed state, converter calibration, and health"><span>Query device, programmed state, calibration, and health</span></div></li>
+            <li class="sequence-row"><div class="sequence-event event-4-5 reverse" aria-label="Calibration control to Mythic tile: program or refresh flash and calibrate"><span>Program/refresh flash and calibrate tile</span></div></li>
+            <li class="sequence-row"><div class="sequence-event event-2-4 reverse" aria-label="Mythic tile to unified runtime: return bound device state"><span>Return bound device state to runtime</span></div></li>
+            <li class="sequence-phase"><span>Request and repeated graph-region loop</span></li>
+            <li class="sequence-row"><div class="sequence-event event-1-2" aria-label="Application to unified runtime: submit input and latency accuracy policy"><span>Submit input and latency/accuracy policy</span></div></li>
+            <li class="sequence-row"><div class="sequence-event event-2-3" aria-label="Unified runtime to Videantis cores: run control, preprocessing, and partition decision"><span>Run control, preprocessing, and partition decision</span></div></li>
+            <li class="sequence-row"><div class="sequence-self self-digital" aria-label="Videantis digital operation: execute unsupported, sensitive, dynamic, and control work"><span>Execute unsupported, sensitive, dynamic, and control work</span></div></li>
+            <li class="sequence-row"><div class="sequence-event event-3-4" aria-label="Videantis cores to Mythic tile: send mapped matrix command, activation phases, range, and calibration identifier"><span>Send matrix command, activation phases, range, and calibration ID</span></div></li>
+            <li class="sequence-row"><div class="sequence-self self-cim" aria-label="Mythic tile operation: apply input approximation, compute flash matrix-vector multiplication, integrate, and convert through ADC"><span>Input phases &rarr; flash MVM &rarr; integrate &rarr; ADC</span></div></li>
+            <li class="sequence-row"><div class="sequence-event event-3-4 reverse" aria-label="Mythic tile to Videantis cores: return analog output, saturation, converter, and health status"><span>Return output, saturation, converter, and health status</span></div></li>
+            <li class="sequence-row"><div class="sequence-self self-digital" aria-label="Videantis digital operation: rescale, accumulate, finish operator, and continue graph"><span>Rescale, accumulate, finish operator, and continue graph</span></div></li>
+            <li class="sequence-row"><div class="sequence-event event-2-3 reverse" aria-label="Videantis cores to unified runtime: return graph-region result and measured cost"><span>Return region result, coverage, and measured cost</span></div></li>
+            <li class="sequence-phase sequence-alt"><span>Only when health or numerical policy fails</span></li>
+            <li class="sequence-row"><div class="sequence-event event-2-5" aria-label="Unified runtime to calibration control: request recalibration, refresh, remap, or quarantine"><span>Request recalibration, refresh, remap, or quarantine</span></div></li>
+            <li class="sequence-row"><div class="sequence-event event-2-5 reverse" aria-label="Calibration control to unified runtime: return updated device state or failed analog coverage"><span>Return updated state or reject analog coverage</span></div></li>
+            <li class="sequence-row"><div class="sequence-event event-2-3" aria-label="Unified runtime to Videantis cores: rerun rejected region using deterministic digital fallback"><span>Rerun rejected region with deterministic digital fallback</span></div></li>
+            <li class="sequence-row"><div class="sequence-event event-1-2 reverse" aria-label="Unified runtime to application: return output, trace, analog coverage, and health status"><span>Return output, trace, coverage, and health status</span></div></li>
+          </ol>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="mythic-bottlenecks">
+      <div class="section-heading">
+        <p class="eyebrow">Mythic-specific bottleneck map</p>
+        <h2>Videantis can remove system gaps, but it can also expose the true analog cost</h2>
+        <p class="section-note">
+          The acquisition helps most with flexible compute, scheduling, memory control, tools, and productization.
+          Flash programming, converter quality, calibration, retention, and analog effective precision remain Mythic
+          responsibilities. Boundary traffic and excessive fallback can erase the claimed analog advantage.
+        </p>
+      </div>
+
+      <div class="bottleneck-summary" aria-label="Three classes of Mythic and Videantis bottlenecks">
+        <article><b>Analog ceiling</b><strong>Flash and converter behavior</strong><span>Programming spread, multilevel retention, ADC effective precision, calibration, range, noise, PVT, and aging.</span></article>
+        <article><b>Hybrid ceiling</b><strong>Coverage and boundary traffic</strong><span>Input phases, output conversion, partial sums, local SRAM, NoC movement, digital fallback, and low analog utilization.</span></article>
+        <article><b>Product ceiling</b><strong>Integration and proof</strong><span>Two software histories, unified IR/runtime ownership, automotive qualification, fleet maintenance, and missing post-deal silicon evidence.</span></article>
+      </div>
+
+      <div class="table-wrap bottleneck-table">
+        <table>
+          <thead>
+            <tr><th scope="col">Bottleneck</th><th scope="col">Why it matters for Mythic</th><th scope="col">What Videantis can contribute</th><th scope="col">What still must be proved</th></tr>
+          </thead>
+          <tbody>
+            <tr><th scope="row">Flash programming precision</th><td>Mapping a weight to one of many conductance levels introduces programming spread and cell-dependent error before inference begins.</td><td>Nothing at the device level; digital cores can orchestrate programming, verification, remapping, and fallback.</td><td>Production distributions, write-verify policy, failed-cell handling, programming time, energy, yield, and capacity loss.</td></tr>
+            <tr><th scope="row">Retention, drift, and refresh</th><td>Stored analog state changes with time and environment, so model correctness has a calibration age and refresh history.</td><td>Health-vector execution, deterministic maintenance scheduling, telemetry, and a digital path while arrays are refreshed.</td><td>Refresh trigger, interval, accuracy recovery, downtime, endurance consumption, field policy, and lifetime corners.</td></tr>
+            <tr><th scope="row">ADC effective precision</th><td>Digitization follows every analog MVM. Offset, nonlinearity, noise, range, PVT, and saturation can set the real accuracy ceiling.</td><td>Range analysis, output correction, sensitive-region fallback, profiling, and software-visible status handling.</td><td>ENOB, INL/DNL, noise, offset, saturation rate, converter energy/area, chip variation, temperature, voltage, and aging.</td></tr>
+            <tr><th scope="row">Input-bit or phase delivery</th><td>Applying multibit activations over separate phases can serialize work and repeatedly charge array lines.</td><td>Input preparation, sparsity, scheduling, overlap, local buffering, and deterministic phase control.</td><td>Actual phase count, activation precision, DAC/input energy, overlap efficiency, utilization, and latency per mapped layer.</td></tr>
+            <tr><th scope="row">MVM dynamic range</th><td>Eight-bit weights do not imply an eight-bit dot-product result; long reductions can clip or lose small contributions.</td><td>Per-layer scaling, outlier routing, high-precision digital accumulation, extra passes, and digital execution for narrow error budgets.</td><td>Accumulator precision, output ranges, partial-sum policy, saturation statistics, model sensitivity, and correction energy.</td></tr>
+            <tr><th scope="row">Analog/digital boundary traffic</th><td>Every fallback or hybrid split may require conversion, SRAM storage, NoC transport, synchronization, and format changes.</td><td>Explicit memory management, multicore scheduling, local-data placement, fusion, and deterministic communication.</td><td>Bytes and conversions per inference, boundary latency/energy, buffer capacity, contention, and whether overlap hides the cost.</td></tr>
+            <tr><th scope="row">Digital fallback dilution</th><td>Fallback protects accuracy, but too much Videantis execution can reduce analog coverage and erase the energy advantage.</td><td>Efficient deterministic execution and a graceful path for unsupported or sensitive work.</td><td>Analog coverage by model and layer, fallback frequency, quality recovery, total energy, latency, area, and breakeven point.</td></tr>
+            <tr><th scope="row">Attention and KV state</th><td>Dynamic attention, normalization, softmax, control, and KV-cache traffic do not match static weight-stationary flash MVM cleanly.</td><td>Programmable VLIW/SIMD execution, memory control, and complete-network processing.</td><td>Memory hierarchy, KV capacity/bandwidth, long-context scaling, attention latency, and end-to-end LLM evidence.</td></tr>
+            <tr><th scope="row">Model loading and updates</th><td>Flash writes are slower and less update-friendly than ordinary SRAM or DRAM model loading.</td><td>Transactional deployment, digital adapters, staged rollout, rollback, and host/runtime control.</td><td>Cold-start time, update granularity, endurance, partial-write recovery, concurrent serving, and fleet rollout cost.</td></tr>
+            <tr><th scope="row">Unified compiler and runtime</th><td>Mythic and Videantis bring separate mapping assumptions, backends, tools, and performance models.</td><td>Videantis contributes mature analysis, code generation, simulation, profiling, debugging, and memory analysis.</td><td>One IR, numerical contract, partition objective, calibration ABI, debugger timeline, versioning, and ownership model.</td></tr>
+            <tr><th scope="row">Roadmap and evidence gap</th><td>Most detailed public Mythic architecture material describes older parts, while the company says it rebuilt architecture and software.</td><td>Production discipline and tools can improve reproducibility and qualification.</td><td>Post-acquisition silicon, same-model digital baseline, chip population, PVT/lifetime data, analog coverage, correction cost, and independent reproduction.</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="critical-path">
+        <strong>Mythic critical path</strong>
+        <p>First prove converter and flash accuracy across devices and time. Then prove that the unified compiler keeps sensitive work digital without excessive boundary traffic. Finally report end-to-end accuracy, latency, energy, analog coverage, calibration, refresh, and fallback together. A peak analog TOPS/W number cannot answer those questions.</p>
+      </div>
+    </section>
+
+    <section class="section" id="timeline">
+      <div class="section-heading">
+        <p class="eyebrow">Public record</p>
+        <h2>The architecture evolved from an analog accelerator toward a hybrid platform</h2>
+      </div>
+      <div class="timeline">
+        <article>
+          <time datetime="2018">2018</time>
+          <strong>Hot Chips architecture</strong>
+          <p>Mythic presented embedded-flash matrix memory, 8-bit weight levels, ADC output, digital input approximation, SRAM, SIMD, RISC-V, and a tile network.</p>
+        </article>
+        <article>
+          <time datetime="2020">2020</time>
+          <strong>M1108 demonstration</strong>
+          <p>Mythic described more than 27,000 converters, 8-bit conversion targets, internal variation handling, and ResNet-50 operation near a digital INT8 baseline.</p>
+        </article>
+        <article>
+          <time datetime="2021">2021</time>
+          <strong>M1076 product brief</strong>
+          <p>The 76-tile device advertised 25 TOPS, 80 million weights, 3-4 W typical model power, pre-qualified networks, and no external DRAM for model weights.</p>
+        </article>
+        <article>
+          <time datetime="2025-12-17">December 2025</time>
+          <strong>Funding and rebuild</strong>
+          <p>Mythic raised $125 million and stated that it had rebuilt its architecture, roadmap, software, and strategy. New performance figures were identified as internal benchmarks.</p>
+        </article>
+        <article>
+          <time datetime="2026-02-04">February 2026</time>
+          <strong>Honda co-development</strong>
+          <p>Honda announced investment and joint automotive-SoC development, combining Honda models and ECU expertise with Mythic's analog CIM and SDK work.</p>
+        </article>
+        <article>
+          <time datetime="2026-05-19">May 2026</time>
+          <strong>Videantis acquisition</strong>
+          <p>Mythic bought the German processor-IP company and retained all five founders. Financial terms were not disclosed in the public announcement.</p>
+        </article>
+      </div>
+    </section>
+
+    <section class="section" id="accuracy">
+      <div class="section-heading">
+        <p class="eyebrow">Mythic accuracy stack</p>
+        <h2>Public disclosures show several correction layers, but not a complete proof</h2>
+        <p class="section-note">
+          Mythic has not publicly disclosed every circuit or calibration algorithm. The flow below separates stated
+          mechanisms from the measurements that would still be required for an engineering sign-off.
+        </p>
+      </div>
+      <div class="hybrid-flow" aria-label="Mythic disclosed model-to-silicon accuracy path">
+        <article><b>1. Import</b><strong>Model graph</strong><span>ONNX, PyTorch, or framework graph enters an offline deployment flow.</span></article>
+        <article><b>2. Normalize</b><strong>Ranges and INT8</strong><span>Quantization and numerical-range choices bound converter inputs and outputs.</span></article>
+        <article><b>3. Program</b><strong>Flash weights</strong><span>Weights are represented by programmed conductance levels; stored truth can support refresh.</span></article>
+        <article><b>4. Stimulate</b><strong>Digital approximation</strong><span>Early architecture material applies input bits separately instead of a monolithic input DAC.</span></article>
+        <article><b>5. Compute</b><strong>Analog MVM</strong><span>Flash currents multiply and sum in parallel inside the memory array.</span></article>
+        <article><b>6. Convert</b><strong>8-bit ADC target</strong><span>Compact high-speed converters digitize outputs; calibration must contain mismatch and PVT error.</span></article>
+        <article><b>7. Complete</b><strong>Digital tile</strong><span>SRAM, SIMD, RISC-V, routing, and software execute non-MVM work and move tensors.</span></article>
+      </div>
+
+      <div class="table-shell top-gap">
+        <table class="mythic-table">
+          <thead>
+            <tr>
+              <th scope="col">Disclosed mechanism</th>
+              <th scope="col">Problem it addresses</th>
+              <th scope="col">What is publicly supported</th>
+              <th scope="col">Remaining evidence gap</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>8-bit flash weight representation</td>
+              <td>Maps a digital model into dense nonvolatile analog storage.</td>
+              <td>Hot Chips material describes 256 levels per weight and conductance-based multiplication.</td>
+              <td>No public distribution of programmed error, retention, endurance, or effective bits across production chips.</td>
+            </tr>
+            <tr>
+              <td>Refresh from off-chip true values</td>
+              <td>Can restore weights after drift or retention loss.</td>
+              <td>Mythic's 2018 explanation explicitly says flash resistance can be refreshed from stored truth.</td>
+              <td>Refresh interval, detection policy, write cost, downtime, endurance, and field telemetry are not disclosed.</td>
+            </tr>
+            <tr>
+              <td>Compact high-speed 8-bit conversion</td>
+              <td>Limits quantization error at the analog/digital boundary.</td>
+              <td>Mythic reported designing and production-testing tens of thousands of on-chip ADC/DAC elements.</td>
+              <td>No public INL, DNL, ENOB, offset, noise, temperature, voltage, yield, or aging tables.</td>
+            </tr>
+            <tr>
+              <td>Internal analog and digital calibration</td>
+              <td>Compensates mismatch, manufacturing variation, and environmental change.</td>
+              <td>Company statements and independent trade reporting describe calibration as central to reaching the 8-bit target.</td>
+              <td>The calibration equations, per-chip state, runtime triggers, cost, and failure policy remain proprietary.</td>
+            </tr>
+            <tr>
+              <td>Range setting, quantization, and retraining</td>
+              <td>Avoids clipping and makes the model robust to low-precision execution.</td>
+              <td>Public descriptions show an offline graph-to-analog-INT8 compilation path and pre-qualified models.</td>
+              <td>No complete public model table reports baseline, converted accuracy, analog accuracy, and calibration conditions.</td>
+            </tr>
+            <tr>
+              <td>Digital support inside each tile</td>
+              <td>Executes control and operations for which analog MVM is unsuitable.</td>
+              <td>M1076 documentation lists RISC-V, SIMD, SRAM, and NoC resources beside every analog engine.</td>
+              <td>The supported-operator list, fallback precision, conversion traffic, and accuracy impact are not public.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="boundary-band">
+        <h3>"INT8 accuracy" is not "perfect 8-bit analog arithmetic"</h3>
+        <p>
+          A model can finish close to a digital INT8 baseline even when individual analog operations have fewer
+          effective bits, because quantization, calibration, retraining, error averaging, and digital execution can
+          absorb some error. A valid proof must report task accuracy against the same digital baseline and also expose
+          effective precision, saturation, chip variation, PVT, retention time, calibration age, and correction cost.
+        </p>
+      </div>
+    </section>
+
+    <section class="section" id="videantis">
+      <div class="section-heading">
+        <p class="eyebrow">What Mythic bought</p>
+        <h2>Videantis contributes the programmable digital system around the analog engine</h2>
+      </div>
+      <div class="codesign-lanes">
+        <article class="lane hardware-lane">
+          <span class="status-pill status-measured">Digital processor IP</span>
+          <h3>VLIW plus SIMD unified cores</h3>
+          <p>Scalable identical cores execute deep learning, classical vision, signal processing, imaging, video, attention, non-max suppression, and SLAM.</p>
+          <p><strong>Accuracy relevance:</strong> deterministic digital execution is a natural home for sensitive, nonlinear, control-heavy, and unsupported graph regions.</p>
+        </article>
+        <article class="lane software-lane">
+          <span class="status-pill status-partial">Production software stack</span>
+          <h3>Compiler, SDK, simulator, and debug</h3>
+          <p>The v-NN SDK performs data-type analysis, dataflow analysis, graph partitioning, multicore mapping, and optimization. The tool suite includes a C compiler, code generation, simulation, profiling, debugging, coverage, and runtime memory analysis.</p>
+          <p><strong>Accuracy relevance:</strong> the tools can host a future sensitivity-aware hybrid partitioner, but the Mythic integration has not been published.</p>
+        </article>
+        <article class="lane runtime-lane">
+          <span class="status-pill status-conditional">System and automotive maturity</span>
+          <h3>Explicit memory and deterministic deployment</h3>
+          <p>Videantis emphasizes local data, explicit memory management, predictable execution, automotive sign-off tooling, ASPICE history, and deployed processor IP.</p>
+          <p><strong>Accuracy relevance:</strong> repeatable scheduling and observability improve validation, but field reliability of prior digital IP does not prove the new analog subsystem's numerical accuracy.</p>
+        </article>
+      </div>
+      <div class="callout caution">
+        <p>
+          <strong>Important boundary:</strong> Videantis does not publicly claim a flash-programming, ADC-calibration,
+          analog-noise, or drift-remediation technology. It solves digital completeness, programmability, data movement,
+          tooling, and productization. Any direct benefit to analog model accuracy comes through partitioning, fallback,
+          orchestration, and validation, unless Mythic later discloses a deeper integration.
+        </p>
+      </div>
+    </section>
+
+    <section class="section" id="acquisition">
+      <div class="section-heading">
+        <p class="eyebrow">Build-versus-buy analysis</p>
+        <h2>The acquisition is strategically coherent because it buys time, software, and production discipline</h2>
+      </div>
+      <div class="acquisition-score">
+        <article><span class="score-value">High fit</span><strong>Architecture complement</strong><p>Analog MVM and programmable digital execution solve different workload regions and share a data-locality philosophy.</p></article>
+        <article><span class="score-value">High leverage</span><strong>Time to product</strong><p>Mythic obtains roughly two decades of processor-IP work, a mature toolchain, founders, and deployed automotive experience instead of rebuilding all of it.</p></article>
+        <article><span class="score-value medium">Indirect</span><strong>Accuracy benefit</strong><p>Digital fallback and partitioning can reduce exposure to analog error, but no public combined benchmark proves the gain.</p></article>
+        <article><span class="score-value low">Low direct effect</span><strong>Cell and converter error</strong><p>Videantis does not directly remove flash drift, programming spread, ADC/DAC nonlinearity, PVT sensitivity, noise, or aging.</p></article>
+        <article><span class="score-value">High value</span><strong>Automotive readiness</strong><p>Tooling, deterministic execution, existing production programs, and safety-process experience align with the Honda SoC schedule.</p></article>
+        <article><span class="score-value medium">Unknown</span><strong>Financial return</strong><p>The public announcement does not disclose purchase price, consideration, revenue, integration cost, or financial targets.</p></article>
+      </div>
+
+      <div class="table-shell top-gap">
+        <table class="mythic-table">
+          <thead>
+            <tr>
+              <th scope="col">System problem</th>
+              <th scope="col">Mythic before the deal</th>
+              <th scope="col">Videantis contribution</th>
+              <th scope="col">Assessment</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td>Dense matrix energy</td><td>Embedded-flash analog MVM.</td><td>Orchestration and surrounding digital work.</td><td>Mythic remains the primary solution.</td></tr>
+            <tr><td>Attention, NMS, SLAM, codecs, control</td><td>Small SIMD/RISC-V resources and host execution.</td><td>Scalable VLIW/SIMD cores and software libraries.</td><td>Direct and explicitly stated acquisition benefit.</td></tr>
+            <tr><td>Accuracy-sensitive graph regions</td><td>Calibration, conversion, digital support, and model qualification.</td><td>Potential deterministic fallback target.</td><td>Strong engineering inference; public policy and results are missing.</td></tr>
+            <tr><td>Graph partitioning and scheduling</td><td>Proprietary Mythic compiler flow.</td><td>v-NN data-type/dataflow analysis and multicore mapping.</td><td>Promising, but the unified IR and cost model are undisclosed.</td></tr>
+            <tr><td>On-chip data movement</td><td>Tile SRAM and NoC.</td><td>Explicit memory management, hierarchical storage, and intelligent scheduling.</td><td>Can reduce boundary traffic if the analog/digital interface is co-designed.</td></tr>
+            <tr><td>Flash, ADC, PVT, drift, aging</td><td>Mythic analog design, calibration, refresh, and software compensation.</td><td>No disclosed device-level solution.</td><td>Not solved by the acquisition itself.</td></tr>
+            <tr><td>Automotive deployment</td><td>Honda co-development and Mythic SDK experience.</td><td>Long production history, sign-off tools, ASPICE experience, and automotive customers.</td><td>Major schedule and execution-risk reduction, but the new hybrid SoC needs its own qualification.</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="boundary-band">
+        <h3>Why acquire instead of license?</h3>
+        <p>
+          The transaction retains all five Videantis founders and keeps Videantis as a wholly owned subsidiary. That
+          gives Mythic control of the architecture roadmap, compiler/runtime integration, safety process, customer
+          support, and scarce engineering knowledge. A normal IP license would provide cores and tools, but less control
+          over the cross-layer numerical contract that a new analog-digital machine requires. This is an inference from
+          the disclosed structure of the deal; Mythic did not publish its internal build-versus-buy analysis.
+        </p>
+      </div>
+    </section>
+
+    <section class="section" id="combined-stack">
+      <div class="section-heading">
+        <p class="eyebrow">Required combined architecture</p>
+        <h2>A hybrid chip needs one compiler contract, not two accelerators connected after the fact</h2>
+      </div>
+      <div class="codesign-flow" aria-label="Proposed Mythic Videantis hybrid software flow">
+        <article class="flow-step"><b>1. Characterize</b><strong>Analog target profile</strong><span>Noise, programming error, converters, PVT, drift, faults, calibration cost</span></article>
+        <article class="flow-step"><b>2. Analyze</b><strong>Graph sensitivity</strong><span>Layer error budget, precision, unsupported ops, fallback value, safety criticality</span></article>
+        <article class="flow-step"><b>3. Partition</b><strong>Analog or digital</strong><span>Joint latency, energy, accuracy, capacity, conversion, locality, and risk objective</span></article>
+        <article class="flow-step"><b>4. Lower</b><strong>Two coordinated backends</strong><span>Flash programming and array mapping plus VLIW/SIMD code generation</span></article>
+        <article class="flow-step"><b>5. Schedule</b><strong>Explicit tensor movement</strong><span>Local buffers, NoC routes, synchronization, conversion, deterministic deadlines</span></article>
+        <article class="flow-step"><b>6. Package</b><strong>Bound artifact</strong><span>Model, digital code, analog weights, calibration, chip identity, fallback policy</span></article>
+        <article class="flow-step"><b>7. Maintain</b><strong>Runtime health loop</strong><span>Monitors, recalibration, refresh, remap, digital fallback, rollback, provenance</span></article>
+        <article class="flow-step"><b>8. Prove</b><strong>Evidence report</strong><span>Accuracy, coverage, PVT, lifetime, latency, energy, conversion traffic, safety</span></article>
+      </div>
+
+      <div class="contract-grid top-gap">
+        <article><code>AnalogTargetProfile</code><strong>Measured capability</strong><p>Per-chip array, converter, noise, fault, PVT, energy, latency, drift, and calibration data.</p></article>
+        <article><code>NumericalContract</code><strong>Operator tolerance</strong><p>Accepted input/output range, error distribution, saturation, precision, accumulation, and fallback rule.</p></article>
+        <article><code>PartitionDecision</code><strong>Auditable placement</strong><p>Why each graph region runs on analog, Videantis digital, host CPU, or a rejected path.</p></article>
+        <article><code>CalibrationArtifact</code><strong>Deployment state</strong><p>Programming targets, scales, offsets, chip identity, temperature assumptions, age, and refresh policy.</p></article>
+        <article><code>RuntimeHealth</code><strong>Field maintenance</strong><p>Sentinel results, drift score, converter health, refresh count, fallback events, and rollback status.</p></article>
+        <article><code>EvidenceReport</code><strong>Claim boundary</strong><p>Baseline, datasets, analog coverage, chip count, conditions, accuracy delta, correction cost, and exclusions.</p></article>
+      </div>
+    </section>
+
+    <section class="section" id="claims">
+      <div class="section-heading">
+        <p class="eyebrow">Source-labeled claim ledger</p>
+        <h2>Separate disclosed facts, independent concerns, and reasonable inference</h2>
+      </div>
+      <div class="segmented" data-filter-group="claim-grid" aria-label="Filter Mythic and Videantis claims">
+        <button class="segment-button" type="button" data-filter="all" aria-pressed="true">All claims</button>
+        <button class="segment-button" type="button" data-filter="company" aria-pressed="false">Company</button>
+        <button class="segment-button" type="button" data-filter="independent" aria-pressed="false">Independent</button>
+        <button class="segment-button" type="button" data-filter="inference" aria-pressed="false">Inference</button>
+      </div>
+      <div class="paper-grid" id="claim-grid">
+        <article class="paper-card claim-card" data-domain="company">
+          <span class="evidence-label company">Mythic, 2018</span>
+          <h3>Flash levels and refresh</h3>
+          <p>Mythic described 8-bit weights as 256 programmed flash conductance levels and stated that resistance values could be refreshed from an off-chip true copy.</p>
+          <p class="paper-boundary"><strong>Boundary:</strong> architecture disclosure, not a population/lifetime measurement.</p>
+        </article>
+        <article class="paper-card claim-card" data-domain="company">
+          <span class="evidence-label company">Mythic, 2020-2021</span>
+          <h3>Converters, calibration, and INT8 target</h3>
+          <p>Mythic reported compact high-speed 8-bit converters, manufacturing test, variation handling, model quantization, and production intent near a digital INT8 baseline.</p>
+          <p class="paper-boundary"><strong>Boundary:</strong> no complete public benchmark table or converter characterization.</p>
+        </article>
+        <article class="paper-card claim-card" data-domain="independent">
+          <span class="evidence-label independent">Trade reporting</span>
+          <h3>Internal calibration is essential</h3>
+          <p>Independent coverage describes analog and digital calibration inside M1076 and reports Mythic's close-to-INT8 accuracy claims.</p>
+          <p class="paper-boundary"><strong>Boundary:</strong> reporting based substantially on vendor briefings, not an independent silicon reproduction.</p>
+        </article>
+        <article class="paper-card claim-card" data-domain="independent">
+          <span class="evidence-label independent">Industry critique</span>
+          <h3>Effective precision and aging remain disputed</h3>
+          <p>Semiconductor Engineering highlights concerns around multi-level flash precision, aging, manufacturing spread, analog noise, and ADC/DAC energy.</p>
+          <p class="paper-boundary"><strong>Boundary:</strong> the article does not identify the cause of Mythic's earlier commercial setback and should not be treated as a Mythic failure analysis.</p>
+        </article>
+        <article class="paper-card claim-card" data-domain="company">
+          <span class="evidence-label company">Acquisition release</span>
+          <h3>Videantis is the digital half</h3>
+          <p>Mythic explicitly assigns dense matrix work to analog and flexible control, attention, NMS, codecs, SLAM, and other high-performance work to Videantis digital execution.</p>
+          <p class="paper-boundary"><strong>Boundary:</strong> combined silicon, scheduling, accuracy, and energy results were not published.</p>
+        </article>
+        <article class="paper-card claim-card" data-domain="company">
+          <span class="evidence-label company">Videantis disclosure</span>
+          <h3>Mature mapping and validation tools</h3>
+          <p>The v-NN SDK performs data-type and dataflow analysis, partitioning, and mapping. The tool suite includes simulation, profiling, debugging, coverage, memory analysis, and automotive sign-off support.</p>
+          <p class="paper-boundary"><strong>Boundary:</strong> these are digital-platform capabilities; their integration with Mythic calibration is not public.</p>
+        </article>
+        <article class="paper-card claim-card" data-domain="inference">
+          <span class="evidence-label inference">Engineering inference</span>
+          <h3>Sensitivity-aware digital fallback is plausible</h3>
+          <p>A unified compiler could route layers with narrow error budgets, converter saturation, unsupported math, or safety constraints to Videantis cores.</p>
+          <p class="paper-boundary"><strong>Boundary:</strong> plausible architecture, not a disclosed feature or measured result.</p>
+        </article>
+        <article class="paper-card claim-card" data-domain="company independent">
+          <span class="evidence-label company">Current roadmap claim</span>
+          <h3>100x energy efficiency remains a claim</h3>
+          <p>Mythic's 2025-2026 releases cite internal benchmarks and a 100x advantage over GPU systems; Honda independently confirms co-development and investment.</p>
+          <p class="paper-boundary"><strong>Boundary:</strong> partnership validates interest and diligence, not the advertised benchmark without public methodology and results.</p>
+        </article>
+      </div>
+    </section>
+
+    <section class="section" id="proof">
+      <div class="section-heading">
+        <p class="eyebrow">What would prove the strategy</p>
+        <h2>Require an ablation that measures both accuracy recovery and its digital cost</h2>
+      </div>
+      <div class="proof-grid">
+        <article><b>Baseline</b><strong>Same model, same data</strong><p>Report FP32 and production digital INT8 before any analog conversion.</p></article>
+        <article><b>Analog-only</b><strong>Expose raw weakness</strong><p>Measure Mythic mapping with calibration but without Videantis fallback.</p></article>
+        <article><b>Hybrid</b><strong>Measure recovered accuracy</strong><p>Add sensitivity-based digital placement and publish the exact analog coverage.</p></article>
+        <article><b>Ablation</b><strong>Price every correction</strong><p>Disable calibration, retraining, refresh, and fallback one at a time.</p></article>
+        <article><b>Population</b><strong>Multiple chips and lots</strong><p>Publish mean, tails, weak arrays, yield, remapping, and rejected devices.</p></article>
+        <article><b>Corners</b><strong>Voltage and temperature</strong><p>Sweep the operating envelope and repeat before and after recalibration.</p></article>
+        <article><b>Lifetime</b><strong>Retention and aging</strong><p>Measure drift, read disturb, refresh frequency, endurance, and field policy.</p></article>
+        <article><b>System cost</b><strong>End-to-end energy</strong><p>Include converters, digital cores, NoC, buffers, host traffic, and idle power.</p></article>
+      </div>
+    </section>
+
+    <section class="section" id="labs" data-progress="mythic-videantis-case-labs">
+      <div class="section-heading">
+        <p class="eyebrow">Study and interview labs</p>
+        <h2>Turn the acquisition into testable engineering work</h2>
+      </div>
+      <div class="progress-panel" aria-live="polite">
+        <div class="progress-track"><div class="progress-bar" data-progress-bar role="progressbar" aria-label="Mythic Videantis study progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"></div></div>
+        <span class="progress-value" data-progress-value>0 / 6 complete</span>
+      </div>
+      <div class="lab-list">
+        <label class="lab-item"><input type="checkbox" data-step="quantization"><span><strong>INT8 claim audit</strong><span>Define digital INT8, analog effective precision, task accuracy, and the measurements needed to connect them.</span></span></label>
+        <label class="lab-item"><input type="checkbox" data-step="partition"><span><strong>Hybrid partitioner</strong><span>Score ResNet and transformer graph regions by sensitivity, operator support, energy, conversion cost, and deadline.</span></span></label>
+        <label class="lab-item"><input type="checkbox" data-step="calibration"><span><strong>Calibration lifecycle</strong><span>Design program, verify, scale/offset calibration, health checks, refresh, digital fallback, and rollback state.</span></span></label>
+        <label class="lab-item"><input type="checkbox" data-step="ablation"><span><strong>Accuracy-cost ablation</strong><span>Compare digital INT8, analog-only, and hybrid execution while reporting analog coverage and every correction cost.</span></span></label>
+        <label class="lab-item"><input type="checkbox" data-step="acquisition"><span><strong>Build-versus-buy memo</strong><span>Evaluate roadmap control, schedule, IP, talent, automotive process, integration risk, and undisclosed financial terms.</span></span></label>
+        <label class="lab-item"><input type="checkbox" data-step="interview"><span><strong>Interview design review</strong><span>Present the combined target profile, numerical contract, compiler partition, runtime health loop, and proof plan.</span></span></label>
+      </div>
+    </section>
+
+    <section class="section" id="sources">
+      <div class="section-heading">
+        <p class="eyebrow">Sources and evidence boundaries</p>
+        <h2>Company disclosures, official partner confirmation, independent reporting, and related research</h2>
+      </div>
+      <div class="source-grid">
+        <article class="source-card"><a href="https://mythic.ai/whats-new/mythic-acquires-videantis-one-of-europes-leading-digital-processor-ip-companies-to-build-the-worlds-most-energy-efficient-ai-compute-platform/">Mythic acquisition announcement</a><span>May 19, 2026 | transaction structure, Videantis production claims, VLIW/SIMD architecture, and hybrid analog/digital intent</span></article>
+        <article class="source-card"><a href="https://www.videantis.com/processors">Videantis processor and SDK</a><span>Unified digital architecture, complete-network execution, explicit memory, data-type/dataflow analysis, mapping, compiler, simulator, profiler, and sign-off tools</span></article>
+        <article class="source-card"><a href="https://www.videantis.com/company">Videantis company milestones</a><span>Spinout history, production milestones, ASPICE, automotive programs, tape-outs, and 5-nm SoC work; company-reported</span></article>
+        <article class="source-card"><a href="https://old.hotchips.org/hc30/2conf/2.05_Mythic_Mythic_Hot_Chips_2018_V5.pdf">Mythic Hot Chips 2018</a><span>Embedded-flash matrix memory, ADC output, digital approximation, mixed-signal tile, host interface, and energy model</span></article>
+        <article class="source-card"><a href="https://medium.com/mythic-ai/mythic-hot-chips-2018-637dfb9e38b7">Mythic Hot Chips explanation</a><span>8-bit flash levels, off-chip truth and refresh, DAC/ADC operation, digital approximation, SRAM, SIMD, RISC-V, and NoC</span></article>
+        <article class="source-card"><a href="https://mythic.ai/wp-content/uploads/2022/03/M1076-AMP-Product-Brief-v1.0-1.pdf">M1076 product brief</a><span>76 tiles, 80 million weights, 25 TOPS, 3-4 W typical model power, pre-qualified DNNs, and digital tile resources</span></article>
+        <article class="source-card"><a href="https://mythic.ai/whats-new/the-era-of-analog-compute-has-arrived/">Mythic 2020 accuracy disclosure</a><span>Converter count, 8-bit conversion target, production testing, variation resilience, ResNet-50 demonstration, and INT8 claim</span></article>
+        <article class="source-card"><a href="https://mythic.ai/technology/mythic-ai-workflow/">Mythic AI workflow</a><span>FP32-to-ANA8 optimization, quantization-aware and analog-aware retraining, graph mapping, packing, code generation, and deployment artifact</span></article>
+        <article class="source-card"><a href="https://mythic.ai/whats-new/an-evolution-in-power-management-with-mythics-analog-matrix-processor/">Mythic numerical-range discussion</a><span>Range setting, 8-bit-and-below inference, converter overhead, flash MVM, and no-external-DRAM rationale</span></article>
+        <article class="source-card"><a href="https://mythic.ai/whats-new/mythic-to-challenge-ais-gpu-pantheon-with-100x-energy-advantage-and-oversubscribed-125m-raise/">Mythic 2025 funding and roadmap</a><span>$125 million round, architecture/software/strategy rebuild, 120 TOPS/W and LLM figures labeled as company or internal benchmarks</span></article>
+        <article class="source-card"><a href="https://global.honda/en/topics/2026/c_2026-02-04eng.html">Honda official co-development announcement</a><span>Investment, automotive SoC plan, Honda model/ECU contribution, and Mythic analog CIM plus SDK contribution</span></article>
+        <article class="source-card"><a href="https://www.eetimes.com/mythic-ai-accelerator-targets-high-end-edge-with-35-tops/">EE Times M1108 report</a><span>Tile structure, precision modes, ADC emphasis, ResNet-50 claim, and close-to-INT8 vendor statements</span></article>
+        <article class="source-card"><a href="https://semiengineering.com/is-in-memory-compute-still-alive/">Semiconductor Engineering critique</a><span>Independent concerns about effective precision, aging, variation, analog noise, conversion overhead, and system completeness</span></article>
+        <article class="source-card"><a href="https://www.nature.com/articles/s44335-025-00044-2">High-precision AIMC review</a><span>General error taxonomy and mitigation through slicing, error correction, mixed precision, and iterative refinement; not Mythic-specific</span></article>
+        <article class="source-card"><a href="https://arxiv.org/abs/1611.03379">Temperature-insensitive NOR-flash VMM</a><span>Related academic flash mechanism: sub-1% cell tuning and temperature-insensitive design; not evidence of Mythic implementation</span></article>
+        <article class="source-card"><a href="https://arxiv.org/abs/2109.01262">Accuracy of analog inference accelerators</a><span>Academic framework for rigorous accuracy evaluation; useful for the proof plan, not a Mythic measurement</span></article>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <p>Source-critical company case study. Vendor claims, partner confirmation, independent reporting, academic context, and engineering inference are labeled separately.</p>
+    <div class="footer-links">
+      <a href="analog-cim-hardware-software-codesign.html">Back to hardware/software co-design</a>
+      <a href="https://github.com/buicongnguyen/NPU">Source</a>
+    </div>
+  </footer>
+</body>
+</html>

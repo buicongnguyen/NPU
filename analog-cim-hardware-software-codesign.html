@@ -1,0 +1,705 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="A paper-driven study of Analog CIM architectures, execution flow, inference sequence, system bottlenecks, and the hardware, compiler, training, runtime, calibration, and validation techniques used to solve them.">
+  <title>Analog CIM Hardware and Software Co-design | NPU Study Guide</title>
+  <link rel="stylesheet" href="analog-cim.css">
+  <link rel="stylesheet" href="npu-engineering.css">
+  <link rel="stylesheet" href="analog-cim-codesign.css">
+  <script src="npu-engineering.js" defer></script>
+</head>
+<body>
+  <header class="site-header">
+    <a class="brand" href="index.html" aria-label="NPU Study Guide home">
+      <img src="https://avatars.githubusercontent.com/u/72680210?v=4" alt="Bui Cong Nguyen avatar">
+      <span>NPU Study Guide</span>
+    </a>
+    <nav class="site-nav" aria-label="Analog CIM learning path">
+      <a href="analog-cim-architecture.html">Architecture</a>
+      <a href="analog-cim-evidence.html">Evidence</a>
+      <a href="analog-cim-hardware-software-codesign.html" aria-current="page">Co-design</a>
+      <a href="analog-cim-tenstorrent-reuse.html">Reuse</a>
+      <a href="analog-cim-interview.html">Interview</a>
+      <a href="analog-cim-quiz.html">MCQ Lab</a>
+    </nav>
+  </header>
+
+  <main>
+    <section class="hero">
+      <div class="hero-copy">
+        <p class="eyebrow">Paper-to-engineering study | research snapshot 2026-07-11</p>
+        <h1>Solving Analog CIM Problems in Hardware and Software</h1>
+        <p class="lede">
+          Analog compute-in-memory is not one architecture and accuracy is not one problem. SRAM charge-domain
+          macros, RRAM crossbars, PCM tiles, embedded-flash arrays, and heterogeneous processors fail differently.
+          The strongest papers recover useful accuracy by co-designing devices, circuits, converters, digital units,
+          compilers, training, calibration, runtime maintenance, and validation.
+        </p>
+        <div class="hero-actions">
+          <a class="button" href="#execution-flow">Trace Analog CIM execution</a>
+          <a class="button" href="#architectures">Compare architectures</a>
+          <a class="button secondary" href="#papers">Inspect paper solutions</a>
+          <a class="button secondary" href="#software">Build the software stack</a>
+        </div>
+        <div class="summary-strip" aria-label="Analog CIM co-design summary">
+          <div><strong>Characterize</strong><span>Measure real error distributions and corners</span></div>
+          <div><strong>Contain</strong><span>Fix high-cost errors near the device and converter</span></div>
+          <div><strong>Adapt</strong><span>Train, map, and calibrate for the measured target</span></div>
+          <div><strong>Maintain</strong><span>Track per-chip state, drift, faults, and fallback</span></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="verdict">
+      <div class="section-heading">
+        <p class="eyebrow">Research verdict</p>
+        <h2>The papers show scoped solutions, not a universal accuracy cure</h2>
+      </div>
+      <div class="callout verdict">
+        <p>
+          <strong>Analog accuracy is now engineerable for selected models and operating conditions.</strong> NeuRRAM,
+          IBM PCM systems, heterogeneous memristor/SRAM processors, and full-stack memristor platforms demonstrate
+          that cross-layer mitigation can approach a declared software baseline. The 2026 reviews still identify
+          variability, nonlinearity, drift, endurance, converters, parasitics, and mitigation overhead as active
+          deployment barriers. A valid claim must name the workload, baseline, hardware boundary, calibration state,
+          time horizon, chip population, and cost of every correction.
+        </p>
+      </div>
+      <div class="verdict-grid" style="margin-top:12px">
+        <article><b>Hardware alone</b><strong>Necessary, not sufficient</strong><span>Better cells and ADCs cannot choose model partitioning or create noise robustness.</span></article>
+        <article><b>Training alone</b><strong>Necessary for weak regimes</strong><span>Noise injection cannot repair saturation, catastrophic faults, missing dynamic range, or a broken ABI.</span></article>
+        <article><b>Compiler alone</b><strong>Allocates the error budget</strong><span>Mapping and fallback work only when the target exposes measured capabilities and calibration state.</span></article>
+        <article><b>Runtime alone</b><strong>Preserves the deployed state</strong><span>Calibration and refresh cannot recover a model that was never trained or mapped for the hardware.</span></article>
+      </div>
+      <div class="case-study-link">
+        <div>
+          <h3>Industry test: Mythic's 2026 Videantis acquisition</h3>
+          <p>See which accuracy mechanisms Mythic has disclosed, what the acquired digital architecture can actually solve, and what remains unproven.</p>
+        </div>
+        <a class="button secondary" href="analog-cim-mythic-videantis.html">Open the case study</a>
+      </div>
+    </section>
+
+    <section class="section" id="execution-flow">
+      <div class="section-heading">
+        <p class="eyebrow">System flow chart</p>
+        <h2>Analog CIM is a lifecycle, not only a crossbar operation</h2>
+        <p class="section-note">
+          The compiler prepares a device-aware artifact, deployment creates per-chip state, inference alternates
+          between digital and analog engines, and maintenance feeds measured drift back into calibration. The four
+          phases have different bottlenecks and must be measured separately.
+        </p>
+      </div>
+
+      <div class="diagram-key" aria-label="Flow chart legend">
+        <span><i class="key-model"></i>Model and compiler</span>
+        <span><i class="key-device"></i>Programming and device state</span>
+        <span><i class="key-data"></i>Inference data path</span>
+        <span><i class="key-control"></i>Telemetry and recovery</span>
+      </div>
+
+      <div class="cim-system-flow" aria-label="Analog CIM model preparation, deployment, inference, and maintenance flow chart">
+        <section class="flow-band flow-offline">
+          <header><b>Offline</b><strong>Prepare and compile</strong><span>Model accuracy is converted into an explicit hardware error budget.</span></header>
+          <ol class="flow-track five">
+            <li><b>1</b><strong>Reference model</strong><span>FP baseline, task metrics, calibration data</span></li>
+            <li><b>2</b><strong>Quantize and harden</strong><span>W4/W8 baseline, clipping, HWA noise, distillation</span></li>
+            <li><b>3</b><strong>Partition graph</strong><span>Analog MVM, SRAM, digital engine, CPU fallback</span></li>
+            <li><b>4</b><strong>Physical lowering</strong><span>Arrays, signed encoding, slices, ranges, partial sums</span></li>
+            <li><b>5</b><strong>Package artifact</strong><span>Commands, weight plan, calibration schema, debug map</span></li>
+          </ol>
+        </section>
+
+        <div class="flow-transition" aria-hidden="true"><span>Deploy to one physical device</span></div>
+
+        <section class="flow-band flow-deploy">
+          <header><b>Deployment</b><strong>Create device-bound state</strong><span>The same portable model may produce a different programming image for each chip.</span></header>
+          <ol class="flow-track five">
+            <li><b>1</b><strong>Discover</strong><span>Revision, healthy arrays, converter modes, firmware ABI</span></li>
+            <li><b>2</b><strong>Program weights</strong><span>Conductance targets, pulses, references, signed cells</span></li>
+            <li><b>3</b><strong>Write and verify</strong><span>Retry, remap faults, reject weak cells or arrays</span></li>
+            <li><b>4</b><strong>Calibrate</strong><span>Gain, offset, ADC range, saturation, temperature</span></li>
+            <li><b>5</b><strong>Bind state</strong><span>Fault map, calibration version, age, provenance</span></li>
+          </ol>
+        </section>
+
+        <div class="flow-transition" aria-hidden="true"><span>Run a layer or token</span></div>
+
+        <section class="flow-band flow-inference">
+          <header><b>Steady state</b><strong>Execute hybrid inference</strong><span>The analog array accelerates dense linear work; digital logic completes the operator and graph.</span></header>
+          <ol class="flow-track six">
+            <li><b>1</b><strong>Prepare activation</strong><span>Digital norm, scale, clip, tile, route</span></li>
+            <li><b>2</b><strong>DAC encode</strong><span>Static A8 range, voltage, pulse, or bit phases</span></li>
+            <li><b>3</b><strong>Analog MVM</strong><span>Conductance products and physical column summation</span></li>
+            <li><b>4</b><strong>ADC readout</strong><span>Integrate, sense, quantize, detect saturation</span></li>
+            <li><b>5</b><strong>Digital finish</strong><span>High-precision partial sums, bias, residual, activation</span></li>
+            <li><b>6</b><strong>Check policy</strong><span>Accept, repeat, use higher fidelity, or fall back</span></li>
+          </ol>
+        </section>
+
+        <div class="flow-feedback">
+          <strong>Closed-loop maintenance</strong>
+          <span>Telemetry &rarr; health vectors &rarr; drift/saturation decision &rarr; recalibrate, refresh, remap, or digital fallback &rarr; update the device-state bundle</span>
+        </div>
+      </div>
+
+      <div class="callout" style="margin-top:14px">
+        <p>
+          <strong>For a 4-bit LLM, the 4-bit boundary normally belongs to weight storage, not to every arrow.</strong>
+          A practical hybrid path is W4-like stored weights, 8-bit DAC inputs and ADC outputs, followed by
+          higher-precision digital accumulation. The <a href="https://arxiv.org/abs/2505.09663">Analog Foundation
+          Models</a> study uses static 8-bit analog input/output boundaries, keeps attention and other digital work
+          in FP16, and keeps the KV cache in FP16. Its result is evidence for hardware-aware adaptation, not a reason
+          to build a 4-bit ADC and 4-bit accumulator.
+        </p>
+      </div>
+
+      <div class="sequence-heading">
+        <p class="eyebrow">Inference sequence diagram</p>
+        <h3>One request crosses five ownership boundaries</h3>
+        <p>The initialization messages run when a model is loaded. The layer loop repeats for every mapped graph region, and the recovery branch runs only when telemetry crosses a declared limit.</p>
+      </div>
+
+      <div class="diagram-scroll" tabindex="0" aria-label="Scrollable Analog CIM inference sequence diagram">
+        <div class="cim-sequence">
+          <div class="sequence-header" aria-label="Sequence participants">
+            <div><b>Application</b><span>Model and request</span></div>
+            <div><b>Runtime</b><span>Schedule and policy</span></div>
+            <div><b>Digital engine</b><span>Tensor preparation</span></div>
+            <div><b>CIM tile</b><span>DAC, array, ADC</span></div>
+            <div><b>Firmware</b><span>Calibration and health</span></div>
+          </div>
+          <ol class="sequence-body">
+            <li class="sequence-phase"><span>Initialization and device binding</span></li>
+            <li class="sequence-row"><div class="sequence-event event-1-2" aria-label="Application to runtime: load compiled model artifact"><span>Load compiled model artifact</span></div></li>
+            <li class="sequence-row"><div class="sequence-event event-2-5" aria-label="Runtime to firmware: discover revision, fault map, calibration age, and precision modes"><span>Discover revision, fault map, calibration age, and precision modes</span></div></li>
+            <li class="sequence-row"><div class="sequence-event event-4-5 reverse" aria-label="Firmware to CIM tile: program, write-verify, and calibrate"><span>Program, write-verify, and calibrate tile</span></div></li>
+            <li class="sequence-row"><div class="sequence-event event-2-4 reverse" aria-label="CIM tile to runtime: return verified device state"><span>Return verified device state to runtime</span></div></li>
+            <li class="sequence-phase"><span>Request and repeated layer/token loop</span></li>
+            <li class="sequence-row"><div class="sequence-event event-1-2" aria-label="Application to runtime: submit inputs and latency or accuracy policy"><span>Submit inputs and latency/accuracy policy</span></div></li>
+            <li class="sequence-row"><div class="sequence-event event-2-3" aria-label="Runtime to digital engine: dispatch digital pre-processing and mapped region"><span>Dispatch digital pre-processing and mapped region</span></div></li>
+            <li class="sequence-row"><div class="sequence-self self-digital" aria-label="Digital engine internal operation: normalize, scale, clip, tile, and quantize activations"><span>Normalize, scale, clip, tile, and quantize activations</span></div></li>
+            <li class="sequence-row"><div class="sequence-event event-3-4" aria-label="Digital engine to CIM tile: send activation phases, array addresses, ADC range, and fidelity mode"><span>Send activation phases, array addresses, ADC range, and fidelity mode</span></div></li>
+            <li class="sequence-row"><div class="sequence-self self-cim" aria-label="CIM tile internal operation: DAC encode, analog matrix-vector multiply, integrate, and ADC convert"><span>DAC encode &rarr; analog MVM &rarr; integrate &rarr; ADC convert</span></div></li>
+            <li class="sequence-row"><div class="sequence-event event-3-4 reverse" aria-label="CIM tile to digital engine: return partial sums, saturation flags, and counters"><span>Return partial sums, saturation flags, and counters</span></div></li>
+            <li class="sequence-row"><div class="sequence-self self-digital" aria-label="Digital engine internal operation: accumulate, rescale, add bias and residual, and run nonlinear work"><span>Accumulate, rescale, add bias/residual, and run nonlinear work</span></div></li>
+            <li class="sequence-row"><div class="sequence-event event-2-3 reverse" aria-label="Digital engine to runtime: return layer result and telemetry"><span>Layer result and telemetry</span></div></li>
+            <li class="sequence-phase sequence-alt"><span>Only when error, drift, or saturation exceeds policy</span></li>
+            <li class="sequence-row"><div class="sequence-event event-2-5" aria-label="Runtime to firmware: request recalibration, refresh, remap, repeat, or digital fallback"><span>Request recalibration, refresh, remap, repeat, or digital fallback</span></div></li>
+            <li class="sequence-row"><div class="sequence-event event-2-5 reverse" aria-label="Firmware to runtime: return updated state and recovery result"><span>Return updated state and recovery result</span></div></li>
+            <li class="sequence-row"><div class="sequence-event event-1-2 reverse" aria-label="Runtime to application: return output with trace and health status"><span>Return output with trace and health status</span></div></li>
+          </ol>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="bottlenecks">
+      <div class="section-heading">
+        <p class="eyebrow">CIM bottleneck map</p>
+        <h2>The array MAC is fast; the system around it decides whether CIM wins</h2>
+        <p class="section-note">
+          A bottleneck is not only the slowest stage. It can be the stage that sets the accuracy ceiling, dominates
+          energy or area, prevents useful array utilization, or makes deployment and field maintenance too costly.
+        </p>
+      </div>
+
+      <div class="bottleneck-summary" aria-label="Three classes of Analog CIM bottlenecks">
+        <article><b>Accuracy ceiling</b><strong>Representation and analog error</strong><span>Programming spread, noise, nonlinear response, limited dynamic range, ADC clipping, drift, and faults.</span></article>
+        <article><b>Throughput ceiling</b><strong>Periphery and movement</strong><span>DAC serialization, integration time, ADC conversion, partial sums, format changes, routing, and low utilization.</span></article>
+        <article><b>Product ceiling</b><strong>Lifecycle and evidence</strong><span>Programming time, endurance, calibration, chip variation, thermal corners, validation, recovery, yield, and support.</span></article>
+      </div>
+
+      <div class="table-wrap bottleneck-table">
+        <table>
+          <thead>
+            <tr><th scope="col">Bottleneck</th><th scope="col">Where it appears</th><th scope="col">What you observe</th><th scope="col">First useful response</th><th scope="col">Cost moved elsewhere</th></tr>
+          </thead>
+          <tbody>
+            <tr><th scope="row">ADC/DAC and sensing</th><td>Mixed-signal periphery before and after every array MVM.</td><td>Converter energy, area, latency, clipping, unused codes, or low effective precision dominate the array.</td><td>Layer-aware range selection, fewer active rows, adaptive thresholds, shared converters, or selectable precision phases.</td><td>More compiler state, calibration, serialization, phases, periphery, or reduced throughput.</td></tr>
+            <tr><th scope="row">Dot-product dynamic range</th><td>Column current, integrator, ADC, partial-sum path.</td><td>Four-bit weights still create outputs wider than four bits; long reductions saturate or lose small contributions.</td><td>Scale per layer/channel, split rows or bit slices, accumulate digitally at higher precision, and isolate outliers.</td><td>Extra passes, metadata, digital additions, SRAM traffic, and conversion energy.</td></tr>
+            <tr><th scope="row">Programming variation and hard faults</th><td>NVM conductance programming and physical cells.</td><td>Requested weights become distributions; stuck devices create structured, location-dependent error.</td><td>Write-verify, stable ranges, differential/offset encoding, spares, defect-aware placement, or factorization.</td><td>Longer load time, write energy, endurance use, redundant cells, capacity loss, or extra MVM stages.</td></tr>
+            <tr><th scope="row">Read noise and nonlinearity</th><td>Cell I-V behavior, sensing, integration, input-dependent array response.</td><td>Repeated MVMs vary, and error changes with signal magnitude or activation pattern.</td><td>Measured-noise HWA training, lower read voltage, references, averaging, weight expansion, or digital routing.</td><td>Training cost, lower signal-to-noise ratio, repeated reads, extra cells, or lower performance.</td></tr>
+            <tr><th scope="row">IR drop and parasitics</th><td>Long wordlines/bitlines, drivers, access devices, large crossbars.</td><td>The same weight behaves differently by position; larger arrays diverge from ideal matrix multiplication.</td><td>Smaller subarrays, stronger/local drivers, access devices, IR-aware mapping, and active-row limits.</td><td>More tiles, ADCs, routes, buffers, partial sums, area, and interconnect energy.</td></tr>
+            <tr><th scope="row">Drift, retention, and PVT</th><td>Stored conductance and analog circuits over time, voltage, and temperature.</td><td>A deployment that passed qualification gradually loses margin or changes after thermal events.</td><td>Reference rows, sensors, guardbands, drift-aware training, health vectors, recalibration, and selective refresh.</td><td>Maintenance traffic, downtime, calibration storage, refresh energy, endurance, and fleet complexity.</td></tr>
+            <tr><th scope="row">Activation delivery</th><td>Input buffers, DACs, pulse/bit phases, routing to rows.</td><td>The array waits for serialized multibit activations or consumes energy repeatedly charging lines.</td><td>Local SRAM, broadcast/reuse, pulse-width encoding, phase overlap, sparsity, and input pruning.</td><td>Larger buffers and control, restricted formats, model changes, or more difficult scheduling.</td></tr>
+            <tr><th scope="row">Partial sums and output movement</th><td>Across subarrays, tiles, chips, SRAM, NoC, and host boundaries.</td><td>Peak macro TOPS/W looks high while end-to-end latency and energy are dominated by reduction and transport.</td><td>Local accumulation, fusion, hierarchy-aware tiling, route scheduling, and keeping dependent work near the tile.</td><td>Digital area, SRAM capacity, synchronization, compiler complexity, and less flexible placement.</td></tr>
+            <tr><th scope="row">Mapping and utilization</th><td>Mismatch between model shapes and fixed physical rows, columns, capacity, and healthy arrays.</td><td>Padded rows, fragmented weights, replicated tensors, idle columns, load imbalance, or insufficient on-chip capacity.</td><td>Shape-aware packing, replication only when beneficial, structured sparsity, heterogeneous placement, and utilization-aware cost models.</td><td>Compilation search time, model restrictions, duplicated storage, or lower theoretical density.</td></tr>
+            <tr><th scope="row">Unsupported and sensitive operations</th><td>Softmax, normalization, nonlinearities, dynamic attention, KV cache, control, and numerically fragile layers.</td><td>Frequent analog/digital boundaries erase gains or low precision degrades task accuracy.</td><td>Digital/SRAM engines, operator fusion, mixed precision, sensitivity-based partitioning, and a clean fallback ABI.</td><td>More silicon, duplicated capabilities, conversions, scheduling dependencies, and software surface area.</td></tr>
+            <tr><th scope="row">Programming and model updates</th><td>Cold start, model replacement, fine-tuning, recovery, and fleet rollout.</td><td>Slow high-voltage writes, erase granularity, endurance limits, and long deployment windows.</td><td>Weight-stationary serving, immutable analog regions, transactional programming, staged rollout, and digital adapters.</td><td>Reduced update flexibility, extra digital memory, operational tooling, rollback storage, and version management.</td></tr>
+            <tr><th scope="row">Calibration and validation</th><td>Manufacturing, deployment, runtime maintenance, and product qualification.</td><td>Per-chip tuning and broad corner testing cost more than the steady-state kernel and delay release.</td><td>Automated calibration, compact device-state bundles, representative health vectors, correlation ladders, and explicit evidence levels.</td><td>Telemetry, storage, test time, simulator ownership, production infrastructure, and support cost.</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="critical-path">
+        <strong>Critical-path rule</strong>
+        <p>Optimize in this order: prevent saturation and illegal mappings, meet task accuracy, remove converter and movement stalls, improve utilization, then reduce calibration and lifecycle cost. Optimizing the crossbar MAC first can improve a number that is not limiting the product.</p>
+      </div>
+    </section>
+
+    <section class="section" id="architectures">
+      <div class="section-heading">
+        <p class="eyebrow">Architecture taxonomy</p>
+        <h2>"NPU on RAM" hides several fundamentally different machines</h2>
+        <p class="section-note">
+          The memory device determines how a weight is stored. The compute domain determines how products are formed
+          and accumulated. Those choices set the failure mechanisms that software must model.
+        </p>
+      </div>
+      <div class="table-wrap architecture-table">
+        <table>
+          <thead>
+            <tr><th scope="col">Architecture</th><th scope="col">Weight and compute</th><th scope="col">Main strength</th><th scope="col">Dominant problems</th><th scope="col">Software consequence</th></tr>
+          </thead>
+          <tbody>
+            <tr><th scope="row">Analog SRAM CIM</th><td>Digital bits in 6T/8T/9T cells gate current or redistribute charge on bitlines and capacitors.</td><td>Mature CMOS, fast writes, high endurance, no conductance drift.</td><td>Large cell area, volatility, model-load energy, mismatch, charge leakage, PVT sensitivity, ADC precision.</td><td>Bit slicing, ADC/row-count selection, PVT-aware calibration, frequent weight loading, and memory-capacity planning.</td></tr>
+            <tr><th scope="row">RRAM / memristor crossbar</th><td>Conductance stores a multilevel weight; voltage or pulse width times conductance creates current; columns sum by physics.</td><td>Dense non-volatile weights, high parallelism, compact 1T1R arrays.</td><td>Stochastic programming, stuck cells, nonlinear I-V, relaxation, IR drop, read noise, endurance, limited conductance range.</td><td>Write-verify, defect maps, differential or offset encoding, hardware-aware training, chip-in-loop tuning, and IR-aware placement.</td></tr>
+            <tr><th scope="row">PCM crossbar</th><td>Phase state controls conductance; pulse-width inputs integrate current into capacitors before time/digital conversion.</td><td>Dense backend-integrated weight storage and proven multicore/multichip demonstrations.</td><td>Programming error, conductance drift, read noise, asymmetry, slow/energy-heavy writes, weight-stationary execution.</td><td>Multi-device weight expansion, optimized programming, HWA training, per-column calibration, recalibration, and strict weight lifecycle.</td></tr>
+            <tr><th scope="row">Embedded-flash CIM</th><td>Floating-gate or charge-trap threshold stores an analog weight; read currents perform dense MVM.</td><td>Mature non-volatile storage, long retention, high density, useful for fixed inference weights.</td><td>High-voltage and slow programming, limited endurance, erase granularity, charge variation, asymmetric updates.</td><td>Offline compilation, infrequent programming, verify-and-calibrate deployment, immutable-weight artifacts, and digital fallback.</td></tr>
+            <tr><th scope="row">Heterogeneous mixed CIM</th><td>Memristor/PCM handles tolerant dense work; SRAM or digital units handle sensitive layers, kernels, reductions, and control.</td><td>Accuracy and flexibility without forcing every operation through the weakest analog regime.</td><td>Partitioning, format conversion, duplicated storage, routing, scheduling, wakeup, and a larger control plane.</td><td>Sensitivity analysis, layer/kernel placement, mixed INT/FP formats, conversion-aware scheduling, and end-to-end cost modeling.</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="callout caution" style="margin-top:12px">
+        <p>
+          <strong>Digital CIM is a separate escape route.</strong> It can provide exact low-bit arithmetic inside SRAM,
+          RRAM, or MRAM, avoiding analog error at the cost of more bit-level operations, addition circuitry, and often
+          lower density or energy advantage. The 2025 mixed processor uses this principle: route sensitive work to
+          lossless SRAM-CIM or tiny digital units instead of demanding that memristor CIM become exact.
+        </p>
+      </div>
+    </section>
+
+    <section class="section" id="papers">
+      <div class="section-heading">
+        <p class="eyebrow">Primary-paper solution ledger</p>
+        <h2>What each architecture changed, and what remained outside the claim</h2>
+        <p class="section-note">Filter by memory or contribution. "Measured" does not always mean a complete end-to-end product; the boundary is stated on each card.</p>
+      </div>
+      <div class="segmented" data-filter-group="paper-grid" aria-label="Filter Analog CIM papers">
+        <button class="segment-button" type="button" data-filter="all" aria-pressed="true">All papers</button>
+        <button class="segment-button" type="button" data-filter="rram" aria-pressed="false">RRAM</button>
+        <button class="segment-button" type="button" data-filter="pcm" aria-pressed="false">PCM</button>
+        <button class="segment-button" type="button" data-filter="sram" aria-pressed="false">SRAM</button>
+        <button class="segment-button" type="button" data-filter="mixed" aria-pressed="false">Mixed</button>
+        <button class="segment-button" type="button" data-filter="software" aria-pressed="false">Software</button>
+        <button class="segment-button" type="button" data-filter="component" aria-pressed="false">Component</button>
+      </div>
+      <div class="paper-grid" id="paper-grid">
+        <article class="paper-card" data-domain="sram component">
+          <span class="status-pill status-partial">Measured SRAM macro</span>
+          <h3><a href="https://doi.org/10.1109/JSSC.2022.3232601">22-nm charge-domain SRAM CIM</a></h3>
+          <p><strong>Problem:</strong> multibit analog SRAM normally loses precision through mismatch, parasitics, noise, and converter cost.</p>
+          <p><strong>Hardware:</strong> a passive C-2C charge ladder, 9T SRAM, local weight multiplexing, and an 8-bit MAC design target linearity across PVT.</p>
+          <p><strong>Software:</strong> circuit and system analysis selects precision and validates the analog error budget; weights remain ordinary digital SRAM bits.</p>
+          <p><strong>Evidence:</strong> 32.2 TOPS/W peak, less than 0.5% MVM error, and less than 1% measured error deviation across PVT.</p>
+          <p class="paper-boundary"><strong>Boundary:</strong> macro evidence, not a full model-to-runtime system; SRAM remains volatile and area intensive.</p>
+        </article>
+
+        <article class="paper-card" data-domain="rram mixed software">
+          <span class="status-pill status-measured">Fully measured datasets</span>
+          <h3><a href="https://doi.org/10.1038/s41586-022-04992-8">NeuRRAM RRAM chip</a></h3>
+          <p><strong>Problem:</strong> wire/driver drop, programming resolution, relaxation, coupling, and limited ADC range made software-only simulation optimistic.</p>
+          <p><strong>Hardware:</strong> 48 reconfigurable cores, transposable dataflow, differential signed weights, and voltage-mode neuron sensing improve utilization and dynamic range.</p>
+          <p><strong>Software:</strong> model-driven calibration, measured-noise training, continuous analog programming, and progressive chip-in-loop fine-tuning.</p>
+          <p><strong>Evidence:</strong> complete hardware runs reached 99.0% MNIST, 85.7% CIFAR-10, and 84.7% Google speech-command accuracy.</p>
+          <p class="paper-boundary"><strong>Boundary:</strong> FPGA supplied intermediate buffers and partial sums; peak array efficiency excludes intermediate transfer.</p>
+        </article>
+
+        <article class="paper-card" data-domain="pcm mixed">
+          <span class="status-pill status-measured">Integrated mixed-signal chip</span>
+          <h3><a href="https://doi.org/10.1038/s41928-023-01010-1">64-core PCM inference chip</a></h3>
+          <p><strong>Problem:</strong> an analog tile alone cannot execute activations, communication, convolution support, or complete LSTM layers.</p>
+          <p><strong>Hardware:</strong> 64 PCM AIMC cores, an on-chip communication network, and digital activation/processing units form a complete mixed-signal data path.</p>
+          <p><strong>Software:</strong> mapping and precision modes select one-phase high-throughput or four-phase high-precision MVM execution.</p>
+          <p><strong>Evidence:</strong> near-software accuracy on ResNet and LSTM, with 2.48 TOPS/W high-precision or 9.76 TOPS/W low-precision modes.</p>
+          <p class="paper-boundary"><strong>Boundary:</strong> accuracy and efficiency still depend on model mapping, device programming, and the selected precision mode.</p>
+        </article>
+
+        <article class="paper-card" data-domain="pcm mixed software">
+          <span class="status-pill status-partial">End-to-end KWS; hybrid RNNT</span>
+          <h3><a href="https://doi.org/10.1038/s41586-023-06337-5">PCM speech recognition and transcription chip</a></h3>
+          <p><strong>Problem:</strong> large speech models amplify programming error, offset, saturation, and cross-tile movement; NVM writes are slow and finite-endurance.</p>
+          <p><strong>Hardware:</strong> 34-tile chips, four PCM devices per cell, an AB differential method, bias rows, pulse-duration routing, and five chips for RNNT.</p>
+          <p><strong>Software:</strong> HWA training and input pruning for KWS; calibration and per-column rescaling; weight expansion for the 45-million-weight RNNT.</p>
+          <p><strong>Evidence:</strong> KWS measured 86.14% versus 86.75%; RNNT measured 9.258% WER versus 7.452% FP baseline.</p>
+          <p class="paper-boundary"><strong>Boundary:</strong> RNNT intermediate data and auxiliary computation used an x86 host; the chip lacked product digital cores and SRAM.</p>
+        </article>
+
+        <article class="paper-card" data-domain="mixed sram rram">
+          <span class="status-pill status-measured">Measured heterogeneous processor</span>
+          <h3><a href="https://doi.org/10.1038/s41586-025-08639-2">Memristor, SRAM, and digital mixed CIM</a></h3>
+          <p><strong>Problem:</strong> memristor CIM is dense but variation sensitive; lossless SRAM CIM is accurate but large and volatile.</p>
+          <p><strong>Hardware:</strong> memristor-CIM, SRAM-CIM, tiny digital units, and INT/FP modes coexist on one edge processor.</p>
+          <p><strong>Software:</strong> layer- and kernel-granular sensitivity analysis partitions work by error tolerance and format requirements.</p>
+          <p><strong>Evidence:</strong> less than 0.45% degradation with 40.91 TFLOPS/W on ResNet-20/CIFAR-100 and 28.63 TFLOPS/W on MobileNet-v2/ImageNet.</p>
+          <p class="paper-boundary"><strong>Boundary:</strong> accuracy is preserved by heterogeneous routing, not by eliminating analog variation.</p>
+        </article>
+
+        <article class="paper-card" data-domain="pcm software mixed">
+          <span class="status-pill status-partial">Transformer weight layers in hardware</span>
+          <h3><a href="https://doi.org/10.1038/s41467-025-63794-4">ALBERT on a 14-nm PCM chip</a></h3>
+          <p><strong>Problem:</strong> transformer projections have task-dependent sensitivity, shared weights see different activation distributions, and PCM drifts with time.</p>
+          <p><strong>Hardware:</strong> 35 million PCM devices, 34 tiles, multi-device weight encoding, and a 2D mesh store all 7.1 million unique ALBERT weights.</p>
+          <p><strong>Software:</strong> task-specific HWA noise fine-tuning, mapping, per-use column scale/offset calibration, and periodic recalibration.</p>
+          <p><strong>Evidence:</strong> HWA improved average measured GLUE accuracy by 4.4%; recalibration reduced long-term drift loss.</p>
+          <p class="paper-boundary"><strong>Boundary:</strong> attention, GELU, softmax, layer normalization, pooling, and classification ran in software; some tasks used representative subsets.</p>
+        </article>
+
+        <article class="paper-card" data-domain="rram software mixed">
+          <span class="status-pill status-measured">Measured multi-chip full stack</span>
+          <h3><a href="https://doi.org/10.1038/s41467-025-57183-0">OpenCIMTC full-stack memristor system</a></h3>
+          <p><strong>Problem:</strong> fixed hardware dataflow, manual placement, and manual parameter tuning prevent diverse models from deploying reliably.</p>
+          <p><strong>Hardware:</strong> eight flexible memristor chips plus FPGA/CPU control support signed inputs/weights, multiple mappings, and model-dependent dataflows.</p>
+          <p><strong>Software:</strong> CIM IR, compiler, simulator, optimizer, automatic placement, post-deployment training, and inference-time parameter search.</p>
+          <p><strong>Evidence:</strong> six models across four tasks ran automatically; optimizations improved inference accuracy by 3.32% to 9.45%.</p>
+          <p class="paper-boundary"><strong>Boundary:</strong> a research platform with FPGA control, but unusually strong evidence for an actual compiler-optimizer-hardware loop.</p>
+        </article>
+
+        <article class="paper-card" data-domain="component rram software">
+          <span class="status-pill status-partial">Measured converter devices; system modeling</span>
+          <h3><a href="https://doi.org/10.1038/s41467-025-65233-w">Adaptive memristor ADC</a></h3>
+          <p><strong>Problem:</strong> uniform low-bit ADCs waste codes on layer-specific output distributions; high-bit ADCs dominate area and energy.</p>
+          <p><strong>Hardware:</strong> analog-CAM quantization cells implement programmable overlapping thresholds, one-step conversion, recalibration, and paired-ADC super-resolution.</p>
+          <p><strong>Software:</strong> layer statistics and a constrained Lloyd-Max optimization choose thresholds; program-and-verify maps them to conductance.</p>
+          <p><strong>Evidence:</strong> fabricated 8x8 devices support the model; 5-bit VGG8 reached 89.55% under measured variation and system studies report lower ADC overhead.</p>
+          <p class="paper-boundary"><strong>Boundary:</strong> not a complete fabricated CIM accelerator; Q-cell count grows exponentially at high resolution.</p>
+        </article>
+
+        <article class="paper-card" data-domain="rram component software">
+          <span class="status-pill status-measured">Measured matrix and wireless prototypes</span>
+          <h3><a href="https://doi.org/10.1038/s41928-026-01638-9">Fault-free analogue computing</a></h3>
+          <p><strong>Problem:</strong> stuck-on/off cells create structured errors that redundancy or retraining may not remove efficiently.</p>
+          <p><strong>Hardware:</strong> two cascaded programmable submatrices and optional compensation layers implement an indirect target matrix and eliminate differential pairs.</p>
+          <p><strong>Software:</strong> gradient-based hardware-aware matrix decomposition uses the measured defect map and hardware constraints.</p>
+          <p><strong>Evidence:</strong> over 99.999% DFT cosine similarity at 39% device faults and a 56-fold wireless bit-error-rate reduction.</p>
+          <p class="paper-boundary"><strong>Boundary:</strong> solves static representation faults for tested matrices; random read noise, ADC error, drift, nonlinear arrays, and complete DNN accuracy remain.</p>
+        </article>
+
+        <article class="paper-card" data-domain="software mixed">
+          <span class="status-pill status-conditional">Large-model simulation study</span>
+          <h3><a href="https://doi.org/10.1038/s41467-023-40770-4">Hardware-aware training across model families</a></h3>
+          <p><strong>Problem:</strong> approximate MVM includes nonlinear and nondeterministic errors that ordinary FP or quantized training never sees.</p>
+          <p><strong>Hardware abstraction:</strong> a realistic crossbar model includes weight, input, output, converter, and circuit nonidealities.</p>
+          <p><strong>Software:</strong> retraining injects the target error model and searches robust operating points for CNNs, recurrent networks, and transformers.</p>
+          <p><strong>Evidence:</strong> many evaluated models recovered floating-point iso-accuracy in simulation; input/output noise was often more damaging than weight noise.</p>
+          <p class="paper-boundary"><strong>Boundary:</strong> simulation evidence depends on model fidelity and does not replace silicon population and lifetime testing.</p>
+        </article>
+      </div>
+    </section>
+
+    <section class="section" id="failure-explorer">
+      <div class="section-heading">
+        <p class="eyebrow">Failure-to-solution explorer</p>
+        <h2>Place each fix at the cheapest layer that can actually remove the error</h2>
+      </div>
+      <div class="tabbed-explorer" data-tabset>
+        <div class="tab-list" role="tablist" aria-label="Analog CIM failure mechanisms">
+          <button class="tab-button" type="button" id="failure-tab-program" role="tab" aria-selected="true" aria-controls="failure-program"><span class="tab-index">1</span><span><strong>Programming and faults</strong><span>Targets, spread, stuck cells</span></span></button>
+          <button class="tab-button" type="button" id="failure-tab-read" role="tab" aria-selected="false" aria-controls="failure-read" tabindex="-1"><span class="tab-index">2</span><span><strong>Read error</strong><span>Noise and nonlinearity</span></span></button>
+          <button class="tab-button" type="button" id="failure-tab-adc" role="tab" aria-selected="false" aria-controls="failure-adc" tabindex="-1"><span class="tab-index">3</span><span><strong>Converters</strong><span>Range and quantization</span></span></button>
+          <button class="tab-button" type="button" id="failure-tab-array" role="tab" aria-selected="false" aria-controls="failure-array" tabindex="-1"><span class="tab-index">4</span><span><strong>Array scaling</strong><span>IR drop and utilization</span></span></button>
+          <button class="tab-button" type="button" id="failure-tab-drift" role="tab" aria-selected="false" aria-controls="failure-drift" tabindex="-1"><span class="tab-index">5</span><span><strong>Drift and PVT</strong><span>Time, chip, temperature</span></span></button>
+          <button class="tab-button" type="button" id="failure-tab-system" role="tab" aria-selected="false" aria-controls="failure-system" tabindex="-1"><span class="tab-index">6</span><span><strong>System execution</strong><span>Unsupported work and movement</span></span></button>
+        </div>
+
+        <article class="panel tab-panel" id="failure-program" role="tabpanel" aria-labelledby="failure-tab-program">
+          <span class="status-pill status-open">Static and programmed state</span>
+          <h3>The written conductance is not the requested weight</h3>
+          <div class="solution-rows">
+            <div><strong>Hardware layer</strong><span>Iterative write-verify, accurate row-wise programming, multi-device weights, reference cells, spare rows/columns, and defect characterization.</span></div>
+            <div><strong>Compiler and training</strong><span>Differential/offset encoding, defect-aware placement, optimized programming targets, post-deployment training, and matrix factorization for severe static faults.</span></div>
+            <div><strong>Runtime</strong><span>Bind the executable to a device fault map, verify programming, reject weak arrays, and preserve programming provenance.</span></div>
+            <div><strong>Tradeoff</strong><span>More devices, programming reads, arrays, optimization time, artifact state, and endurance consumption.</span></div>
+          </div>
+        </article>
+
+        <article class="panel tab-panel" id="failure-read" role="tabpanel" aria-labelledby="failure-tab-read" hidden>
+          <span class="status-pill status-conditional">Stochastic and input dependent</span>
+          <h3>The same MVM produces a distribution, not an exact value</h3>
+          <div class="solution-rows">
+            <div><strong>Hardware layer</strong><span>Low-noise sensing, linear read voltage, voltage-mode readout, differential/AB methods, averaging, integration-time control, and weight expansion.</span></div>
+            <div><strong>Training layer</strong><span>Inject measured weight, input, output, and activation noise; clip outliers; tune noise scale per task; use chip-in-loop data when the model is incomplete.</span></div>
+            <div><strong>Runtime</strong><span>Monitor repeated-read variance and saturation, select a precision mode, and route sensitive regions to SRAM or digital units.</span></div>
+            <div><strong>Tradeoff</strong><span>Longer latency, duplicated weights, lower signal range, more digital work, and model-specific retraining.</span></div>
+          </div>
+        </article>
+
+        <article class="panel tab-panel" id="failure-adc" role="tabpanel" aria-labelledby="failure-tab-adc" hidden>
+          <span class="status-pill status-vendor">Peripheral bottleneck</span>
+          <h3>ADC and DAC choices can erase the array advantage</h3>
+          <div class="solution-rows">
+            <div><strong>Hardware layer</strong><span>Shared or per-column converters, pulse-width inputs, multiple precision phases, voltage-mode normalization, programmable thresholds, bias rows, and converter recalibration.</span></div>
+            <div><strong>Compiler layer</strong><span>Profile layer/channel distributions, assign ranges and bit widths, split outliers, choose row activation count, and program adaptive thresholds.</span></div>
+            <div><strong>Training layer</strong><span>Quantization-aware training includes actual clipping, ADC codebook, saturation, offset, and output noise.</span></div>
+            <div><strong>Tradeoff</strong><span>High resolution costs area and energy; low resolution costs accuracy; adaptive flash-like ADCs can scale exponentially in threshold cells.</span></div>
+          </div>
+        </article>
+
+        <article class="panel tab-panel" id="failure-array" role="tabpanel" aria-labelledby="failure-tab-array" hidden>
+          <span class="status-pill status-partial">Physical scale and mapping</span>
+          <h3>Large ideal crossbars become nonuniform physical networks</h3>
+          <div class="solution-rows">
+            <div><strong>Hardware layer</strong><span>Smaller subarrays, access devices, stronger drivers, local ADCs, hierarchical routing, local SRAM, and balanced tile interfaces.</span></div>
+            <div><strong>Compiler layer</strong><span>IR-drop-aware placement, physical row/column tiling, partial-sum planning, utilization-aware packing, replication, and communication scheduling.</span></div>
+            <div><strong>Model layer</strong><span>Prune unimportant inputs, exploit structured sparsity, and choose architectures whose shapes pack efficiently.</span></div>
+            <div><strong>Tradeoff</strong><span>More tiles, converters, buffers, routing, partial sums, and data movement reduce peak density and TOPS/W.</span></div>
+          </div>
+        </article>
+
+        <article class="panel tab-panel" id="failure-drift" role="tabpanel" aria-labelledby="failure-tab-drift" hidden>
+          <span class="status-pill status-open">Lifecycle error</span>
+          <h3>A correct deployment can become incorrect with time and temperature</h3>
+          <div class="solution-rows">
+            <div><strong>Hardware layer</strong><span>Reference/bias rows, temperature sensors, stable operating ranges, refresh support, redundant state, and better retention devices.</span></div>
+            <div><strong>Training and compiler</strong><span>Drift-aware noise models, time-corner training, guardbands, per-use calibration metadata, and refresh/reprogram policy in the artifact.</span></div>
+            <div><strong>Runtime</strong><span>Store per-chip scale/offset and age, run health vectors, recalibrate, selectively refresh, fall back, and record every state transition.</span></div>
+            <div><strong>Tradeoff</strong><span>Calibration data, test time, downtime, maintenance energy, write endurance, and fleet-management complexity.</span></div>
+          </div>
+        </article>
+
+        <article class="panel tab-panel" id="failure-system" role="tabpanel" aria-labelledby="failure-tab-system" hidden>
+          <span class="status-pill status-partial">End-to-end boundary</span>
+          <h3>An analog MVM tile is not a complete NPU</h3>
+          <div class="solution-rows">
+            <div><strong>Hardware layer</strong><span>Digital processing units, SRAM buffers, NoC, DMA, reductions, activation units, control processors, queues, trace, and reset.</span></div>
+            <div><strong>Compiler layer</strong><span>Capability partitioning, analog/digital placement, fusion, scheduling, memory planning, format conversion, fallback, and a versioned executable artifact.</span></div>
+            <div><strong>Runtime layer</strong><span>Programming, calibration, queues, synchronization, telemetry, device-specific state, recovery, and compatibility negotiation.</span></div>
+            <div><strong>Tradeoff</strong><span>Real system efficiency must count auxiliary compute, data movement, utilization, programming, calibration, host work, and idle power.</span></div>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <section class="section" id="hardware">
+      <div class="section-heading">
+        <p class="eyebrow">Hardware solution hierarchy</p>
+        <h2>Fix physical errors locally, then expose the residual error as a contract</h2>
+      </div>
+      <div class="hardware-stack">
+        <article><b>Layer 1</b><strong>Material and memory cell</strong><span>Improve linearity, symmetry, conductance window, programming resolution, retention, endurance, variability, and CMOS compatibility.</span><em>Produces: characterized device distributions and legal operating ranges.</em></article>
+        <article><b>Layer 2</b><strong>Array and access</strong><span>Use 1T1R/2T2R selection, smaller subarrays, write-verify, differential/offset encoding, spares, references, and fault maps.</span><em>Produces: physical array capabilities and defects.</em></article>
+        <article><b>Layer 3</b><strong>Mixed-signal periphery</strong><span>Design DAC/input encoding, integration, sensing, ADCs, gain/offset control, saturation detection, and precision modes together.</span><em>Produces: calibrated numeric and energy models.</em></article>
+        <article><b>Layer 4</b><strong>Tile and data path</strong><span>Add local SRAM, partial-sum logic, digital activations, routing, control, counters, trace, and a programmable command model.</span><em>Produces: schedulable engines with observable behavior.</em></article>
+        <article><b>Layer 5</b><strong>SoC and product</strong><span>Integrate DMA, NoC, firmware, driver, power/thermal control, security, reset, test, binning, field calibration, and update policy.</span><em>Produces: a supportable device rather than a laboratory macro.</em></article>
+      </div>
+    </section>
+
+    <section class="section" id="software">
+      <div class="section-heading">
+        <p class="eyebrow">Software solution stack</p>
+        <h2>Make measured analog behavior a first-class compilation input</h2>
+        <p class="section-note">
+          A normal NPU stack assumes deterministic instructions. An Analog CIM stack also consumes a target profile,
+          nonideality model, per-chip state, and declared numerical tolerance.
+        </p>
+      </div>
+      <div class="codesign-flow" aria-label="Analog CIM software deployment flow">
+        <article class="flow-step"><b>1. Characterize</b><strong>Target profile</strong><span>Devices, arrays, converters, faults, PVT, time, energy</span></article>
+        <article class="flow-step"><b>2. Harden</b><strong>HWA training</strong><span>Quantization, noise, drift, clipping, sensitivity, chip-in-loop</span></article>
+        <article class="flow-step"><b>3. Partition</b><strong>Graph compiler</strong><span>Analog, SRAM, digital, CPU, rejection, conversion cost</span></article>
+        <article class="flow-step"><b>4. Map</b><strong>Physical lowering</strong><span>Arrays, signed encoding, slices, ADC range, faults, schedule</span></article>
+        <article class="flow-step"><b>5. Package</b><strong>Executable artifact</strong><span>Code, weights, programming plan, calibration schema, debug map</span></article>
+        <article class="flow-step"><b>6. Deploy</b><strong>Runtime</strong><span>Write-verify, calibrate, bind state, execute, trace, recover</span></article>
+        <article class="flow-step"><b>7. Maintain</b><strong>Fleet loop</strong><span>Health vectors, drift, refresh, fallback, rollback, evidence</span></article>
+      </div>
+
+      <div class="codesign-lanes" style="margin-top:14px">
+        <section>
+          <h3>Training and model preparation</h3>
+          <ul class="note-list">
+            <li>Start from a quantized digital baseline so analog loss is not confused with quantization loss.</li>
+            <li>Inject measured weight, input, output, ADC, drift, and PVT distributions at the correct graph locations.</li>
+            <li>Search the noise scale instead of assuming more noise always improves robustness.</li>
+            <li>Use per-channel scaling, clipping, outlier splitting, distillation, and sensitivity analysis.</li>
+            <li>Reserve chip-in-loop tuning for residual behavior the simulator cannot model accurately.</li>
+          </ul>
+        </section>
+        <section>
+          <h3>Compiler and optimizer</h3>
+          <ul class="note-list">
+            <li>Legalize only operators whose numeric and physical contracts the target can satisfy.</li>
+            <li>Partition sensitive layers or kernels to SRAM/digital units and account for conversion overhead.</li>
+            <li>Lower logical tensors into signed cells, bit slices, physical arrays, converter modes, routes, and partial sums.</li>
+            <li>Use defect-, IR-drop-, saturation-, endurance-, and calibration-aware placement and scheduling.</li>
+            <li>Emit a reproducible report explaining every fallback and predicted error contribution.</li>
+          </ul>
+        </section>
+        <section>
+          <h3>Runtime, firmware, and driver</h3>
+          <ul class="note-list">
+            <li>Discover device revision, array health, fault map, calibration age, firmware ABI, and precision modes.</li>
+            <li>Program and verify weights transactionally, with recovery from partial writes and power loss.</li>
+            <li>Store per-chip scale, offset, fault, temperature, age, and refresh data separately from portable model content.</li>
+            <li>Monitor saturation, read variance, temperature, drift, timeouts, and device loss during execution.</li>
+            <li>Support recalibration, selective refresh, remapping, digital fallback, rollback, quarantine, and replacement devices.</li>
+          </ul>
+        </section>
+        <section>
+          <h3>Simulator and validation</h3>
+          <ul class="note-list">
+            <li>Maintain FP32, digital-quantized, ideal-array, nonideality, cycle-model, RTL, and silicon references.</li>
+            <li>Use measured distributions and preserve correlation IDs, model/artifact hashes, calibration version, and device state.</li>
+            <li>Report first divergent layer, error distributions, tails, saturation, and task accuracy instead of one average MVM error.</li>
+            <li>Correlate latency, energy, utilization, converter activity, movement, programming, calibration, and fallback.</li>
+            <li>Qualify across chips, process, voltage, temperature, aging, faults, workloads, and time.</li>
+          </ul>
+        </section>
+      </div>
+    </section>
+
+    <section class="section" id="fault-free-claim">
+      <div class="section-heading">
+        <p class="eyebrow">The June 2026 Nature Electronics result</p>
+        <h2>"Fault-free" changes representation, not the laws of analog hardware</h2>
+      </div>
+      <div class="claim-boundary">
+        <section class="supports">
+          <h3>What the paper convincingly solves</h3>
+          <ul class="note-list">
+            <li>A target matrix can be factored into two adjustable matrices that route around severe stuck-device maps.</li>
+            <li>The representation can eliminate conventional differential pairs and improve density for tested matrices.</li>
+            <li>Gradient-based optimization can incorporate circuit/device constraints before programming.</li>
+            <li>Measured DFT and wireless demonstrations show that the static-fault technique is real.</li>
+          </ul>
+        </section>
+        <section class="limits">
+          <h3>What remains unsolved</h3>
+          <ul class="note-list">
+            <li>Random read noise, ADC/DAC error, input-dependent nonlinearity, IR drop, coupling, temperature, and drift.</li>
+            <li>End-to-end DNN accuracy, unsupported operators, model partitioning, scheduling, runtime, and field maintenance.</li>
+            <li>The cost of the second MVM, analog bridge, compensation layers, calibration, and intermediate dynamic range for every workload.</li>
+            <li>Population-level yield, long-term retention, endurance, and production qualification.</li>
+          </ul>
+        </section>
+      </div>
+      <div class="callout" style="margin-top:12px">
+        <p>
+          <strong>Compiler implication:</strong> treat matrix factorization as an optional physical-lowering strategy.
+          It consumes a measured fault map and emits two array programs plus bridge/compensation configuration. The
+          cost model must compare it with spares, remapping, differential encoding, retraining, digital fallback, and
+          replacing the device. The method is valuable precisely because its claim is narrower than "analog is exact."
+        </p>
+      </div>
+    </section>
+
+    <section class="section" id="selection">
+      <div class="section-heading">
+        <p class="eyebrow">Solution selection matrix</p>
+        <h2>Choose mitigations by error type, not by fashion</h2>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th scope="col">Observed failure</th><th scope="col">First hardware response</th><th scope="col">First software response</th><th scope="col">Escalation</th></tr></thead>
+          <tbody>
+            <tr><th scope="row">Random programming spread</th><td>Closed-loop write-verify and stable conductance range.</td><td>Optimized programming targets plus HWA training.</td><td>Multi-device expansion, remap, or digital placement.</td></tr>
+            <tr><th scope="row">Many stuck devices</th><td>Characterize fault map; spares where cheap.</td><td>Defect-aware placement or adaptive matrix factorization.</td><td>Reject/quarantine array when extra MVM stages lose value.</td></tr>
+            <tr><th scope="row">ADC saturation or code waste</th><td>Gain/offset control, precision modes, adaptive thresholds.</td><td>Representative calibration, per-layer range, clipping, outlier split.</td><td>More phases/bits or move the region to digital compute.</td></tr>
+            <tr><th scope="row">Read noise and nonlinear error</th><td>Linear read region, better sensing, differential/AB, references.</td><td>Measured-noise HWA training and sensitivity routing.</td><td>Average, expand weights, chip-in-loop tune, or fall back.</td></tr>
+            <tr><th scope="row">IR drop and position bias</th><td>Smaller arrays, access devices, stronger/local periphery.</td><td>IR-aware mapping, tiling, partial-sum and route planning.</td><td>Reduce active rows or redesign the tile.</td></tr>
+            <tr><th scope="row">Drift over time</th><td>Reference rows, sensors, refresh/reprogram capability.</td><td>Drift-aware training, calibration metadata, guardbands.</td><td>Recalibrate, selectively refresh, remap, or replace.</td></tr>
+            <tr><th scope="row">Sensitive model region</th><td>Provide SRAM/digital units and clean conversion paths.</td><td>Layer/kernel sensitivity partition and mixed precision.</td><td>Change model architecture or reject target deployment.</td></tr>
+            <tr><th scope="row">Poor application efficiency</th><td>Local SRAM, DPU, NoC, overlap, counters, power control.</td><td>Fusion, packing, scheduling, memory planning, pipeline balancing.</td><td>Redesign dataflow; peak macro TOPS/W is not the product metric.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="section" id="contracts">
+      <div class="section-heading">
+        <p class="eyebrow">Implementation contracts</p>
+        <h2>Six artifacts make the co-design reproducible</h2>
+      </div>
+      <div class="artifact-grid">
+        <article><b>01</b><strong>Target profile</strong><span>Array geometry, formats, converters, precision modes, memory, digital units, command ABI, and legal operating ranges.</span></article>
+        <article><b>02</b><strong>Nonideality model</strong><span>Measured programming, read, drift, PVT, parasitic, ADC, saturation, correlation, and uncertainty distributions.</span></article>
+        <article><b>03</b><strong>Mapping report</strong><span>Partition, physical arrays, signed encoding, slices, ranges, fault decisions, schedule, movement, and predicted error.</span></article>
+        <article><b>04</b><strong>Executable artifact</strong><span>Code, constants, programming plan, calibration schema, compatibility, hashes, provenance, and source-to-command debug map.</span></article>
+        <article><b>05</b><strong>Device state bundle</strong><span>Per-chip faults, programmed state, scale/offset, temperature, calibration age, drift, health, refresh, and replacement history.</span></article>
+        <article><b>06</b><strong>Qualification report</strong><span>Task accuracy, first divergence, latency, energy, utilization, programming/calibration cost, population, corners, and lifetime.</span></article>
+      </div>
+    </section>
+
+    <section class="section" id="validation">
+      <div class="section-heading">
+        <p class="eyebrow">Evidence ladder</p>
+        <h2>Do not let a component result silently become a product claim</h2>
+      </div>
+      <div class="level-grid">
+        <article class="level-card"><b>Level 1</b><strong>Device</strong><span>Conductance states, write error, noise, drift, endurance, retention, PVT</span></article>
+        <article class="level-card"><b>Level 2</b><strong>Macro</strong><span>MVM error, ADC/DAC, parasitics, array size, utilization, energy and area</span></article>
+        <article class="level-card"><b>Level 3</b><strong>Tile / chip</strong><span>Digital units, routing, buffers, synchronization, calibration, trace, faults</span></article>
+        <article class="level-card"><b>Level 4</b><strong>Application</strong><span>Complete dataset, named baseline, hardware boundary, host work, end-to-end metrics</span></article>
+        <article class="level-card"><b>Level 5</b><strong>Product</strong><span>Chip population, temperature, age, field updates, recovery, security, yield, cost</span></article>
+      </div>
+      <div class="callout caution" style="margin-top:12px">
+        <p>
+          The adaptive ADC paper contains measured memristor devices and converter characterization, then model and
+          system evaluation under measured variation. The HWA training paper is a broad simulation study. NeuRRAM
+          reports complete hardware-measured datasets. ALBERT maps the fully connected weights to hardware but keeps
+          attention and activation work in software. These are all useful results, but they occupy different rungs.
+        </p>
+      </div>
+    </section>
+
+    <section class="section" id="labs" data-progress="analog-cim-codesign-labs">
+      <div class="section-heading">
+        <p class="eyebrow">Study and portfolio labs</p>
+        <h2>Turn the papers into engineering evidence</h2>
+      </div>
+      <div class="progress-panel" aria-live="polite">
+        <div class="progress-track"><div class="progress-bar" data-progress-bar role="progressbar" aria-label="Analog CIM co-design lab progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"></div></div>
+        <span class="progress-value" data-progress-value>0 / 8 complete</span>
+      </div>
+      <div class="lab-list">
+        <label class="lab-item"><input type="checkbox" data-step="taxonomy"><span><strong>Architecture taxonomy</strong><span>Write a one-page comparison of SRAM charge-domain, RRAM, PCM, flash, and heterogeneous CIM with explicit software consequences.</span></span></label>
+        <label class="lab-item"><input type="checkbox" data-step="noise"><span><strong>Measured-noise training</strong><span>Use AIHWKit to compare FP32, quantized, ideal-array, and HWA-trained accuracy under programming, read, ADC, and drift sweeps.</span></span></label>
+        <label class="lab-item"><input type="checkbox" data-step="adc"><span><strong>Adaptive ADC experiment</strong><span>Fit uniform and Lloyd-Max thresholds to layer outputs; measure MSE, saturation, accuracy, code usage, and estimated converter cost.</span></span></label>
+        <label class="lab-item"><input type="checkbox" data-step="fault"><span><strong>Fault-map lowering</strong><span>Compare spares, remapping, differential encoding, and two-matrix factorization across fault rates and count every extra MVM.</span></span></label>
+        <label class="lab-item"><input type="checkbox" data-step="partition"><span><strong>Heterogeneous partitioner</strong><span>Assign graph regions to analog, SRAM, or digital targets from sensitivity, energy, latency, capacity, and conversion costs.</span></span></label>
+        <label class="lab-item"><input type="checkbox" data-step="compiler"><span><strong>OpenCIMTC trace</strong><span>Trace one model through import, CIM IR, placement, optimizer, simulator, code generation, and hardware parameter search.</span></span></label>
+        <label class="lab-item"><input type="checkbox" data-step="runtime"><span><strong>Calibration runtime</strong><span>Implement per-chip state, write-verify, scale/offset calibration, health vectors, drift simulation, refresh, fallback, and rollback.</span></span></label>
+        <label class="lab-item"><input type="checkbox" data-step="report"><span><strong>Paper claim audit</strong><span>For three papers, record evidence rung, baseline, on-chip work, mitigation cost, missing corners, and the experiment needed for the next claim.</span></span></label>
+      </div>
+    </section>
+
+    <section class="section" id="sources">
+      <div class="section-heading">
+        <p class="eyebrow">Primary sources</p>
+        <h2>Measured systems, components, software, and current reviews</h2>
+      </div>
+      <div class="source-grid">
+        <article class="source-card"><a href="https://doi.org/10.1038/s41586-022-04992-8">NeuRRAM RRAM CIM chip</a><span>Nature 2022 | architecture, voltage-mode sensing, calibration, measured-noise training, chip-in-loop fine-tuning</span></article>
+        <article class="source-card"><a href="https://doi.org/10.1038/s41928-023-01010-1">64-core mixed-signal PCM chip</a><span>Nature Electronics 2023 | AIMC cores, digital processing, on-chip communication, precision modes</span></article>
+        <article class="source-card"><a href="https://doi.org/10.1038/s41586-023-06337-5">Analog-AI speech chip</a><span>Nature 2023 | KWS, multichip RNNT, AB method, weight expansion, HWA training, calibration</span></article>
+        <article class="source-card"><a href="https://doi.org/10.1109/JSSC.2022.3232601">22-nm charge-domain SRAM macro</a><span>IEEE JSSC 2023 | C-2C passive charge computation, 8-bit MAC, PVT and MVM error</span></article>
+        <article class="source-card"><a href="https://doi.org/10.1038/s41586-025-08639-2">Mixed memristor/SRAM/digital processor</a><span>Nature 2025 | sensitivity-based layer/kernel placement and mixed INT/FP execution</span></article>
+        <article class="source-card"><a href="https://doi.org/10.1038/s41467-025-63794-4">ALBERT on PCM hardware</a><span>Nature Communications 2025 | transformer mapping, HWA fine-tuning, calibration, drift and hybrid boundary</span></article>
+        <article class="source-card"><a href="https://doi.org/10.1038/s41467-025-57183-0">Full-stack memristor CIM system</a><span>Nature Communications 2025 | compiler, CIM IR, optimizer, simulator, automatic deployment, eight-chip hardware</span></article>
+        <article class="source-card"><a href="https://github.com/Tsinghua-LEMON-Lab/OpenCIMTC">OpenCIMTC source</a><span>Compiler, optimizer, simulator, trainable modules, examples, and paper artifacts</span></article>
+        <article class="source-card"><a href="https://doi.org/10.1038/s41467-023-40770-4">Hardware-aware training study</a><span>Nature Communications 2023 | realistic crossbar model across CNN, recurrent, and transformer workloads</span></article>
+        <article class="source-card"><a href="https://arxiv.org/abs/2505.09663">Analog Foundation Models</a><span>NeurIPS 2025 | LLM distillation, static 8-bit analog boundaries, clipping, noise injection, and limits of off-the-shelf quantized models</span></article>
+        <article class="source-card"><a href="https://doi.org/10.1038/s41467-022-31405-1">Optimized analog weight programming</a><span>Nature Communications 2022 | HWA training plus multi-device programming optimization and drift modeling</span></article>
+        <article class="source-card"><a href="https://doi.org/10.1038/s41467-025-65233-w">Adaptive memristor ADC</a><span>Nature Communications 2025 | programmable thresholds, Lloyd-Max optimization, super-resolution, converter tradeoffs</span></article>
+        <article class="source-card"><a href="https://doi.org/10.1038/s41928-026-01638-9">Fault-free analogue computing</a><span>Nature Electronics 2026 | hardware-aware two-matrix representation for severe static device faults</span></article>
+        <article class="source-card"><a href="https://github.com/ZCXU0421/Fault_free_analog_computing">Fault-free reference code</a><span>Matrix decomposition and compensation-layer implementation published with the paper</span></article>
+        <article class="source-card"><a href="https://doi.org/10.1038/s41928-025-01537-5">Design of Analog CIM tiles</a><span>Nature Electronics 2025 | memory technologies, tile components, signed mapping, input/output encoding, ADC design</span></article>
+        <article class="source-card"><a href="https://doi.org/10.1038/s44287-025-00187-1">Deep learning software stacks for AIMC</a><span>Nature Reviews Electrical Engineering 2025 | weight stationarity, stochastic execution, heterogeneous backend requirements</span></article>
+        <article class="source-card"><a href="https://doi.org/10.1038/s41563-026-02600-y">Strategies for high-accuracy memristor CIM</a><span>Nature Materials 2026 | device-to-algorithm error hierarchy and mitigation overhead roadmap</span></article>
+        <article class="source-card"><a href="https://doi.org/10.1038/s42254-026-00957-2">Non-idealities in artificial synapses</a><span>Nature Reviews Physics 2026 | nonlinearity, asymmetry, variability, endurance, retention, and cross-layer responses</span></article>
+        <article class="source-card"><a href="https://github.com/IBM/aihwkit">IBM AIHWKit</a><span>Open-source analog simulator and hardware-aware training toolkit for reproducible study</span></article>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <p>English-only source-critical study. Measured evidence, hybrid demonstrations, simulations, and reviews are labeled separately.</p>
+    <div class="footer-links">
+      <a href="analog-cim-tenstorrent-reuse.html">Next: reuse decision guide</a>
+      <a href="https://github.com/buicongnguyen/NPU">Source</a>
+    </div>
+  </footer>
+</body>
+</html>
