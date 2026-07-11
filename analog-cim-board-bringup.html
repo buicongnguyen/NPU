@@ -1,0 +1,1067 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="A detailed implementation guide for bringing up a PCIe Analog CIM board: host and device requirements, UMD/KMD boundaries, BAR and queue contracts, DMA and MSI-X ordering, firmware boot, YOLO dataflow, calibration, recovery, security, tests, and staged delivery.">
+  <title>Analog CIM Board Bring-Up | NPU Study Guide</title>
+  <link rel="stylesheet" href="analog-cim.css">
+  <link rel="stylesheet" href="npu-engineering.css">
+  <link rel="stylesheet" href="analog-cim-bringup.css">
+  <script src="npu-engineering.js" defer></script>
+</head>
+<body>
+  <header class="site-header">
+    <a class="brand" href="index.html" aria-label="NPU Study Guide home">
+      <img src="https://avatars.githubusercontent.com/u/72680210?v=4" alt="Bui Cong Nguyen avatar">
+      <span>NPU Study Guide</span>
+    </a>
+    <nav class="site-nav" aria-label="Analog CIM learning path">
+      <a href="analog-cim-architecture.html">Architecture</a>
+      <a href="analog-cim-evidence.html">Evidence</a>
+      <a href="analog-cim-hardware-software-codesign.html">Co-design</a>
+      <a href="analog-cim-ihw-patents.html">iHW patents</a>
+      <a href="analog-cim-sdk-toolchain.html">SDK</a>
+      <a href="analog-cim-board-bringup.html" aria-current="page">Bring-up</a>
+      <a href="analog-cim-tenstorrent-reuse.html">Reuse</a>
+      <a href="analog-cim-scaleout-llm.html">Scale/LLM</a>
+      <a href="analog-cim-interview.html">Interview</a>
+      <a href="analog-cim-quiz.html">MCQ Lab</a>
+    </nav>
+  </header>
+
+  <main>
+    <section class="hero">
+      <div class="hero-copy">
+        <p class="eyebrow">Implementation guide | reviewed 2026-07-11</p>
+        <h1>Analog CIM Board Bring-Up: YOLO, PCIe, UMD, KMD, and Firmware</h1>
+        <p class="lede">
+          This is the missing bridge between a compiled <code>.acx</code> artifact and a controlled physical board. It
+          defines a proposed Linux host stack, PCIe endpoint contract, queue and DMA protocol, device firmware loop,
+          hybrid YOLO placement, analog programming and calibration lifecycle, fault recovery, and a staged path from
+          simulator to silicon.
+        </p>
+        <div class="hero-actions">
+          <a class="button" href="#decision">Choose the driver path</a>
+          <a class="button secondary" href="#system">Trace the system</a>
+          <a class="button secondary" href="#pcie">Implement PCIe</a>
+          <a class="button secondary" href="#delivery">Open the delivery plan</a>
+        </div>
+        <div class="summary-strip" role="group" aria-label="Bring-up guide summary">
+          <div><strong>4</strong><span>deployment modes with different trust boundaries</span></div>
+          <div><strong>3</strong><span>versioned interfaces: UAPI, firmware ABI, artifact</span></div>
+          <div><strong>9</strong><span>incremental hardware milestones</span></div>
+          <div><strong>1</strong><span>correlation ID from graph node to board trace</span></div>
+        </div>
+        <div class="evidence-key" role="group" aria-label="Evidence labels">
+          <span class="evidence-tag primary">Primary-source behavior</span>
+          <span class="evidence-tag design">Proposed v0 design</span>
+          <span class="evidence-tag required">Vendor input required</span>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="gap-audit">
+      <div class="section-heading">
+        <p class="eyebrow">Gap audit</p>
+        <h2>What the existing documents cover, and what this page adds</h2>
+        <p class="section-note">
+          The compiler, artifact, HAL, SoC, and scale-out contracts already exist. Their missing implementation boundary
+          was how Linux safely discovers a board, transfers buffers, starts firmware work, receives completion, and
+          recovers a device without exposing arbitrary host memory.
+        </p>
+      </div>
+      <div class="gap-grid">
+        <article class="gap-item">
+          <strong>Already covered: model build</strong>
+          <span>ONNX import, MLIR dialects and passes, partitioning, calibration inputs, scheduling, artifact packaging, and framework plugins.</span>
+          <a href="analog-cim-sdk-toolchain.html">SDK and compiler guide</a>
+        </article>
+        <article class="gap-item">
+          <strong>Already covered: platform roles</strong>
+          <span>Runtime, driver, firmware, command processors, memory, control plane, data plane, observability, and ABI principles.</span>
+          <a href="npu-soc-software-architecture.html">NPU/SoC software architecture</a>
+        </article>
+        <article class="gap-item">
+          <strong>Already covered: logical device</strong>
+          <span>Fault hierarchy, topology epochs, placement, collectives, recovery, hybrid LLM partition, and scale-out descriptors.</span>
+          <a href="analog-cim-scaleout-llm.html">Scale-out and LLM design</a>
+        </article>
+        <article class="gap-item missing">
+          <strong>Added: physical board contract</strong>
+          <span>PCI IDs and capabilities, BAR layout, doorbells, DMA masks, MSI-X, reset, firmware mailbox, health, trace, and AER behavior.</span>
+          <a href="#pcie">Open PCIe implementation</a>
+        </article>
+        <article class="gap-item missing">
+          <strong>Added: protected execution path</strong>
+          <span>UMD and KMD APIs, buffer ownership, IOMMU mapping, submission and completion rings, memory ordering, interrupts, and cleanup.</span>
+          <a href="#queues">Open queue contracts</a>
+        </article>
+        <article class="gap-item missing">
+          <strong>Added: first real workload</strong>
+          <span>A proposed YOLO compile, program, execute, postprocess, profile, and accuracy-correlation path with analog and digital placement gates.</span>
+          <a href="#yolo">Open YOLO dataflow</a>
+        </article>
+      </div>
+    </section>
+
+    <section class="section" id="decision">
+      <div class="section-heading">
+        <p class="eyebrow">Driver decision</p>
+        <h2>Does an Analog CIM board need a UMD and KMD?</h2>
+      </div>
+      <div class="verdict-banner">
+        <div>
+          <span class="evidence-tag design">Architecture conclusion</span>
+          <strong>Production PCIe: yes</strong>
+          <span>A bus-mastering accelerator should not trust a process with raw physical addresses or unrestricted register access.</span>
+        </div>
+        <p>
+          Keep policy, graph execution, artifact parsing, and batching in a UMD/runtime. Keep isolation, DMA mappings,
+          interrupt ownership, reset, power, device lifetime, firmware loading, and the stable Linux UAPI in a KMD.
+          Firmware must validate the device-side command contract again. A simulator or tightly controlled lab prototype
+          can use a smaller path while the hardware protocol is still moving.
+        </p>
+      </div>
+      <div class="decision-grid top-gap">
+        <article class="decision-option prototype">
+          <b>Software-only</b>
+          <strong>No KMD</strong>
+          <span>Use the same HAL against functional, statistical, and cycle backends. Mock BARs, queues, interrupts, reset, and faults.</span>
+          <code>Best for: compiler and runtime CI</code>
+        </article>
+        <article class="decision-option prototype">
+          <b>Trusted FPGA lab</b>
+          <strong>VFIO with an IOMMU</strong>
+          <span>Userspace owns BARs, DMA mappings, and interrupts through VFIO. Verify the complete IOMMU group, FLR or reset, and locked-memory limits.</span>
+          <code>Best for: protocol exploration</code>
+        </article>
+        <article class="decision-option caution">
+          <b>Narrow prototype</b>
+          <strong>UIO only for simple MMIO</strong>
+          <span>UIO maps device memory and forwards interrupts, but has no IOMMU protection. Do not make it the product path for unrestricted bus-master DMA.</span>
+          <code>Best for: mailbox or PIO loopback</code>
+        </article>
+        <article class="decision-option recommended">
+          <b>Product path</b>
+          <strong>Dedicated KMD + UMD/HAL</strong>
+          <span>Context-bound buffers, validated queues, MSI-X, reset, AER, firmware, telemetry, permissions, and backward-compatible UAPI.</span>
+          <code>Best for: multi-process deployment</code>
+        </article>
+      </div>
+      <div class="callout caution top-gap">
+        <p>
+          <strong>Subsystem choice:</strong> evaluate Linux <code>drivers/accel</code> before inventing a private device
+          framework. The accelerator subsystem exposes <code>/dev/accel/accel*</code> and reuses DRM infrastructure. A
+          small out-of-tree character driver is acceptable for early board enablement, but its UAPI should still be
+          designed as if it must survive old userspace and new kernels.
+        </p>
+      </div>
+    </section>
+
+    <section class="section" id="system">
+      <div class="section-heading">
+        <p class="eyebrow">End-to-end architecture</p>
+        <h2>The board is one backend beneath a stable compiler, artifact, and runtime</h2>
+        <p class="section-note">
+          The simulator and hardware must consume the same executable semantics. Only the HAL transport changes. This
+          keeps model correctness separate from PCIe, firmware, and analog variation bugs.
+        </p>
+      </div>
+      <div class="system-map" role="group" aria-label="Analog CIM host and device architecture">
+        <div class="system-tier">
+          <div class="tier-label">Model and application</div>
+          <div class="tier-nodes">
+            <div class="tier-node control"><strong>PyTorch / ONNX</strong><span>Graph, tensors, shapes, QDQ, preprocessing</span></div>
+            <div class="tier-node control"><strong>Compiler</strong><span>Support, partition, lower, schedule, package</span></div>
+            <div class="tier-node control"><strong>YOLO application</strong><span>Capture, policy, decode, NMS, results</span></div>
+          </div>
+        </div>
+        <div class="system-tier">
+          <div class="tier-label">Host userspace</div>
+          <div class="tier-nodes">
+            <div class="tier-node"><strong>Framework plugin</strong><span>ORT EP capability and fallback boundary</span></div>
+            <div class="tier-node"><strong>Runtime</strong><span>Artifact load, session, buffers, queues, events</span></div>
+            <div class="tier-node"><strong>UMD / hardware HAL</strong><span>Discover, query, allocate, submit, wait, trace</span></div>
+          </div>
+        </div>
+        <div class="system-boundary">Stable Linux UAPI: ioctl + mmap + poll/eventfd + dma-buf</div>
+        <div class="system-tier">
+          <div class="tier-label">Host kernel</div>
+          <div class="tier-nodes">
+            <div class="tier-node control"><strong>KMD contexts</strong><span>Ownership, lifetime, permissions, ABI</span></div>
+            <div class="tier-node control"><strong>Memory manager</strong><span>Pin/import, IOMMU map, IOVA, fence</span></div>
+            <div class="tier-node control"><strong>PCI driver</strong><span>BAR, DMA, MSI-X, reset, AER, firmware</span></div>
+          </div>
+        </div>
+        <div class="system-boundary">PCIe contract: configuration + BAR MMIO + DMA + MSI-X</div>
+        <div class="system-tier">
+          <div class="tier-label">Device control</div>
+          <div class="tier-nodes">
+            <div class="tier-node hardware"><strong>Endpoint + boot ROM</strong><span>Identity, reset, mailbox, firmware load</span></div>
+            <div class="tier-node hardware"><strong>Firmware scheduler</strong><span>Validate, queue, dispatch, complete, recover</span></div>
+            <div class="tier-node hardware"><strong>Trace and health</strong><span>Cycles, bytes, stalls, saturation, faults</span></div>
+          </div>
+        </div>
+        <div class="system-tier">
+          <div class="tier-label">Device data plane</div>
+          <div class="tier-nodes">
+            <div class="tier-node"><strong>DMA + SRAM</strong><span>Stage inputs, outputs, commands, partial sums</span></div>
+            <div class="tier-node"><strong>Analog MVM</strong><span>Program, encode, integrate, ADC, reconstruct</span></div>
+            <div class="tier-node"><strong>Digital engines</strong><span>Elementwise, resize, activation, reduction, fallback</span></div>
+          </div>
+        </div>
+      </div>
+      <div class="contract-grid top-gap">
+        <article class="contract-card"><strong>Artifact ABI</strong><span>Compiler to runtime and firmware semantics.</span><code>target + program + constants + commands + debug map</code></article>
+        <article class="contract-card"><strong>Linux UAPI</strong><span>UMD to KMD ownership and transport.</span><code>caps + contexts + buffers + queues + waits + faults</code></article>
+        <article class="contract-card"><strong>Firmware ABI</strong><span>KMD queues to device validation and execution.</span><code>SQ/CQ + mailbox + opcodes + status + trace</code></article>
+      </div>
+    </section>
+
+    <section class="section" id="model-flow">
+      <div class="section-heading">
+        <p class="eyebrow">Compile and deploy flow</p>
+        <h2>Do not make MLIR responsible for PCIe</h2>
+        <p class="section-note">
+          MLIR selects and encodes legal hardware work. The runtime resolves physical buffers and live device state.
+          The KMD protects host resources. Firmware owns device scheduling. Keeping these decisions separate permits the
+          same artifact to run in simulation and on a board.
+        </p>
+      </div>
+      <div class="pipeline-flow" role="group" aria-label="Model to board flow chart">
+        <div class="pipeline-stage host"><b>1. Import</b><strong>ONNX graph</strong><span>Validate opset, infer shapes, normalize layouts and constants.</span></div>
+        <div class="pipeline-stage host"><b>2. Analyze</b><strong>Target support</strong><span>Match operators, precision, tensor bounds, calibration, and fallback.</span></div>
+        <div class="pipeline-stage analog"><b>3. Partition</b><strong>Analog islands</strong><span>Cluster resident dense or convolution work; minimize analog/digital crossings.</span></div>
+        <div class="pipeline-stage digital"><b>4. Lower</b><strong>Device programs</strong><span>Map arrays, digital kernels, transfers, dependencies, and scratch memory.</span></div>
+        <div class="pipeline-stage host"><b>5. Package</b><strong><code>.acx</code> artifact</strong><span>Code, constants, profiles, commands, ABI, hashes, and graph debug map.</span></div>
+        <div class="pipeline-stage analog"><b>6. Execute</b><strong>HAL backend</strong><span>Simulator or UMD/KMD/firmware uses identical buffer and command semantics.</span></div>
+      </div>
+      <div class="table-wrap top-gap">
+        <table>
+          <thead><tr><th scope="col">Decision</th><th scope="col">Compiler owns</th><th scope="col">Runtime owns</th><th scope="col">Device owns</th></tr></thead>
+          <tbody>
+            <tr><th scope="row">Operator legality</th><td>Static support and diagnostic reason</td><td>Capability/firmware compatibility check</td><td>Descriptor validation before dispatch</td></tr>
+            <tr><th scope="row">Memory</th><td>Logical buffers, lifetimes, offsets, alignment</td><td>Buffer objects, imports, bindings, reuse</td><td>SRAM allocation, DMA windows, bounds check</td></tr>
+            <tr><th scope="row">Analog mapping</th><td>Array slices, precision, profile ID, alternatives</td><td>Select live profile and healthy placement</td><td>Program ID, calibration table, remap, saturation policy</td></tr>
+            <tr><th scope="row">Scheduling</th><td>Dependencies and legal overlap</td><td>Batching, queue and latency policy</td><td>Resource arbitration, watchdog, completion order</td></tr>
+            <tr><th scope="row">Failure</th><td>Fallback-capable variants</td><td>Retry, rebind, digital fallback, session loss</td><td>Fault isolation, abort, reset and health update</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="section" id="yolo">
+      <div class="section-heading">
+        <p class="eyebrow">First model dataflow</p>
+        <h2>A YOLO demo should prove the whole hybrid path, not only one analog convolution</h2>
+        <p class="section-note">
+          This placement is a proposed starting point, not a claim about an iHW or Mythic product. The exact YOLO
+          version, supported operators, array geometry, digital engines, precision, and SRAM capacity must decide the
+          final partition. Keep host fallback available until each device segment passes differential tests.
+        </p>
+      </div>
+      <div class="yolo-flow" role="group" aria-label="Hybrid YOLO host and device data flow">
+        <div class="yolo-stage host"><b>Host</b><strong>Capture + preprocess</strong><span>Decode, resize/letterbox, normalize, quantize, pack layout.</span></div>
+        <div class="yolo-stage host"><b>PCIe</b><strong>Input DMA</strong><span>Imported or allocated input BO; one H2D transfer per frame.</span></div>
+        <div class="yolo-stage analog"><b>Device analog</b><strong>Backbone Conv</strong><span>Resident weights, calibrated array MVM, ADC and reconstruction.</span></div>
+        <div class="yolo-stage digital"><b>Device digital</b><strong>Neck transforms</strong><span>Activation, resize, concat, routing, unsupported operators.</span></div>
+        <div class="yolo-stage analog"><b>Device mixed</b><strong>Head projections</strong><span>Analog eligible convolution/linear plus digital decode preparation.</span></div>
+        <div class="yolo-stage host"><b>PCIe</b><strong>Output DMA</strong><span>Return compact logits/boxes, not intermediate feature maps.</span></div>
+        <div class="yolo-stage host"><b>Host</b><strong>Decode + NMS</strong><span>Dequantize, box transform, confidence filter, NMS, annotate.</span></div>
+      </div>
+      <div class="callout top-gap">
+        <p>
+          <strong>Partition rule:</strong> one analog operator surrounded by host fallback can be slower than CPU/GPU
+          execution because every boundary moves a feature map over PCIe. Prefer the largest accuracy-safe contiguous
+          device island, keep weights resident across frames, and transfer only input and final output once the device
+          path is validated.
+        </p>
+      </div>
+      <div class="table-wrap top-gap">
+        <table>
+          <thead><tr><th scope="col">YOLO stage</th><th scope="col">Preferred placement</th><th scope="col">Compiler proof</th><th scope="col">Runtime/board proof</th></tr></thead>
+          <tbody>
+            <tr><th scope="row">Input preprocessing</th><td>Host initially; device later if a validated image engine exists</td><td>Exact resize, padding, color order, normalization, quantization</td><td>Golden tensor immediately before first device operator</td></tr>
+            <tr><th scope="row">Conv + static weights</th><td>Analog when dimensions, precision, and accuracy are legal</td><td>Weight slicing, sign mapping, bias, scale, activation fusion, array utilization</td><td>Program/verify result, calibration profile, saturation and error counters</td></tr>
+            <tr><th scope="row">Activation / elementwise</th><td>Digital vector engine or firmware kernel</td><td>Quantization domain and rounding are explicit</td><td>Cycle and numerical checkpoints at each partition boundary</td></tr>
+            <tr><th scope="row">Resize / concat / route</th><td>Digital engine; avoid host round-trip</td><td>Layout and memory plan fit SRAM and DMA rules</td><td>No hidden copy; measured bytes and stall reason</td></tr>
+            <tr><th scope="row">Detection head</th><td>Hybrid; target profile selects analog-eligible projections</td><td>Tensor shapes and output scale remain compatible with decode</td><td>Layer error distribution plus end-to-end mAP on full validation set</td></tr>
+            <tr><th scope="row">Decode / NMS</th><td>Host for MVP, device only with a measured benefit</td><td>Model-specific anchors/strides and thresholds packaged as metadata</td><td>Deterministic postprocess and identical evaluation configuration</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="formula-strip top-gap" role="group" aria-label="YOLO system performance equations">
+        <div class="formula-item"><code>T_frame = T_pre + T_H2D + T_queue + T_device + T_D2H + T_post</code><span>Report each term, median, and tail latency.</span></div>
+        <div class="formula-item"><code>FPS_steady &lt;= 1 / max(stage_time)</code><span>With pipelining, the slowest non-overlapped stage limits throughput.</span></div>
+        <div class="formula-item"><code>coverage = device_ops / supported_candidate_ops</code><span>Also report bytes crossing every partition, not only operator count.</span></div>
+        <div class="formula-item"><code>accuracy_delta = mAP_device - mAP_reference</code><span>Use the same dataset, preprocessing, decode, and thresholds.</span></div>
+      </div>
+    </section>
+
+    <section class="section" id="requirements">
+      <div class="section-heading">
+        <p class="eyebrow">Platform requirements</p>
+        <h2>Freeze a host profile and device profile before writing the KMD</h2>
+        <p class="section-note">
+          PCIe generation, lane width, BAR sizes, DMA address width, queue count, and memory capacity are target facts,
+          not values to infer from a demo. Encode them in machine-readable target and capability records.
+        </p>
+      </div>
+      <div class="requirements-grid">
+        <article class="requirement-panel">
+          <header><strong>Host requirement profile</strong><span>Minimum supported Linux environment</span></header>
+          <ul class="requirement-list">
+            <li><strong>CPU and OS</strong><span>Document x86-64 and/or AArch64, distribution, kernel range, page size, endianness, and 32-bit userspace policy.</span></li>
+            <li><strong>PCIe root</strong><span>Required link generation and width, 64-bit BAR support, MSI-X, AER, hot reset/FLR behavior, and link retraining policy.</span></li>
+            <li><strong>IOMMU</strong><span>Enable Intel VT-d, AMD-Vi, or SMMU for isolation. Qualify IOVA width, page sizes, and IOMMU group topology.</span></li>
+            <li><strong>Memory</strong><span>Locked-memory limits, pinned-memory budget, scatter/gather limits, alignment, NUMA node, and optional hugepage policy.</span></li>
+            <li><strong>Build</strong><span>Compiler, CMake/Ninja, kernel headers, DKMS or in-tree build, packaging, symbols, sanitizers, and reproducible toolchain image.</span></li>
+            <li><strong>Access</strong><span>udev rules, device group, least-privilege permissions, firmware search path, module signing, and secure-boot policy.</span></li>
+            <li><strong>Observability</strong><span><code>lspci</code>, sysfs, debugfs or tracefs, dynamic debug, ftrace, perf, AER counters, and support-bundle command.</span></li>
+            <li><strong>Media interop</strong><span>Optional dma-buf import for camera/display pipelines; define synchronization and supported exporters explicitly.</span></li>
+          </ul>
+        </article>
+        <article class="requirement-panel">
+          <header><strong>Device requirement profile</strong><span>RTL, board, firmware, and analog contract</span></header>
+          <ul class="requirement-list">
+            <li><strong>Identity</strong><span>Vendor/device/subsystem IDs, revision, serial, board SKU, capability bits, hardware ABI, and manufacturing state.</span></li>
+            <li><strong>PCIe endpoint</strong><span>BAR type/size, DMA address width, maximum payload/read request, MSI-X vectors, FLR, AER, and power states.</span></li>
+            <li><strong>Boot</strong><span>ROM state, mailbox, firmware image format, authenticity check, load window, entry point, timeout, rollback, and recovery mode.</span></li>
+            <li><strong>Queues</strong><span>Submission/completion entry formats, count, depth, alignment, ownership, generation, doorbells, interrupt moderation, and reset.</span></li>
+            <li><strong>Memory</strong><span>SRAM banks, address map, DMA engines, segment limits, alignment, coherency, ECC, bandwidth counters, and reserved regions.</span></li>
+            <li><strong>Compute</strong><span>Analog macro geometry, DAC/ADC modes, accumulators, digital engines, supported operators, precision, and scheduling constraints.</span></li>
+            <li><strong>Reliability</strong><span>Row/column/tile fault map, temperature/voltage sensors, watchdog, saturation flags, ECC, calibration age, and reset domains.</span></li>
+            <li><strong>Debug</strong><span>Trace SRAM, timestamp domain, correlation ID, performance counters, crash dump, firmware log, and safe register snapshot.</span></li>
+          </ul>
+        </article>
+      </div>
+    </section>
+
+    <section class="section" id="pcie">
+      <div class="section-heading">
+        <p class="eyebrow">PCIe endpoint implementation</p>
+        <h2>Start with a small versioned control BAR, DMA rings, and MSI-X</h2>
+        <p class="section-note">
+          The layout below is a proposed v0 example for RTL, firmware, KMD, simulator, and documentation to implement
+          from one register specification. It is not a disclosed register map for any company. Generate C, C++, SystemVerilog,
+          simulator, and documentation definitions from the same schema.
+        </p>
+      </div>
+      <div class="bar-map">
+        <div class="bar-index">
+          <div class="bar-chip"><strong>BAR0: control</strong><span>Example size: 64 KiB</span><code>Identity, mailbox, queues, IRQ, fault, trace control</code></div>
+          <div class="bar-chip optional"><strong>BAR2: aperture</strong><span>Optional and capability-gated</span><code>Device SRAM/program window for bring-up, not raw production mapping</code></div>
+          <div class="bar-chip optional"><strong>BAR4: trace</strong><span>Optional read-only window</span><code>Snapshot or streaming trace when DMA trace is unavailable</code></div>
+        </div>
+        <div class="register-map" role="group" aria-label="Proposed PCIe BAR0 register map" tabindex="0">
+          <div class="register-row"><span>Offset</span><span>Register</span><span>Access</span><span>Required semantics</span></div>
+          <div class="register-row"><code>0x0000</code><strong>DEVICE_ID</strong><code>RO</code><span>Magic, hardware revision, register-layout major/minor.</span></div>
+          <div class="register-row"><code>0x0010</code><strong>CAPS0 / CAPS1</strong><code>RO</code><span>DMA width, queues, MSI-X, reset, trace, memory, analog and digital features.</span></div>
+          <div class="register-row"><code>0x0020</code><strong>DEVICE_STATUS</strong><code>RO</code><span>Reset, ROM, firmware ready, quiesced, fatal, thermal, calibration-required.</span></div>
+          <div class="register-row"><code>0x0024</code><strong>DEVICE_CONTROL</strong><code>RW</code><span>Quiesce, function reset request, firmware start, trace enable; reserved bits must be zero.</span></div>
+          <div class="register-row"><code>0x0040</code><strong>FW_MAILBOX_*</strong><code>RW</code><span>Image location/length/hash, command, response, boot epoch, ABI and timeout reason.</span></div>
+          <div class="register-row"><code>0x0100</code><strong>SQ_BASE_LO/HI</strong><code>RW</code><span>DMA address of coherent submission ring; write only while queue disabled.</span></div>
+          <div class="register-row"><code>0x0110</code><strong>SQ_SIZE / SQ_TAIL</strong><code>RW</code><span>Power-of-two entry count and producer position; size bounded by capability.</span></div>
+          <div class="register-row"><code>0x0120</code><strong>CQ_BASE_LO/HI</strong><code>RW</code><span>DMA address of coherent completion ring and consumer record.</span></div>
+          <div class="register-row"><code>0x0130</code><strong>QUEUE_CONTROL</strong><code>RW</code><span>Enable, interrupt vector, moderation, context and queue generation.</span></div>
+          <div class="register-row"><code>0x0140</code><strong>SQ_DOORBELL</strong><code>WO</code><span>New producer index. Descriptor writes and ownership change must precede this MMIO write.</span></div>
+          <div class="register-row"><code>0x0200</code><strong>IRQ_CAUSE / MASK / ACK</strong><code>RW1C</code><span>Completion, fault, firmware, thermal and health causes with defined clear semantics.</span></div>
+          <div class="register-row"><code>0x0240</code><strong>FAULT_CODE / INFO</strong><code>RO</code><span>First-fault record, context, queue, command, engine, IOVA, and reset generation.</span></div>
+          <div class="register-row"><code>0x0300</code><strong>TRACE_CONTROL / HEAD</strong><code>RW</code><span>Snapshot trigger, filter, buffer location, overflow and timestamp frequency.</span></div>
+          <div class="register-row"><code>0x1000 + q*0x100</code><strong>QUEUE_q</strong><code>RW</code><span>Per-queue register block; stride and queue count are capability values.</span></div>
+        </div>
+      </div>
+      <div class="contract-grid top-gap">
+        <article class="contract-card"><strong>Endianness</strong><span>Specify little-endian MMIO and ring fields. Convert explicitly in firmware and KMD; do not rely on host layout.</span><code>readl/writel + cpu_to_leXX/leXX_to_cpu</code></article>
+        <article class="contract-card"><strong>Atomicity</strong><span>Define which 64-bit values use paired 32-bit writes, latch order, and commit register. Never assume a 64-bit MMIO write is atomic everywhere.</span><code>BASE_LO, BASE_HI, then QUEUE_ENABLE</code></article>
+        <article class="contract-card"><strong>Posted writes</strong><span>PCI memory writes are posted. Use ordered accessors and read a harmless device register when the protocol requires confirmed arrival before reset or teardown.</span><code>writel(...); readl(DEVICE_STATUS);</code></article>
+        <article class="contract-card"><strong>Reset generation</strong><span>Increment an epoch on every firmware or function reset. Reject stale queues, buffer handles, completions, and artifacts.</span><code>submission.generation == device.generation</code></article>
+        <article class="contract-card"><strong>Register ownership</strong><span>Declare ROM-only, KMD-only, firmware-only, debug-only, and safe userspace doorbell pages. Production userspace never maps the full control BAR.</span><code>spec/registers.yaml: owner + access + side_effect</code></article>
+        <article class="contract-card"><strong>Discovery</strong><span>Unknown major layout fails closed. New minor capability bits are ignored only when their documented default is safe.</span><code>major mismatch -&gt; -EPROTO</code></article>
+      </div>
+    </section>
+
+    <section class="section" id="queues">
+      <div class="section-heading">
+        <p class="eyebrow">Command and queue ABI</p>
+        <h2>Descriptors carry handles and bounded references, not trust</h2>
+        <p class="section-note">
+          A KMD resolves process-owned buffer handles into IOVAs. Firmware accepts only ranges registered in the
+          context table. Keep fixed-width fields, natural alignment, explicit reserved fields, and static size checks.
+          Add a new ioctl or opcode for new semantics instead of silently changing an old one.
+        </p>
+      </div>
+      <div class="code-panel">
+        <header><strong>Proposed firmware queue entries</strong><span>Illustrative v0 shared header; all fields little-endian</span></header>
+        <pre><code>/* include/hw/acim_queue_v0.h - generated from the protocol schema */
+struct acim_sq_entry_v0 {
+  __le16 opcode;          /* EXECUTE, PROGRAM, VERIFY, COPY, TRACE, ABORT */
+  __le16 flags;           /* interrupt, priority class, retry permission */
+  __le32 command_bytes;   /* bounded command-buffer length */
+  __le64 context_id;      /* firmware-created context, never a pointer */
+  __le64 command_iova;    /* IOVA already registered for this context */
+  __le64 user_cookie;     /* opaque value returned in completion */
+  __le64 deadline_ns;     /* relative or zero; clock semantics are specified */
+  __le32 generation;      /* rejects work submitted before reset */
+  __le32 crc32;           /* optional transport corruption check */
+};
+
+struct acim_cq_entry_v0 {
+  __le64 user_cookie;
+  __le32 status;          /* OK, INVALID, FAULT, TIMEOUT, RESET, RETRY */
+  __le32 fault_code;
+  __le64 device_cycles;
+  __le64 completed_bytes;
+  __le32 generation;
+  __le32 reserved0;
+};
+
+static_assert(sizeof(struct acim_sq_entry_v0) == 48);
+static_assert(sizeof(struct acim_cq_entry_v0) == 40);</code></pre>
+      </div>
+      <div class="code-panel top-gap">
+        <header><strong>Proposed Linux UAPI surface</strong><span>KMD-managed queues first; map a fast doorbell only after isolation is proven</span></header>
+        <pre><code>/* include/uapi/linux/acim_accel.h - no C pointers or implicit padding */
+#define ACIM_IOCTL_QUERY_CAPS      _IOWR('A', 0x00, struct acim_query_caps)
+#define ACIM_IOCTL_CREATE_CONTEXT _IOWR('A', 0x01, struct acim_create_context)
+#define ACIM_IOCTL_CREATE_BO      _IOWR('A', 0x02, struct acim_create_bo)
+#define ACIM_IOCTL_IMPORT_DMABUF  _IOWR('A', 0x03, struct acim_import_dmabuf)
+#define ACIM_IOCTL_CREATE_QUEUE   _IOWR('A', 0x04, struct acim_create_queue)
+#define ACIM_IOCTL_SUBMIT         _IOWR('A', 0x05, struct acim_submit)
+#define ACIM_IOCTL_WAIT           _IOWR('A', 0x06, struct acim_wait)
+#define ACIM_IOCTL_QUERY_FAULT    _IOWR('A', 0x07, struct acim_query_fault)
+#define ACIM_IOCTL_RESET_CONTEXT  _IOWR('A', 0x08, struct acim_reset_context)
+
+struct acim_submit {
+  __u32 size;             /* must equal the known v0 structure size */
+  __u32 flags;
+  __u64 context_handle;
+  __u64 queue_handle;
+  __u64 command_bo_handle;
+  __u64 command_offset;
+  __u64 command_bytes;
+  __u64 user_cookie;
+  __u64 reserved[4];      /* userspace writes zero; kernel validates zero */
+};</code></pre>
+      </div>
+      <div class="table-wrap top-gap ownership-table">
+        <table>
+          <thead><tr><th scope="col">Object</th><th scope="col">UMD representation</th><th scope="col">KMD proof</th><th scope="col">Firmware proof</th><th scope="col">Lifetime ends</th></tr></thead>
+          <tbody>
+            <tr><th scope="row">Context</th><td>Opaque handle tied to an open device FD</td><td>Owner process/file, credentials, generation, quotas</td><td>Valid context table entry and allowed engine mask</td><td>FD close, explicit destroy, fatal reset</td></tr>
+            <tr><th scope="row">Buffer object</th><td>Handle, size, usage, optional CPU map</td><td>Allocation/import, pages, DMA direction, IOMMU map, reference count</td><td>IOVA range belongs to context and command access is in bounds</td><td>All dependent fences signal, then unmap/unpin</td></tr>
+            <tr><th scope="row">Queue</th><td>Handle plus event or pollable FD</td><td>Depth, ring memory, MSI-X vector, context, reset epoch</td><td>Base, size, owner, head/tail and generation are valid</td><td>Quiesce, drain/abort, disable, free IRQ/ring</td></tr>
+            <tr><th scope="row">Artifact/program</th><td>Loaded module and binding table</td><td>Header, ABI, size, hashes, BO access and firmware compatibility</td><td>Opcode, section bounds, program ID, target/profile compatibility</td><td>Last in-flight execution finishes and program is evicted</td></tr>
+            <tr><th scope="row">Fence/event</th><td>Monotonic sequence or opaque event</td><td>Queue/context membership, timeout, cancellation, wakeup</td><td>Exactly one terminal CQ record per accepted submission</td><td>Waiter releases it after completion or device loss</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="section" id="ownership">
+      <div class="section-heading">
+        <p class="eyebrow">UMD, KMD, and firmware split</p>
+        <h2>Put mechanisms at the lowest layer that can enforce them</h2>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th scope="col">Responsibility</th><th scope="col">Runtime / UMD</th><th scope="col">KMD</th><th scope="col">Firmware</th><th scope="col">Do not do</th></tr></thead>
+          <tbody>
+            <tr><th scope="row">Discovery</th><td>Enumerate device nodes and select compatible target</td><td>Bind PCI IDs, publish capabilities and health</td><td>Report hardware/firmware ABI and engine inventory</td><td>Infer capabilities from board name</td></tr>
+            <tr><th scope="row">Artifact</th><td>Parse semantic metadata, choose variants, bind buffers</td><td>Validate top-level sizes, compatibility and access</td><td>Validate every command and program section used</td><td>Trust compiler-generated bytes because they are signed by the same process</td></tr>
+            <tr><th scope="row">Memory</th><td>Choose usage, reuse, import, copy and synchronization</td><td>Allocate/pin/import, map to IOMMU, enforce context and quota</td><td>Use only registered IOVA windows and declared access</td><td>Expose physical addresses to userspace or firmware commands</td></tr>
+            <tr><th scope="row">Submission</th><td>Batch commands, choose queue, attach trace and deadline</td><td>Validate handles and publish protected descriptors</td><td>Arbitrate resources, execute and complete</td><td>Let userspace rewrite a descriptor after validation</td></tr>
+            <tr><th scope="row">Interrupt</th><td>Wait through poll/eventfd and drain completions</td><td>Own MSI-X, acknowledge cause, schedule completion work, wake waiters</td><td>Write CQ before MSI-X and moderate according to contract</td><td>Depend on a userspace process to mask a fatal interrupt</td></tr>
+            <tr><th scope="row">Analog state</th><td>Select compatible characterization and retry/fallback policy</td><td>Serialize privileged programming/reset and expose health</td><td>Apply calibration, remap, program/verify, monitor saturation/drift</td><td>Treat calibration files as ordinary unvalidated model constants</td></tr>
+            <tr><th scope="row">Recovery</th><td>Cancel work, rebuild session, recompile/rebind or fall back</td><td>Quiesce DMA, reset context/function, coordinate AER and device loss</td><td>Abort engines, capture fault, reset domains and increment generation</td><td>Continue using handles from before reset</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="callout top-gap">
+        <p>
+          <strong>Tenstorrent lesson to adapt:</strong> Tenstorrent publishes separate <code>tt-kmd</code> and
+          <code>tt-umd</code> repositories; its UMD requires the KMD and handles IOMMU/host-memory configuration. Reuse
+          the separation, testing habits, packaging ideas, and observability patterns. Do not copy its Tensix-specific
+          address spaces, TLB model, queue protocol, or ioctl ABI into an Analog CIM device whose hardware contract is different.
+        </p>
+      </div>
+    </section>
+
+    <section class="section" id="kmd">
+      <div class="section-heading">
+        <p class="eyebrow">Kernel-mode driver skeleton</p>
+        <h2>Probe in dependency order; remove in reverse after quiescing DMA</h2>
+        <p class="section-note">
+          The skeleton shows order and failure ownership, not drop-in production code. Select current managed PCI APIs
+          for the supported kernel range, implement every unwind path, and test probe failure after each resource acquisition.
+        </p>
+      </div>
+      <div class="code-panel">
+        <header><strong>Proposed Linux PCI probe path</strong><span>Enable, claim, map, configure DMA, IRQ, firmware, then expose userspace</span></header>
+        <pre><code>static int acim_probe(struct pci_dev *pdev,
+                      const struct pci_device_id *id)
+{
+  struct acim_dev *adev;
+  const struct firmware *fw = NULL;
+  int ret, i;
+
+  ret = pcim_enable_device(pdev);
+  if (ret)
+    return ret;
+
+  ret = pcim_iomap_regions(pdev, BIT(0), "acim");
+  if (ret)
+    return ret;
+
+  adev = devm_kzalloc(&amp;pdev-&gt;dev, sizeof(*adev), GFP_KERNEL);
+  if (!adev)
+    return -ENOMEM;
+
+  adev->bar0 = pcim_iomap_table(pdev)[0];
+  pci_set_drvdata(pdev, adev);
+
+  ret = acim_read_and_validate_caps(adev);  /* ROM-visible; no DMA yet */
+  if (ret)
+    return ret;
+
+  if (adev->caps.dma_bits != 32 &amp;&amp; adev->caps.dma_bits != 64)
+    return -EPROTO;
+
+  ret = dma_set_mask_and_coherent(&amp;pdev-&gt;dev,
+                                  DMA_BIT_MASK(adev->caps.dma_bits));
+  if (ret)
+    return dev_err_probe(&amp;pdev-&gt;dev, ret, "unsupported DMA mask\n");
+
+  pci_set_master(pdev);                 /* device may now initiate DMA */
+
+  ret = acim_alloc_admin_rings(adev);       /* dma_alloc_coherent */
+  if (ret)
+    goto err_clear_master;
+
+  ret = pci_alloc_irq_vectors(pdev, 1, adev->caps.max_vectors,
+                              PCI_IRQ_MSI | PCI_IRQ_MSIX);
+  if (ret &lt; 0)
+    goto err_free_rings;
+  adev->nr_vectors = ret;
+
+  for (i = 0; i &lt; adev->nr_vectors; ++i) {
+    ret = request_threaded_irq(pci_irq_vector(pdev, i),
+                               acim_irq, acim_irq_thread, 0,
+                               "acim", adev);
+    if (ret)
+      goto err_free_irqs;
+  }
+
+  ret = request_firmware(&amp;fw, adev-&gt;caps.firmware_name, &amp;pdev-&gt;dev);
+  if (ret)
+    goto err_free_irqs;
+
+  ret = acim_boot_firmware(adev, fw);       /* reset, load, hash, start, ABI */
+  release_firmware(fw);
+  if (ret)
+    goto err_free_irqs;
+
+  ret = acim_register_accel_or_chardev(adev); /* userspace opens only now */
+  if (ret)
+    goto err_quiesce;
+
+  return 0;
+
+err_quiesce:
+  acim_quiesce_and_reset(adev);
+err_free_irqs:
+  while (i--)
+    free_irq(pci_irq_vector(pdev, i), adev);
+err_free_vectors:
+  pci_free_irq_vectors(pdev);
+err_free_rings:
+  acim_free_admin_rings(adev);
+err_clear_master:
+  pci_clear_master(pdev);
+  return ret;
+}</code></pre>
+      </div>
+      <div class="boot-flow top-gap" role="group" aria-label="Kernel driver remove and reset flow">
+        <div class="boot-stage"><b>1. Block</b><strong>Stop new opens/submits</strong><span>Mark device removing or lost; wake waiters with a terminal error.</span></div>
+        <div class="boot-stage"><b>2. Quiesce</b><strong>Mask and drain</strong><span>Disable queues, stop engines and DMA, synchronize IRQ handlers.</span></div>
+        <div class="boot-stage"><b>3. Reclaim</b><strong>Finish ownership</strong><span>Signal/cancel fences, unmap streaming DMA, detach dma-buf and unpin pages.</span></div>
+        <div class="boot-stage"><b>4. Release</b><strong>IRQ and rings</strong><span>Free vectors, coherent control memory, firmware state and device node.</span></div>
+        <div class="boot-stage"><b>5. Disable</b><strong>Clear bus master</strong><span>Confirm no bus transaction remains before managed BAR/device release.</span></div>
+      </div>
+      <div class="callout caution top-gap">
+        <p>
+          <strong>Important:</strong> do not enable processing engines or expose a device node immediately after
+          <code>pci_set_master()</code>. First validate the register ABI, allocate protected control rings, install
+          interrupts, boot compatible firmware, and complete a health handshake. A failed firmware boot is a detected
+          device that is not ready for userspace.
+        </p>
+      </div>
+    </section>
+
+    <section class="section" id="umd">
+      <div class="section-heading">
+        <p class="eyebrow">User-mode driver skeleton</p>
+        <h2>Expose a transport-neutral HAL to the runtime</h2>
+        <p class="section-note">
+          The application should not issue ioctls directly. The UMD translates stable SDK objects into Linux UAPI
+          objects and can later support VFIO, simulator, Windows, or an SoC transport without changing model execution.
+        </p>
+      </div>
+      <div class="code-panel">
+        <header><strong>Proposed C HAL surface</strong><span>Opaque handles, explicit ownership, stable status values</span></header>
+        <pre><code>AcimStatus acimEnumerate(AcimDeviceInfo *items, size_t *count);
+AcimStatus acimOpen(uint32_t index, const AcimOpenOptions *, AcimDevice **out);
+AcimStatus acimQueryCaps(AcimDevice *, AcimCaps *out);
+
+AcimStatus acimCreateContext(AcimDevice *, const AcimContextDesc *, AcimContext **out);
+AcimStatus acimCreateBuffer(AcimContext *, const AcimBufferDesc *, AcimBuffer **out);
+AcimStatus acimImportDmaBuf(AcimContext *, int fd, const AcimImportDesc *, AcimBuffer **out);
+AcimStatus acimMapBuffer(AcimBuffer *, AcimMapMode, void **ptr);
+AcimStatus acimFlushBuffer(AcimBuffer *, size_t offset, size_t bytes);
+
+AcimStatus acimLoadExecutable(AcimContext *, const void *acx, size_t bytes,
+                              AcimExecutable **out);
+AcimStatus acimCreateQueue(AcimContext *, const AcimQueueDesc *, AcimQueue **out);
+AcimStatus acimSubmit(AcimQueue *, const AcimSubmission *, AcimEvent **out);
+AcimStatus acimWait(AcimEvent *, uint64_t timeout_ns, AcimCompletion *out);
+AcimStatus acimQueryFault(AcimContext *, AcimFaultReport *out);
+AcimStatus acimResetContext(AcimContext *);
+
+void acimReleaseEvent(AcimEvent *);
+void acimReleaseQueue(AcimQueue *);
+void acimReleaseExecutable(AcimExecutable *);
+void acimReleaseBuffer(AcimBuffer *);
+void acimReleaseContext(AcimContext *);
+void acimClose(AcimDevice *);</code></pre>
+      </div>
+      <div class="contract-grid top-gap">
+        <article class="contract-card"><strong>Capability cache</strong><span>Cache immutable identity only. Refresh health, topology epoch, thermal state, and calibration validity before binding work.</span><code>immutable_caps != live_state</code></article>
+        <article class="contract-card"><strong>Thread safety</strong><span>Document object-level concurrency. Queues may be single producer first; device/context queries and waits should be safe across threads.</span><code>one owner per mutable queue tail</code></article>
+        <article class="contract-card"><strong>Fork and exec</strong><span>Use close-on-exec FDs. Either reject use after fork or reinitialize explicitly; never duplicate live queue ownership accidentally.</span><code>O_CLOEXEC + PID generation check</code></article>
+        <article class="contract-card"><strong>Timeouts</strong><span>Use monotonic nanoseconds and distinguish queue wait timeout from device execution timeout and reset timeout.</span><code>WAIT_TIMEOUT != DEVICE_HANG</code></article>
+        <article class="contract-card"><strong>Diagnostics</strong><span>Every failure carries stable status, source layer, context/queue/command IDs, firmware code, reset epoch, and a human-readable message.</span><code>status + structured detail</code></article>
+        <article class="contract-card"><strong>Backend parity</strong><span>Functional, statistical, cycle, VFIO-lab, and KMD hardware backends run the same conformance suite.</span><code>same artifact, buffers, events, errors</code></article>
+      </div>
+    </section>
+
+    <section class="section" id="dma">
+      <div class="section-heading">
+        <p class="eyebrow">DMA and interrupt dataflow</p>
+        <h2>Map only for the device lifetime of the transfer, then complete ownership</h2>
+        <p class="section-note">
+          Use coherent DMA for small long-lived queue/control structures and streaming mappings or managed buffer
+          objects for payloads. The DMA address returned by the kernel is a device bus address, not a CPU physical address.
+        </p>
+      </div>
+      <div class="dma-flow" role="group" aria-label="DMA buffer lifecycle flow chart">
+        <div class="dma-stage"><b>1. Create/import</b><strong>Buffer object</strong><span>KMD allocates or imports pages and records owner, size, usage and direction.</span></div>
+        <div class="dma-stage"><b>2. Map</b><strong>IOMMU / DMA API</strong><span>Create IOVA or scatter/gather mapping; check every mapping result.</span></div>
+        <div class="dma-stage"><b>3. Publish</b><strong>Validated descriptor</strong><span>Write command and ring fields, transfer ownership, then ring doorbell.</span></div>
+        <div class="dma-stage"><b>4. Execute</b><strong>DMA + engines</strong><span>H2D stage, analog/digital compute, D2H result; enforce range and direction.</span></div>
+        <div class="dma-stage"><b>5. Complete</b><strong>CQ + MSI-X</strong><span>Device writes completion before interrupt; KMD acknowledges and wakes waiter.</span></div>
+        <div class="dma-stage"><b>6. Reclaim</b><strong>Fence then unmap</strong><span>CPU reads result only after completion/sync; unmap, detach, or retain for reuse.</span></div>
+      </div>
+      <div class="code-panel top-gap">
+        <header><strong>Producer and consumer ordering</strong><span>Linux kernel pseudocode for coherent ring memory plus MMIO doorbell</span></header>
+        <pre><code>/* KMD producer: descriptor fields before ownership and MMIO notification */
+sq[idx].command_iova = cpu_to_le64(cmd_iova);
+sq[idx].command_bytes = cpu_to_le32(cmd_bytes);
+sq[idx].user_cookie = cpu_to_le64(cookie);
+sq[idx].generation = cpu_to_le32(adev-&gt;generation);
+dma_wmb();
+WRITE_ONCE(sq[idx].owner, ACIM_OWNER_DEVICE);
+writel(new_tail, adev-&gt;bar0 + ACIM_SQ_DOORBELL(qid));
+
+/* KMD completion path: ownership before completion fields */
+if (READ_ONCE(cq[idx].owner) == ACIM_OWNER_HOST) {
+  dma_rmb();
+  complete_submission(le64_to_cpu(cq[idx].user_cookie),
+                      le32_to_cpu(cq[idx].status));
+}
+
+/* Before reset/teardown, force a posted MMIO write to reach the endpoint. */
+writel(ACIM_CONTROL_QUIESCE, adev-&gt;bar0 + ACIM_DEVICE_CONTROL);
+readl(adev-&gt;bar0 + ACIM_DEVICE_STATUS);</code></pre>
+      </div>
+      <div class="callout caution top-gap">
+        <p>
+          <strong>Ordering boundary:</strong> coherent memory does not remove the need for barriers. <code>dma_wmb()</code>
+          and <code>dma_rmb()</code> order shared DMA memory; they do not themselves order arbitrary MMIO. Use the kernel
+          MMIO accessors and the hardware protocol's readback rule. MSI/MSI-X is preferred because PCI ordering ensures
+          the device's preceding memory writes arrive before the interrupt-generating write.
+        </p>
+      </div>
+    </section>
+
+    <section class="section" id="sequence">
+      <div class="section-heading">
+        <p class="eyebrow">First inference sequence</p>
+        <h2>One correlation ID follows the frame across every boundary</h2>
+        <p class="section-note">
+          The sequence assumes weights were programmed and verified during session creation. Do not erase/program flash
+          weights for every frame. A reset or changed placement/calibration epoch invalidates the resident program binding.
+        </p>
+      </div>
+      <div class="sequence-wrap" tabindex="0" aria-label="Scrollable first inference sequence diagram">
+        <div class="sequence-diagram" role="group" aria-label="Application to Analog CIM inference sequence">
+          <div></div>
+          <div class="sequence-lane">Application / ORT</div>
+          <div class="sequence-lane">Runtime / UMD</div>
+          <div class="sequence-lane">KMD</div>
+          <div class="sequence-lane">Firmware</div>
+          <div class="sequence-lane">DMA + ACiM engines</div>
+
+          <div class="sequence-number">01</div><div class="sequence-event span-1-2">Run(frame, correlation_id) -&gt; bind executable and input</div><div class="sequence-empty"></div><div class="sequence-empty"></div><div class="sequence-empty"></div>
+          <div class="sequence-number">02</div><div class="sequence-empty"></div><div class="sequence-event span-2-3">CREATE/IMPORT BO + validate context -&gt;</div><div class="sequence-empty"></div><div class="sequence-empty"></div>
+          <div class="sequence-number">03</div><div class="sequence-empty"></div><div class="sequence-event span-2-3">SUBMIT handles, offsets, sizes, deadline -&gt;</div><div class="sequence-empty"></div><div class="sequence-empty"></div>
+          <div class="sequence-number">04</div><div class="sequence-empty"></div><div class="sequence-empty"></div><div class="sequence-event span-3-4">Validate, map IOVA, publish SQ, doorbell -&gt;</div><div class="sequence-empty"></div>
+          <div class="sequence-number">05</div><div class="sequence-empty"></div><div class="sequence-empty"></div><div class="sequence-empty"></div><div class="sequence-event device span-4-5">Validate command, reserve SRAM/engines, start DMA -&gt;</div>
+          <div class="sequence-number">06</div><div class="sequence-empty"></div><div class="sequence-empty"></div><div class="sequence-empty"></div><div class="sequence-event device span-4-5">H2D, analog MVM, ADC/reconstruct, digital stages, D2H</div>
+          <div class="sequence-number">07</div><div class="sequence-empty"></div><div class="sequence-empty"></div><div class="sequence-event device span-4-5">&lt;- CQ record then MSI-X</div><div class="sequence-empty"></div>
+          <div class="sequence-number">08</div><div class="sequence-empty"></div><div class="sequence-event span-3-2">&lt;- IRQ ack, drain CQ, signal event/fence</div><div class="sequence-empty"></div><div class="sequence-empty"></div>
+          <div class="sequence-number">09</div><div class="sequence-event span-2-1">&lt;- completion, output BO, counters, analog status</div><div class="sequence-empty"></div><div class="sequence-empty"></div><div class="sequence-empty"></div>
+          <div class="sequence-number">10</div><div class="sequence-event span-1-2">Decode/NMS; release or recycle event and buffers</div><div class="sequence-empty"></div><div class="sequence-empty"></div><div class="sequence-empty"></div>
+        </div>
+      </div>
+      <p class="sequence-caption">Horizontal direction shows request or completion ownership; empty lanes remain active but do not own that transition.</p>
+    </section>
+
+    <section class="section" id="firmware">
+      <div class="section-heading">
+        <p class="eyebrow">Firmware implementation</p>
+        <h2>Boot establishes trust; the scheduler validates every submission again</h2>
+      </div>
+      <div class="boot-flow" role="group" aria-label="Firmware boot flow chart">
+        <div class="boot-stage"><b>ROM</b><strong>Reset-safe state</strong><span>DMA off, IRQ masked, mailbox available, immutable identity readable.</span></div>
+        <div class="boot-stage"><b>KMD</b><strong>Load image</strong><span>Request firmware, validate host-side container, stage image and command ROM.</span></div>
+        <div class="boot-stage"><b>ROM</b><strong>Authenticate + start</strong><span>Verify image according to product security policy, initialize SRAM and engines.</span></div>
+        <div class="boot-stage"><b>Firmware</b><strong>Publish ABI</strong><span>Version, build hash, capabilities, generation, health, queue requirements.</span></div>
+        <div class="boot-stage"><b>KMD</b><strong>Enable userspace</strong><span>Negotiate compatible ABI, run admin loopback, then register the device node.</span></div>
+      </div>
+      <div class="code-panel top-gap">
+        <header><strong>Proposed firmware scheduler loop</strong><span>Validation precedes resource reservation and side effects</span></header>
+        <pre><code>for (;;) {
+  wait_for_doorbell_or_admin_event();
+
+  while (sq_has_entry()) {
+    SqEntry e = sq_acquire();
+    Validation v = validate_entry(e, device_generation, context_table);
+    if (!v.ok) {
+      cq_complete(e.cookie, STATUS_INVALID, v.fault_code);
+      continue;
+    }
+
+    Command cmd = map_and_validate_command(v.context, e.command_iova,
+                                            e.command_bytes);
+    if (!cmd.ok) {
+      cq_complete(e.cookie, STATUS_INVALID, cmd.fault_code);
+      continue;
+    }
+
+    Reservation r = reserve_resources(cmd.engines, cmd.sram, cmd.deadline);
+    if (!r.ok) {
+      defer_or_complete_busy(e, r);
+      continue;
+    }
+
+    TraceScope trace(e.cookie, cmd.graph_correlation_id);
+    Result result = execute_dma_analog_digital(cmd, r);
+    release_resources(r);
+    cq_publish_before_msix(e.cookie, result);
+  }
+
+  service_health_watchdog_and_calibration_events();
+}</code></pre>
+      </div>
+      <div class="state-machine top-gap" role="group" aria-label="Firmware command state machine">
+        <div class="state"><b>Accepted</b><strong>Descriptor owned</strong><span>Generation and context valid.</span></div>
+        <div class="state"><b>Validated</b><strong>All ranges legal</strong><span>Opcode, buffers, artifact and profile checked.</span></div>
+        <div class="state"><b>Reserved</b><strong>Resources held</strong><span>SRAM, DMA, array and digital engine assigned.</span></div>
+        <div class="state"><b>Running</b><strong>Watchdog armed</strong><span>Trace and performance counters active.</span></div>
+        <div class="state"><b>Completing</b><strong>Writes visible</strong><span>Output and CQ committed before MSI-X.</span></div>
+        <div class="state"><b>Terminal</b><strong>OK or fault</strong><span>Exactly one completion and resources released.</span></div>
+      </div>
+    </section>
+
+    <section class="section" id="analog-contract">
+      <div class="section-heading">
+        <p class="eyebrow">Analog-specific device contract</p>
+        <h2>PCIe moves bytes; the analog lifecycle determines whether those bytes are correct</h2>
+        <p class="section-note">
+          A digital NPU can often load deterministic code and weights. An Analog CIM board also needs a controlled
+          program, verify, characterize, bind, monitor, and refresh lifecycle. These operations are privileged and
+          should not be hidden inside an ordinary inference command.
+        </p>
+      </div>
+      <div class="pipeline-flow" role="group" aria-label="Analog weight deployment flow chart">
+        <div class="pipeline-stage host"><b>1. Package</b><strong>Weight program</strong><span>Logical tensor, slices, sign method, target cells, tolerances, hash.</span></div>
+        <div class="pipeline-stage analog"><b>2. Program</b><strong>Device operation</strong><span>Erase/program pulse policy and wear budget are device-specific.</span></div>
+        <div class="pipeline-stage analog"><b>3. Verify</b><strong>Readback quality</strong><span>Detect bad cell/row/column, retry within limits, record residual error.</span></div>
+        <div class="pipeline-stage digital"><b>4. Calibrate</b><strong>Converters + paths</strong><span>Gain/offset, ADC range, temperature bucket, digital correction.</span></div>
+        <div class="pipeline-stage host"><b>5. Bind</b><strong>Logical program ID</strong><span>Compiler placement maps to healthy physical resources and profile epoch.</span></div>
+        <div class="pipeline-stage analog"><b>6. Monitor</b><strong>Inference health</strong><span>Saturation, drift, ECC/fault, temperature and accuracy sentinels.</span></div>
+      </div>
+      <div class="table-wrap top-gap">
+        <table>
+          <thead><tr><th scope="col">Artifact / state</th><th scope="col">Required fields</th><th scope="col">Owner</th><th scope="col">Invalidated by</th></tr></thead>
+          <tbody>
+            <tr><th scope="row">Target descriptor</th><td>Array geometry, supported precision/modes, converter limits, digital ops, SRAM and alignment</td><td>Hardware team; compiler consumes</td><td>Hardware revision or incompatible firmware ABI</td></tr>
+            <tr><th scope="row">Characterization profile</th><td>Chip/lot/device ID, temperature/voltage bucket, gain/offset/noise, bad resources, measurement method, timestamp</td><td>Silicon/test team; runtime verifies</td><td>Age, PVT excursion, repair/remap, recalibration policy</td></tr>
+            <tr><th scope="row">Program manifest</th><td>Model/weight hashes, physical placement, slice/sign scheme, programming algorithm, verify tolerance, wear count</td><td>Compiler + privileged service</td><td>Reprogram, remap, failed verify, reset if state is volatile</td></tr>
+            <tr><th scope="row">Live health map</th><td>Unavailable rows/columns/tiles/converters, saturation, thermal, calibration age, topology epoch</td><td>Firmware + KMD</td><td>Any new fault, reset, thermal transition or service action</td></tr>
+            <tr><th scope="row">Executable binding</th><td>Artifact hash, program IDs, physical resources, profile hash, device generation, fallback variant</td><td>Runtime/UMD</td><td>Any mismatch in the fields above</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="callout verdict top-gap">
+        <p>
+          <strong>Fail closed:</strong> if the runtime cannot prove that the resident program, physical placement,
+          calibration profile, live fault map, firmware ABI, and executable agree, it must rebind/reprogram or choose a
+          digital fallback. Silently running with a stale analog profile creates an accuracy failure that ordinary DMA
+          and queue tests will not catch.
+        </p>
+      </div>
+    </section>
+
+    <section class="section" id="recovery">
+      <div class="section-heading">
+        <p class="eyebrow">Fault, reset, and security</p>
+        <h2>Every failure has an owner, a containment boundary, and a terminal event</h2>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th scope="col">Failure</th><th scope="col">Detect</th><th scope="col">Contain</th><th scope="col">Recover</th><th scope="col">Evidence retained</th></tr></thead>
+          <tbody>
+            <tr><th scope="row">Malformed ioctl</th><td>KMD size, flags, reserved fields, overflow and handle checks</td><td>Reject before allocation or MMIO</td><td>Return stable <code>-EINVAL</code>/<code>-E2BIG</code>/<code>-ENOENT</code></td><td>Rate-limited audit counter, command ID</td></tr>
+            <tr><th scope="row">Illegal IOVA</th><td>IOMMU fault plus firmware range check</td><td>Stop offending context/queue; do not reset unrelated contexts first</td><td>Abort context, signal all fences, reset context or function if needed</td><td>IOVA, access type, context, command, engine</td></tr>
+            <tr><th scope="row">Execution timeout</th><td>Firmware watchdog and host deadline</td><td>Stop queue, then engine/reset domain</td><td>Queue abort -&gt; context reset -&gt; function reset escalation</td><td>Last command, trace tail, engine status, temperature</td></tr>
+            <tr><th scope="row">Firmware panic</th><td>Fatal mailbox/IRQ, heartbeat loss</td><td>Mask new work and stop DMA</td><td>Capture bounded dump, reset, reload, increment generation</td><td>Build hash, panic code, logs, registers, in-flight IDs</td></tr>
+            <tr><th scope="row">PCIe AER</th><td>PCI core AER callbacks and counters</td><td><code>error_detected()</code> quiesces without new I/O</td><td>Recover, slot reset and reinitialize, or mark permanently lost</td><td>AER severity, requester, TLP header where available</td></tr>
+            <tr><th scope="row">Analog saturation/drift</th><td>ADC saturation, sentinel inference, profile age, temperature</td><td>Stop affected program/tile; preserve other healthy capacity</td><td>Change range/profile, recalibrate, remap, retry or digital fallback</td><td>Array/tile, inputs summary, profile, PVT, before/after error</td></tr>
+            <tr><th scope="row">Uncorrectable array fault</th><td>Program verify, health scan, accuracy sentinel</td><td>Remove row/column/tile from live resource map</td><td>Rebind spare/replica or recompile placement; increment topology epoch</td><td>Fault location, first seen, wear, remap and accuracy result</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="contract-grid top-gap">
+        <article class="contract-card"><strong>No raw addresses</strong><span>Userspace passes handles and offsets. KMD resolves IOVA and validates overflow; firmware validates ranges again.</span><code>offset + bytes &lt;= BO.size</code></article>
+        <article class="contract-card"><strong>No mutable-after-check</strong><span>Copy command metadata into protected memory or enforce ownership so a process cannot change it after validation.</span><code>validate -&gt; publish immutable descriptor</code></article>
+        <article class="contract-card"><strong>No global reset first</strong><span>Contain to queue, context, engine, tile, then function when hardware supports it.</span><code>smallest effective reset domain</code></article>
+        <article class="contract-card"><strong>No stale completion</strong><span>Generation and context identify work. Device loss completes every waiter exactly once with a terminal status.</span><code>cookie + generation + terminal status</code></article>
+        <article class="contract-card"><strong>No debug backdoor</strong><span>Gate raw BAR/SRAM/register access behind build-time and privilege policy; disable it in production images.</span><code>debug aperture off by default</code></article>
+        <article class="contract-card"><strong>No silent firmware swap</strong><span>Record image hash and ABI; enforce signature/rollback policy according to the product threat model.</span><code>measured boot metadata in support bundle</code></article>
+      </div>
+    </section>
+
+    <section class="section" id="observability">
+      <div class="section-heading">
+        <p class="eyebrow">Profiling and correlation</p>
+        <h2>A fast array is irrelevant if the frame stalls at a boundary you cannot see</h2>
+      </div>
+      <div class="proof-grid">
+        <article><b>Host</b><strong>Queue and copy time</strong><span>CPU preprocessing, BO allocation/import, map, submit, wait, postprocess, scheduler delay.</span></article>
+        <article><b>PCIe</b><strong>Bytes and efficiency</strong><span>H2D/D2H bytes, DMA segments, payload size, link width/speed, replay/AER, effective bandwidth.</span></article>
+        <article><b>Device digital</b><strong>Movement and stalls</strong><span>SRAM bank conflicts, DMA idle, digital kernels, format transforms, partial sums, dependencies.</span></article>
+        <article><b>Device analog</b><strong>Useful work and correction</strong><span>Array utilization, DAC/ADC cycles, saturation, retries, calibration, reconstruction and fallback.</span></article>
+      </div>
+      <div class="table-wrap top-gap">
+        <table>
+          <thead><tr><th scope="col">Trace field</th><th scope="col">Origin</th><th scope="col">Purpose</th><th scope="col">Required clock relation</th></tr></thead>
+          <tbody>
+            <tr><th scope="row">graph_node_id</th><td>Compiler debug map</td><td>Relate device work to original ONNX node/subgraph</td><td>Identifier only</td></tr>
+            <tr><th scope="row">correlation_id</th><td>Application/runtime</td><td>Join frame/request across host, KMD, firmware and engines</td><td>Identifier only</td></tr>
+            <tr><th scope="row">command_id / cookie</th><td>UMD/KMD</td><td>Queue ownership, wait and completion diagnosis</td><td>Identifier only</td></tr>
+            <tr><th scope="row">host_submit_ns</th><td>KMD monotonic clock</td><td>Host queue and interrupt latency</td><td><code>CLOCK_MONOTONIC</code> nanoseconds</td></tr>
+            <tr><th scope="row">device_start/end_cycles</th><td>Firmware hardware timer</td><td>DMA, analog and digital stage duration</td><td>Publish timer frequency and reset epoch</td></tr>
+            <tr><th scope="row">profile/topology epoch</th><td>Firmware/runtime</td><td>Explain numerical or performance changes after calibration/remap</td><td>Monotonic per device generation</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="callout top-gap">
+        <p>
+          <strong>Minimum profiler output:</strong> one line per command with model/artifact hash, graph node, context,
+          queue, correlation ID, input/output bytes, queue delay, H2D, compute stages, D2H, interrupt/wakeup, analog
+          profile, saturation/retry count, status, and reset generation. Aggregate only after raw correlation works.
+        </p>
+      </div>
+    </section>
+
+    <section class="section" id="repository">
+      <div class="section-heading">
+        <p class="eyebrow">Implementation repository</p>
+        <h2>Generate shared protocol definitions and test each boundary independently</h2>
+      </div>
+      <div class="repository-tree">
+        <div class="code-panel">
+          <header><strong>Proposed source layout</strong><span>One protocol schema, several generated consumers</span></header>
+          <pre><code>acim-stack/
+  spec/
+    registers.yaml
+    queue.yaml
+    firmware_abi.yaml
+    capabilities.schema.json
+  generated/
+    include/hw/acim_regs.h
+    include/hw/acim_queue.h
+    rtl/acim_regs_pkg.sv
+    docs/registers.md
+  include/
+    uapi/linux/acim_accel.h
+    acim/acim.h
+  driver/kmd/
+    pci.c  uapi.c  context.c  memory.c
+    queue.c  irq.c  firmware.c  reset.c  trace.c
+  runtime/umd/
+    device.cpp  buffer.cpp  queue.cpp  artifact.cpp
+    backends/kmd_linux.cpp  backends/vfio_lab.cpp
+  firmware/
+    boot/  mailbox/  scheduler/  dma/  analog/  digital/
+    health/  trace/  tests/
+  sim/
+    functional/  analog/  cycle/  pcie_model/
+  compiler/
+    dialect/  transforms/  target/  packaging/
+  tools/
+    acim-info  acim-fw  acim-memtest  acim-trace
+    acim-health  acim-support-bundle
+  tests/
+    uapi/  protocol/  simulator/  kmd/  firmware/
+    differential/  fault-injection/  yolo/</code></pre>
+        </div>
+        <div class="tree-notes">
+          <div class="tree-note"><strong><code>spec/</code> is authoritative</strong><span>CI regenerates headers and fails on a diff. Every register includes access, owner, reset value, side effects and revision.</span></div>
+          <div class="tree-note"><strong><code>generated/</code> is mechanical</strong><span>RTL, KMD, firmware, simulator and documentation consume identical constants and field definitions.</span></div>
+          <div class="tree-note"><strong><code>uapi/</code> is append-only in behavior</strong><span>Run ABI layout checks on 32-bit and 64-bit builds; explicit reserved fields replace compiler padding.</span></div>
+          <div class="tree-note"><strong><code>sim/pcie_model</code> comes before the board</strong><span>Model BAR side effects, ring wrap, posted writes, interrupts, reset epochs, malformed commands and DMA faults.</span></div>
+          <div class="tree-note"><strong><code>tools/</code> are release deliverables</strong><span>Enumeration, firmware, memory test, trace, health and support bundle are necessary to debug customer systems.</span></div>
+          <div class="tree-note"><strong><code>tests/yolo</code> stores provenance</strong><span>Model and dataset version, preprocessing, quantization, calibration, artifact hash, board profile and expected metrics.</span></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="delivery" data-progress="acim-board-bringup">
+      <div class="section-heading">
+        <p class="eyebrow">Staged delivery</p>
+        <h2>Reach the board through nine independently testable milestones</h2>
+        <p class="section-note">
+          Each stage preserves the same API and descriptor semantics. Do not begin full YOLO before DMA loopback,
+          queue wrap, interrupt loss, reset, and one-operation numerical correlation are boring and repeatable.
+        </p>
+      </div>
+      <div class="progress-panel" aria-live="polite">
+        <div class="progress-track"><progress class="progress-bar" data-progress-bar aria-label="Analog CIM board bring-up progress" max="100" value="0">0%</progress></div>
+        <span class="progress-value" data-progress-value>0 / 9 complete</span>
+      </div>
+      <div class="lab-list">
+        <label class="lab-item"><input type="checkbox" data-step="protocol"><span><strong>1. Freeze protocol v0</strong><span>Register schema, capability record, mailbox, SQ/CQ, opcodes, status, reset generation, UAPI structs, ownership and memory ordering.</span></span></label>
+        <label class="lab-item"><input type="checkbox" data-step="model"><span><strong>2. Build the PCIe device model</strong><span>In-process or QEMU-style model for BARs, DMA, rings, MSI-X, posted writes, faults and reset; run UMD/KMD-facing conformance tests.</span></span></label>
+        <label class="lab-item"><input type="checkbox" data-step="enumerate"><span><strong>3. Enumerate the FPGA/board</strong><span><code>lspci</code>, IDs, BAR claim/map, capability read, reset, firmware mailbox, health handshake and safe remove/reprobe.</span></span></label>
+        <label class="lab-item"><input type="checkbox" data-step="dma"><span><strong>4. Pass DMA loopback</strong><span>Coherent admin ring, streaming payload, scatter/gather boundaries, IOMMU faults, data patterns, sizes, alignment and bandwidth.</span></span></label>
+        <label class="lab-item"><input type="checkbox" data-step="queue"><span><strong>5. Pass queues and MSI-X</strong><span>Wrap, full/empty, multi-queue, interrupt moderation, polling, lost/duplicate interrupt injection, timeout, abort and reset generation.</span></span></label>
+        <label class="lab-item"><input type="checkbox" data-step="mvm"><span><strong>6. Execute one resident MVM</strong><span>Program/verify one weight block, bind calibration, transfer input, run analog path, return output, compare every numerical boundary.</span></span></label>
+        <label class="lab-item"><input type="checkbox" data-step="subgraph"><span><strong>7. Execute a YOLO subgraph</strong><span>Contiguous Conv/activation/route island, device digital fallback, SRAM schedule, one input/output transfer and layer-level differential report.</span></span></label>
+        <label class="lab-item"><input type="checkbox" data-step="yolo"><span><strong>8. Qualify end-to-end YOLO</strong><span>Full validation data, mAP delta, latency percentiles, FPS, power/frame, thermal soak, program reuse, fallback and reproducible manifest.</span></span></label>
+        <label class="lab-item"><input type="checkbox" data-step="product"><span><strong>9. Harden the product path</strong><span>Multi-process isolation, dma-buf, AER, suspend/resume, hot reset, firmware update, fault injection, security review, packaging and support tools.</span></span></label>
+      </div>
+    </section>
+
+    <section class="section" id="tests">
+      <div class="section-heading">
+        <p class="eyebrow">Verification matrix</p>
+        <h2>Separate transport correctness, numerical correlation, and product qualification</h2>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th scope="col">Test layer</th><th scope="col">Representative cases</th><th scope="col">Pass condition</th><th scope="col">Automation</th></tr></thead>
+          <tbody>
+            <tr><th scope="row">Schema and ABI</th><td>Generated register diff, struct sizes/offsets, reserved bits, unknown versions, endian conversion</td><td>RTL/C/C++/docs agree; old UMD works with new KMD inside declared compatibility</td><td>Every change, 32/64-bit cross-build</td></tr>
+            <tr><th scope="row">KMD UAPI</th><td>Fuzz ioctls, invalid handles, overflow, race/close, fork, quotas, permissions, compat mode</td><td>No crash/leak; stable errno; no unauthorized MMIO/DMA</td><td>KUnit, kselftest, syzkaller-style corpus</td></tr>
+            <tr><th scope="row">DMA and queues</th><td>All sizes/alignment, scatterlists, ring wrap/full, interrupt storms/loss, timeout, concurrent queues</td><td>Exact data; one terminal completion; no mapping remains after fence/device loss</td><td>Simulator, FPGA and silicon parity suite</td></tr>
+            <tr><th scope="row">Firmware</th><td>Malformed descriptor, illegal IOVA, unsupported opcode, resource exhaustion, watchdog, panic, reset mid-command</td><td>Bounded fault, captured evidence, generation change, clean reinitialization</td><td>Firmware unit tests plus host fault injection</td></tr>
+            <tr><th scope="row">Analog operation</th><td>Program/verify, bad rows/columns, PVT, saturation, drift, calibration mismatch, remap and retry</td><td>Declared tolerance/distribution; stale profile rejected; fallback works</td><td>Statistical simulator and device population</td></tr>
+            <tr><th scope="row">YOLO correctness</th><td>Boundary tensors, layer distributions, full validation set, host/device/fallback variants</td><td>Predetermined mAP and per-layer error budgets with identical preprocessing/postprocess</td><td>Nightly model corpus and release run</td></tr>
+            <tr><th scope="row">Performance</th><td>Cold/warm start, single stream, throughput, queue depth, overlap, thermal soak, recovery</td><td>No unexplained gap between stage times and end-to-end latency; tails within SLO</td><td>Scenario harness with raw trace archive</td></tr>
+            <tr><th scope="row">PCIe reliability</th><td>AER correctable/non-fatal/fatal, link retrain, FLR/hot reset, remove during work</td><td>Callbacks quiesce correctly; recover or report permanent device loss without stale DMA</td><td>Lab qualification and platform matrix</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="proof-grid top-gap">
+        <article><b>First board</b><strong>Enumeration proof</strong><span>1000 bind/unbind/reset cycles without resource leak or host crash.</span></article>
+        <article><b>First data</b><strong>DMA proof</strong><span>Pattern-exact transfer across required sizes, alignments, IOMMU and scatter/gather cases.</span></article>
+        <article><b>First compute</b><strong>MVM proof</strong><span>Simulator-to-silicon checkpoints identify the first numerical divergence.</span></article>
+        <article><b>First model</b><strong>YOLO proof</strong><span>Full validation accuracy and end-to-end performance, power and thermal provenance.</span></article>
+      </div>
+    </section>
+
+    <section class="section" id="questions">
+      <div class="section-heading">
+        <p class="eyebrow">Information to obtain</p>
+        <h2>Questions that must be answered by the chip, board, and firmware teams</h2>
+        <p class="section-note">
+          Public demos cannot answer these details. They are the minimum inputs for turning the architecture into code
+          without guessing at hidden hardware behavior.
+        </p>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th scope="col">Area</th><th scope="col">Required questions</th><th scope="col">Deliverable</th><th scope="col">Blocks</th></tr></thead>
+          <tbody>
+            <tr><th scope="row">PCIe</th><td>IDs/revisions? Gen/lanes? BAR sizes? DMA width/segments? MSI-X count? FLR/AER? posted-write readback register?</td><td>PCIe compliance and register specification</td><td>KMD probe, DMA, interrupt and reset</td></tr>
+            <tr><th scope="row">Boot/firmware</th><td>ROM states? Load path? Authentication? Firmware ABI? mailbox? heartbeat? crash dump? rollback?</td><td>Boot protocol and firmware image format</td><td>Safe device publication and field update</td></tr>
+            <tr><th scope="row">Memory/queues</th><td>SRAM map/banks? coherent regions? DMA engines? queue format/depth? ownership? ordering? timeout/abort?</td><td>Memory map, queue ABI and timing model</td><td>UMD/KMD/firmware and simulator</td></tr>
+            <tr><th scope="row">Analog macro</th><td>Array size? weight/input bits? sign and slicing? DAC/ADC modes? accumulation? saturation? programming endurance/time?</td><td>Machine-readable target profile</td><td>Compiler legality, mapping, scheduling and cost</td></tr>
+            <tr><th scope="row">Calibration</th><td>Factory vs field data? profile format? PVT buckets? gain/offset/noise? bad resources? refresh triggers? authenticity?</td><td>Characterization schema and lifecycle</td><td>Accuracy, binding, recovery and qualification</td></tr>
+            <tr><th scope="row">Digital engines</th><td>ISA/microcode? RISC-V? vector ops? resize/concat/activation/NMS? precision/layout? local memory and synchronization?</td><td>Digital backend and firmware kernel ABI</td><td>Contiguous YOLO device partition</td></tr>
+            <tr><th scope="row">YOLO demo</th><td>Exact model/export/opset? dataset? preprocessing? quantization/retraining? operator placement? off-chip work? measured silicon?</td><td>Reproducible model card and run manifest</td><td>Honest baseline and software reproduction</td></tr>
+            <tr><th scope="row">Product policy</th><td>Single/multi-process? threat model? secure boot? dma-buf? virtualization? power states? supported kernels/platforms?</td><td>Platform requirements and security model</td><td>Stable product UAPI and qualification plan</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="section" id="sources">
+      <div class="section-heading">
+        <p class="eyebrow">Primary references and evidence limits</p>
+        <h2>Kernel behavior is sourced; hardware details remain proposed until disclosed</h2>
+      </div>
+      <div class="source-grid">
+        <article class="source-card"><a href="https://docs.kernel.org/PCI/pci.html">Linux PCI driver guide</a><span>Probe order, BAR resources, DMA masks, bus mastering, IRQ registration, engine enablement and teardown responsibilities.</span></article>
+        <article class="source-card"><a href="https://docs.kernel.org/core-api/dma-api-howto.html">Linux DMA mapping guide</a><span>CPU/physical/bus address distinction, coherent versus streaming mappings, masks, errors, map/unmap lifecycle and barriers.</span></article>
+        <article class="source-card"><a href="https://docs.kernel.org/core-api/wrappers/memory-barriers.html">Linux memory barriers</a><span><code>dma_wmb()</code>/<code>dma_rmb()</code> ownership example and the distinction between shared DMA memory and MMIO ordering.</span></article>
+        <article class="source-card"><a href="https://docs.kernel.org/PCI/msi-howto.html">Linux MSI/MSI-X guide</a><span>Message-signaled interrupt ordering, vector allocation and advantages over shared pin interrupts.</span></article>
+        <article class="source-card"><a href="https://docs.kernel.org/driver-api/device-io.html">Linux device I/O</a><span>Portable MMIO accessors, ordered access, PCI posted writes and readback for completion.</span></article>
+        <article class="source-card"><a href="https://docs.kernel.org/driver-api/vfio.html">Linux VFIO</a><span>IOMMU-protected userspace device access, groups, BARs, interrupts and DMA mapping for a trusted lab path.</span></article>
+        <article class="source-card"><a href="https://docs.kernel.org/driver-api/uio-howto.html">Linux UIO guide</a><span>Small userspace drivers for mappable memory and interrupts; not a universal interface.</span></article>
+        <article class="source-card"><a href="https://docs.kernel.org/accel/introduction.html">Linux compute accelerators</a><span>Common accelerator subsystem, command queues/DMA context, DRM reuse and <code>/dev/accel/accel*</code>.</span></article>
+        <article class="source-card"><a href="https://docs.kernel.org/driver-api/ioctl.html">Linux ioctl design</a><span>Command macros, backward compatibility, structure layout, explicit padding, compat mode and information-leak prevention.</span></article>
+        <article class="source-card"><a href="https://docs.kernel.org/driver-api/dma-buf.html">Linux dma-buf</a><span>Buffer export/import, attachment, scatterlist access, CPU synchronization and pollable fences.</span></article>
+        <article class="source-card"><a href="https://docs.kernel.org/PCI/pcieaer-howto.html">Linux PCIe AER</a><span>Error classes, counters and driver recovery callback requirement.</span></article>
+        <article class="source-card"><a href="https://docs.kernel.org/PCI/pci-error-recovery.html">Linux PCI error recovery</a><span><code>error_detected</code>, reset, resume, permanent failure and interrupt behavior during recovery.</span></article>
+        <article class="source-card"><a href="https://docs.kernel.org/driver-api/firmware/request_firmware.html">Linux firmware loading</a><span><code>request_firmware()</code> lifecycle and synchronous/asynchronous image loading APIs.</span></article>
+        <article class="source-card"><a href="https://github.com/tenstorrent/tt-kmd">Tenstorrent <code>tt-kmd</code></a><span>Public KMD repository with character device, PCIe, memory, interrupt, message queue, telemetry and device-specific modules.</span></article>
+        <article class="source-card"><a href="https://github.com/tenstorrent/tt-umd">Tenstorrent <code>tt-umd</code></a><span>Public UMD repository, KMD dependency, IOMMU/host-memory setup, simulator tests, logging and profiling patterns.</span></article>
+        <article class="source-card"><a href="analog-cim-sdk-toolchain.html">Analog CIM SDK guide</a><span>Compiler, artifact, HAL, runtime and first software vertical slice that this board backend implements.</span></article>
+        <article class="source-card"><a href="npu-soc-software-architecture.html">NPU/SoC software architecture</a><span>Control/data planes, runtime-driver-firmware contracts, profiling, debugger and production platform context.</span></article>
+        <article class="source-card"><a href="analog-cim-ihw-patents.html">iHW patent study</a><span>Public patent mechanisms and evidence limits; no private iHW register, driver, firmware or YOLO implementation is assumed here.</span></article>
+      </div>
+      <div class="callout caution top-gap">
+        <p>
+          <strong>Evidence boundary:</strong> no public source identified in this study discloses an iHW production UMD,
+          KMD, firmware ABI, PCIe register map, operator placement, or complete YOLO run manifest. Every concrete
+          <code>ACIM_*</code> name, offset, structure, and repository path on this page is an engineering proposal to be
+          replaced or confirmed by the actual hardware contract.
+        </p>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <p>Implementation reference. Proposed interfaces are labeled explicitly; Linux behavior is linked to primary documentation, and private vendor behavior is not inferred from public demos.</p>
+    <div class="footer-links">
+      <a href="analog-cim-sdk-toolchain.html">Back to SDK and compiler</a>
+      <a href="npu.html#analog-cim">Back to the NPU learning path</a>
+      <a href="https://github.com/buicongnguyen/NPU">Source</a>
+    </div>
+  </footer>
+</body>
+</html>

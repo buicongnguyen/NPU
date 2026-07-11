@@ -120,6 +120,11 @@ main,
   text-decoration: none;
 }
 
+.site-nav a {
+  padding-inline: 8px;
+  font-size: 14px;
+}
+
 .site-nav a[aria-current="page"] {
   border-color: var(--teal);
   color: var(--teal);

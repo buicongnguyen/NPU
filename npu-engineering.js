@@ -72,8 +72,13 @@
       const completed = checks.filter((check) => check.checked).length;
       const percent = checks.length ? Math.round((completed / checks.length) * 100) : 0;
       if (bar) {
-        bar.style.width = `${percent}%`;
-        bar.setAttribute('aria-valuenow', String(percent));
+        if (bar instanceof HTMLProgressElement) {
+          bar.value = percent;
+          bar.textContent = `${percent}%`;
+        } else {
+          bar.style.width = `${percent}%`;
+          bar.setAttribute('aria-valuenow', String(percent));
+        }
       }
       if (value) value.textContent = `${completed} / ${checks.length} complete`;
     };

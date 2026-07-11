@@ -24,6 +24,7 @@
       <a href="analog-cim-hardware-software-codesign.html">Co-design</a>
       <a href="analog-cim-ihw-patents.html">iHW patents</a>
       <a href="analog-cim-sdk-toolchain.html" aria-current="page">SDK</a>
+      <a href="analog-cim-board-bringup.html">Bring-up</a>
       <a href="analog-cim-tenstorrent-reuse.html">Reuse</a>
       <a href="analog-cim-scaleout-llm.html">Scale/LLM</a>
       <a href="analog-cim-interview.html">Interview</a>
@@ -855,6 +856,13 @@ acim-profile build/matmul.atrace --summary</code></pre>
           the schemas, sequence, and acceptance metrics.
         </p>
       </div>
+      <div class="callout top-gap">
+        <p>
+          <strong>Physical-board vertical slice:</strong> the <a href="analog-cim-board-bringup.html">PCIe board
+          bring-up guide</a> implements the hardware HAL boundary with host/device requirements, UMD and KMD APIs, BAR
+          and queue schemas, DMA/MSI-X ordering, firmware boot, analog program/verify, and a staged YOLO path.
+        </p>
+      </div>
     </section>
 
     <section class="section" id="roadmap" data-progress="acim-sdk-roadmap">
@@ -929,6 +937,7 @@ acim-profile build/matmul.atrace --summary</code></pre>
         <article class="source-card"><a href="https://github.com/mlcommons/inference_policies/blob/master/inference_rules.adoc">MLPerf Inference rules</a><span>Primary reference for system-under-test, quality, latency/throughput scenarios, reproducibility, and audit boundaries.</span></article>
         <article class="source-card"><a href="analog-cim-ihw-patents.html">iHW patent study</a><span>Patent mechanisms and evidence limits that motivate, but do not disclose, this software design.</span></article>
         <article class="source-card"><a href="analog-cim-tenstorrent-reuse.html">Tenstorrent reuse guide</a><span>Repository-level learn/adapt/replace decisions and license/evidence gates.</span></article>
+        <article class="source-card"><a href="analog-cim-board-bringup.html">PCIe board bring-up guide</a><span>Concrete UMD/KMD, BAR, DMA, MSI-X, firmware, analog lifecycle, YOLO dataflow, recovery, security, and validation contracts.</span></article>
         <article class="source-card"><a href="analog-cim-scaleout-llm.html">ACiM scale-out and LLM design</a><span>Fault-aware descriptors, logical mesh, distributed placement, hybrid LLM mapping, recovery, and the second vertical slice.</span></article>
         <article class="source-card"><a href="analog-cim-hardware-software-codesign.html">Hardware/software co-design</a><span>Physical bottlenecks, measured-paper solutions, lifecycle, and analog/digital partition context.</span></article>
       </div>

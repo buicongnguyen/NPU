@@ -923,6 +923,13 @@ emit_offsets_and_peak_usage(arena)</code></pre>
         <label class="lab-item"><input type="checkbox" data-step="trace"><span><strong>Correlated trace and layer debugger</strong><span>Emit model/region/command IDs, device cycles, flows, counters, tensor checkpoints, and first-divergence reports.</span></span></label>
         <label class="lab-item"><input type="checkbox" data-step="ci"><span><strong>CI qualification lanes</strong><span>Run unit, differential, simulator, performance, compatibility, and artifact-retention jobs.</span></span></label>
       </div>
+      <div class="callout" style="margin-top:12px">
+        <p>
+          <strong>Hardware implementation companion:</strong> continue with the <a href="analog-cim-board-bringup.html">Analog
+          CIM board bring-up guide</a> for a concrete PCIe BAR map, UMD/KMD split, Linux probe path, DMA and MSI-X
+          sequence, firmware scheduler, analog program/calibration lifecycle, YOLO dataflow, recovery, and qualification plan.
+        </p>
+      </div>
     </section>
 
     <section class="section" id="sources">
@@ -935,6 +942,7 @@ emit_offsets_and_peak_usage(arena)</code></pre>
         <article class="source-card"><a href="https://onnxruntime.ai/docs/execution-providers/">ONNX Runtime execution providers</a><span>Capability-based subgraph assignment and common runtime API</span></article>
         <article class="source-card"><a href="https://tvm.apache.org/docs/arch/relax_vm.html">TVM Relax VM architecture</a><span>Executable, bytecode, compiled kernels, devices, allocators, and runtime flow</span></article>
         <article class="source-card"><a href="https://docs.kernel.org/core-api/dma-api-howto.html">Linux dynamic DMA mapping guide</a><span>CPU virtual, physical, and device-visible DMA address distinctions</span></article>
+        <article class="source-card"><a href="analog-cim-board-bringup.html">Analog CIM PCIe board bring-up</a><span>Build-oriented implementation of the runtime, KMD, UMD, firmware, DMA, interrupt, reset, security, and model-to-board contracts described here</span></article>
         <article class="source-card"><a href="https://docs.kernel.org/power/runtime_pm.html">Linux runtime power management</a><span>Device runtime suspend, resume, idle, usage counters, and autosuspend</span></article>
         <article class="source-card"><a href="https://docs.kernel.org/driver-api/devfreq.html">Linux device frequency scaling</a><span>DVFS interface, utilization status, governors, and device profiles</span></article>
         <article class="source-card"><a href="https://www.accellera.org/activities/working-groups/systemc-tlm">Accellera SystemC TLM</a><span>Transaction-level modeling for architecture exploration, performance, and virtual platforms</span></article>
