@@ -97,6 +97,17 @@
   font-size: 13px;
 }
 
+.stack-node a {
+  color: inherit;
+  text-decoration-color: color-mix(in srgb, var(--teal) 55%, transparent);
+  text-underline-offset: 3px;
+}
+
+.stack-node a:hover {
+  color: var(--teal);
+  text-decoration-color: currentColor;
+}
+
 .boundary-line {
   margin-left: 141px;
   padding: 4px 10px;
@@ -106,6 +117,175 @@
   font-weight: 800;
   text-align: center;
   text-transform: uppercase;
+}
+
+.stack-catalog-heading {
+  max-width: 850px;
+  margin-top: 34px;
+}
+
+.stack-catalog-heading h3,
+.artifact-anatomy h3 {
+  margin-top: 0;
+  font-size: 26px;
+}
+
+.stack-catalog {
+  margin-top: 12px;
+  border-top: 1px solid var(--line);
+}
+
+.stack-detail-group {
+  display: grid;
+  grid-template-columns: 132px minmax(0, 1fr);
+  gap: 18px;
+  padding: 26px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.stack-group-heading {
+  align-self: start;
+}
+
+.stack-group-number {
+  display: grid;
+  width: 34px;
+  height: 34px;
+  place-items: center;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: var(--surface-2);
+  color: var(--teal);
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.stack-group-heading h3 {
+  margin: 9px 0 6px;
+  font-size: 19px;
+}
+
+.stack-group-heading p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.stack-detail-list {
+  min-width: 0;
+}
+
+.stack-detail-item {
+  min-width: 0;
+  padding-bottom: 23px;
+  scroll-margin-top: 20px;
+}
+
+.stack-detail-item + .stack-detail-item {
+  padding-top: 23px;
+  border-top: 1px solid var(--line);
+}
+
+.stack-detail-item:last-child {
+  padding-bottom: 0;
+}
+
+.component-heading {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  justify-content: space-between;
+}
+
+.component-heading h4 {
+  margin: 0;
+  font-size: 19px;
+  line-height: 1.35;
+}
+
+.plane-chip {
+  flex: 0 0 auto;
+  min-height: 25px;
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid currentColor;
+  border-radius: 999px;
+  padding: 2px 8px;
+  font-size: 11px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.plane-data {
+  color: var(--teal);
+  background: var(--soft-teal);
+}
+
+.plane-control {
+  color: var(--blue);
+  background: var(--soft-blue);
+}
+
+.plane-both {
+  color: var(--amber);
+  background: var(--soft-amber);
+}
+
+.component-purpose {
+  max-width: 900px;
+  margin: 8px 0 0;
+}
+
+.component-contract {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
+  margin: 15px 0 0;
+}
+
+.component-contract div {
+  min-width: 0;
+  padding-left: 11px;
+  border-left: 2px solid var(--line);
+}
+
+.component-contract dt {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.component-contract dd {
+  margin: 5px 0 0;
+  font-size: 13px;
+  line-height: 1.55;
+  overflow-wrap: anywhere;
+}
+
+.component-risk {
+  margin: 14px 0 0;
+  padding: 10px 12px;
+  border-left: 3px solid var(--amber);
+  background: var(--soft-amber);
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.component-risk strong {
+  color: var(--ink);
+}
+
+.artifact-anatomy {
+  margin-top: 34px;
+  padding-top: 30px;
+  border-top: 1px solid var(--line);
+  scroll-margin-top: 20px;
+}
+
+.artifact-load-flow {
+  margin-top: 12px;
 }
 
 .tabbed-explorer {
@@ -574,6 +754,10 @@
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
+  .component-contract {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .engineering-flow,
   .engineering-flow.six,
   .level-grid {
@@ -609,6 +793,27 @@
     grid-template-columns: 1fr;
   }
 
+  .stack-detail-group {
+    grid-template-columns: 1fr;
+    gap: 18px;
+  }
+
+  .stack-group-heading {
+    display: grid;
+    grid-template-columns: 34px minmax(0, 1fr);
+    gap: 0 10px;
+    align-items: center;
+  }
+
+  .stack-group-heading h3 {
+    margin: 0;
+  }
+
+  .stack-group-heading p {
+    grid-column: 1 / -1;
+    margin-top: 8px;
+  }
+
   .lane-label {
     min-height: 38px;
   }
@@ -638,6 +843,20 @@
 @media (max-width: 480px) {
   .hero h1 {
     font-size: 34px;
+  }
+
+  .component-heading {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 7px;
+  }
+
+  .component-heading .plane-chip {
+    justify-self: start;
+  }
+
+  .component-contract {
+    grid-template-columns: 1fr;
   }
 
   .stack-nodes {

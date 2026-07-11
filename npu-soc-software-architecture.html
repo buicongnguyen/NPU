@@ -6,7 +6,7 @@
   <meta name="description" content="An engineering study of NPU and SoC software architecture: compiler artifacts, SDKs, runtimes, drivers, firmware, scheduling, memory planning, C++ hardware models, profiling, debugging, and CI/CD.">
   <title>NPU &amp; SoC Software Architecture | NPU Study Guide</title>
   <link rel="stylesheet" href="analog-cim.css">
-  <link rel="stylesheet" href="npu-engineering.css">
+  <link rel="stylesheet" href="npu-engineering.css?v=20260711-2">
   <script src="npu-engineering.js" defer></script>
 </head>
 <body>
@@ -104,43 +104,43 @@
         <div class="stack-lane">
           <div class="lane-label">Model plane</div>
           <div class="stack-nodes">
-            <article class="stack-node"><strong>Application</strong><span>Inputs, outputs, preprocessing, latency policy</span></article>
-            <article class="stack-node"><strong>Framework / ONNX</strong><span>Graph semantics, shapes, dtypes, constants</span></article>
-            <article class="stack-node"><strong>Deployment profile</strong><span>Target, precision, memory, fallback, power mode</span></article>
+            <article class="stack-node"><strong><a href="#detail-application">Application</a></strong><span>Inputs, outputs, preprocessing, latency policy</span></article>
+            <article class="stack-node"><strong><a href="#detail-framework">Framework / ONNX</a></strong><span>Graph semantics, shapes, dtypes, constants</span></article>
+            <article class="stack-node"><strong><a href="#detail-profile">Deployment profile</a></strong><span>Target, precision, memory, fallback, power mode</span></article>
           </div>
         </div>
         <div class="stack-lane">
           <div class="lane-label">Build plane</div>
           <div class="stack-nodes">
-            <article class="stack-node"><strong>Importer and analyzer</strong><span>Validate, infer, normalize, diagnose support</span></article>
-            <article class="stack-node"><strong>NPU compiler</strong><span>Partition, schedule, plan memory, lower kernels</span></article>
-            <article class="stack-node"><strong>Artifact packager</strong><span>Code, constants, commands, metadata, ABI versions</span></article>
+            <article class="stack-node"><strong><a href="#detail-importer">Importer and analyzer</a></strong><span>Validate, infer, normalize, diagnose support</span></article>
+            <article class="stack-node"><strong><a href="#detail-compiler">NPU compiler</a></strong><span>Partition, schedule, plan memory, lower kernels</span></article>
+            <article class="stack-node"><strong><a href="#detail-packager">Artifact packager</a></strong><span>Code, constants, commands, metadata, ABI versions</span></article>
           </div>
         </div>
         <div class="boundary-line">Offline build boundary</div>
         <div class="stack-lane">
           <div class="lane-label">Host control</div>
           <div class="stack-nodes">
-            <article class="stack-node control"><strong>SDK</strong><span>C/C++ API, Python tools, examples, diagnostics</span></article>
-            <article class="stack-node control"><strong>User runtime</strong><span>Sessions, buffers, queues, events, execution</span></article>
-            <article class="stack-node control"><strong>Kernel driver</strong><span>Isolation, DMA mapping, interrupts, power, reset</span></article>
+            <article class="stack-node control"><strong><a href="#detail-sdk">SDK</a></strong><span>C/C++ API, Python tools, examples, diagnostics</span></article>
+            <article class="stack-node control"><strong><a href="#detail-runtime">User runtime</a></strong><span>Sessions, buffers, queues, events, execution</span></article>
+            <article class="stack-node control"><strong><a href="#detail-driver">Kernel driver</a></strong><span>Isolation, DMA mapping, interrupts, power, reset</span></article>
           </div>
         </div>
         <div class="boundary-line">User / kernel / device trust boundaries</div>
         <div class="stack-lane">
           <div class="lane-label">Device control</div>
           <div class="stack-nodes">
-            <article class="stack-node control"><strong>Firmware scheduler</strong><span>Validate descriptors, sequence engines, report faults</span></article>
-            <article class="stack-node hardware"><strong>SoC services</strong><span>IOMMU, DMA, NoC, clocks, power domains, timers</span></article>
-            <article class="stack-node hardware"><strong>Trace and counters</strong><span>Correlation IDs, cycles, bytes, stalls, errors</span></article>
+            <article class="stack-node control"><strong><a href="#detail-firmware">Firmware scheduler</a></strong><span>Validate descriptors, sequence engines, report faults</span></article>
+            <article class="stack-node hardware"><strong><a href="#detail-services">SoC services</a></strong><span>IOMMU, DMA, NoC, clocks, power domains, timers</span></article>
+            <article class="stack-node hardware"><strong><a href="#detail-trace">Trace and counters</a></strong><span>Correlation IDs, cycles, bytes, stalls, errors</span></article>
           </div>
         </div>
         <div class="stack-lane">
           <div class="lane-label">NPU data plane</div>
           <div class="stack-nodes">
-            <article class="stack-node hardware"><strong>Command processors</strong><span>Queues, microcode, dependencies, events</span></article>
-            <article class="stack-node hardware"><strong>Compute engines</strong><span>Matrix, vector, scalar, activation, reduction</span></article>
-            <article class="stack-node hardware"><strong>Memory system</strong><span>SRAM banks, caches, DRAM, fabric, coherency</span></article>
+            <article class="stack-node hardware"><strong><a href="#detail-command">Command processors</a></strong><span>Queues, microcode, dependencies, events</span></article>
+            <article class="stack-node hardware"><strong><a href="#detail-compute">Compute engines</a></strong><span>Matrix, vector, scalar, activation, reduction</span></article>
+            <article class="stack-node hardware"><strong><a href="#detail-memory">Memory system</a></strong><span>SRAM banks, caches, DRAM, fabric, coherency</span></article>
           </div>
         </div>
       </div>
@@ -151,6 +151,372 @@
           and include enough provenance to reproduce the compile. A binary blob without that contract is difficult to
           validate, debug, cache, or evolve.
         </p>
+      </div>
+
+      <div class="stack-catalog-heading">
+        <p class="eyebrow">Responsibility catalog</p>
+        <h3>What every component consumes, produces, owns, and must reveal</h3>
+        <p class="section-note">
+          The compact map shows placement. The catalog below shows engineering ownership. A layer is complete only
+          when its input contract, output contract, decisions, telemetry, and failure behavior are all explicit.
+        </p>
+      </div>
+
+      <div class="stack-catalog">
+        <section class="stack-detail-group" aria-labelledby="model-plane-details">
+          <header class="stack-group-heading">
+            <span class="stack-group-number">01</span>
+            <h3 id="model-plane-details">Model plane</h3>
+            <p>Defines application meaning and deployment intent before target-specific lowering begins.</p>
+          </header>
+          <div class="stack-detail-list">
+            <article class="stack-detail-item" id="detail-application">
+              <header class="component-heading">
+                <h4>Application</h4>
+                <span class="plane-chip plane-both">Data + control</span>
+              </header>
+              <p class="component-purpose">
+                Converts a product request, sensor frame, or media stream into model inputs and turns model outputs
+                into product behavior. It owns the user-visible latency and correctness contract, not only tensor I/O.
+              </p>
+              <dl class="component-contract">
+                <div><dt>Consumes</dt><dd>Raw requests or sensor data, application configuration, model identity, and service-level policy.</dd></div>
+                <div><dt>Produces</dt><dd>Typed tensor bindings, shape metadata, deadlines, priorities, correlation IDs, and interpreted outputs.</dd></div>
+                <div><dt>Owns</dt><dd>Preprocessing and postprocessing versions, batching and admission policy, fallback, cancellation, and accuracy/latency tradeoffs.</dd></div>
+                <div><dt>Must expose</dt><dd>Request shape, preprocessing time, queue delay, inference time, postprocessing time, fallback reason, and final status.</dd></div>
+              </dl>
+              <p class="component-risk"><strong>Failure pattern:</strong> training used RGB normalization and NHWC tensors, while deployment silently sends BGR or NCHW; the accelerator is correct but the product result is wrong.</p>
+            </article>
+
+            <article class="stack-detail-item" id="detail-framework">
+              <header class="component-heading">
+                <h4>Framework / ONNX</h4>
+                <span class="plane-chip plane-data">Semantic data</span>
+              </header>
+              <p class="component-purpose">
+                Represents the portable computation contract. A graph is more than operator names: opset versions,
+                attributes, control flow, broadcasting, aliasing, layouts, quantization metadata, and shape constraints
+                determine the result that every backend must preserve.
+              </p>
+              <dl class="component-contract">
+                <div><dt>Consumes</dt><dd>Trained checkpoint or framework module, exporter configuration, example inputs, and external constant files.</dd></div>
+                <div><dt>Produces</dt><dd>A versioned graph with nodes, tensors, constants, symbolic dimensions, dtypes, quantization parameters, and named outputs.</dd></div>
+                <div><dt>Owns</dt><dd>Framework-level semantics and export fidelity; it does not own target scheduling, physical addresses, or device command order.</dd></div>
+                <div><dt>Must expose</dt><dd>Exporter revision, opset imports, source-node mapping, unresolved shape constraints, model digest, and framework golden outputs.</dd></div>
+              </dl>
+              <p class="component-risk"><strong>Failure pattern:</strong> an exporter decomposes one operation differently after an upgrade, or leaves preprocessing outside the graph, and the importer accepts a graph whose meaning no longer matches the validated model.</p>
+            </article>
+
+            <article class="stack-detail-item" id="detail-profile">
+              <header class="component-heading">
+                <h4>Deployment profile</h4>
+                <span class="plane-chip plane-control">Control policy</span>
+              </header>
+              <p class="component-purpose">
+                Separates model semantics from deployment choices. The same graph may need different precision,
+                memory, fallback, and power decisions for a camera, battery device, automotive SoC, or throughput server.
+              </p>
+              <dl class="component-contract">
+                <div><dt>Consumes</dt><dd>Model analysis, hardware capability manifest, accuracy tolerance, latency target, memory budget, thermal limits, and fleet policy.</dd></div>
+                <div><dt>Produces</dt><dd>An immutable compile profile naming target revision, shape classes, precision policy, calibration data, fallback rules, and optimization objective.</dd></div>
+                <div><dt>Owns</dt><dd>Allowed approximations, dynamic-shape bounds, SRAM/DRAM limits, power mode, digital fallback, and compatibility floor.</dd></div>
+                <div><dt>Must expose</dt><dd>Profile digest, policy source, rejected constraints, selected objective weights, calibration-set identity, and target capability version.</dd></div>
+              </dl>
+              <p class="component-risk"><strong>Failure pattern:</strong> important target flags live only in shell scripts or engineer memory, so two builds of the same model produce different artifacts with no reproducible explanation.</p>
+            </article>
+          </div>
+        </section>
+
+        <section class="stack-detail-group" aria-labelledby="build-plane-details">
+          <header class="stack-group-heading">
+            <span class="stack-group-number">02</span>
+            <h3 id="build-plane-details">Build plane</h3>
+            <p>Proves semantics, makes target decisions, and freezes them into a deployable contract.</p>
+          </header>
+          <div class="stack-detail-list">
+            <article class="stack-detail-item" id="detail-importer">
+              <header class="component-heading">
+                <h4>Importer and analyzer</h4>
+                <span class="plane-chip plane-both">Semantic gate</span>
+              </header>
+              <p class="component-purpose">
+                Turns an external graph into a canonical internal representation while preserving source identity.
+                It should fail early on ambiguity and provide a support report before expensive target compilation.
+              </p>
+              <dl class="component-contract">
+                <div><dt>Consumes</dt><dd>Framework graph, constants, deployment profile, calibration metadata, importer schema, and target support manifest.</dd></div>
+                <div><dt>Produces</dt><dd>Validated typed IR, inferred shape constraints, canonical operators, source maps, support classification, and actionable diagnostics.</dd></div>
+                <div><dt>Owns</dt><dd>Schema and opset checks, shape/type inference, constant integrity, semantic normalization, capability diagnosis, and minimal failing subgraphs.</dd></div>
+                <div><dt>Must expose</dt><dd>Unsupported node path, source location, inferred versus declared shape, fallback reason, warning severity, and normalization history.</dd></div>
+              </dl>
+              <p class="component-risk"><strong>Failure pattern:</strong> unsupported behavior is discovered after many compiler passes and reported as an internal lowering error, leaving the user unable to identify the original node or repair the model.</p>
+            </article>
+
+            <article class="stack-detail-item" id="detail-compiler">
+              <header class="component-heading">
+                <h4>NPU compiler</h4>
+                <span class="plane-chip plane-data">Program construction</span>
+              </header>
+              <p class="component-purpose">
+                Converts validated IR into a legal and efficient command program. Partitioning, layout, quantization,
+                tiling, scheduling, and memory allocation are coupled decisions because each changes traffic, lifetime,
+                engine occupancy, and numerical behavior.
+              </p>
+              <dl class="component-contract">
+                <div><dt>Consumes</dt><dd>Canonical IR, deployment profile, target ISA and capabilities, kernel library, calibration data, and measured cost models.</dd></div>
+                <div><dt>Produces</dt><dd>Partitions, lowered kernels or microcode, command DAG, DMA plan, static buffer offsets, constants, relocations, and debug maps.</dd></div>
+                <div><dt>Owns</dt><dd>Legalization, fusion, precision and layout choice, tiling, resource scheduling, memory lifetimes, spill decisions, and fallback boundaries.</dd></div>
+                <div><dt>Must expose</dt><dd>Pass pipeline, IR checkpoints, cost breakdown, rejected alternatives, peak memory, expected cycles/bytes, and every graph-to-command mapping.</dd></div>
+              </dl>
+              <p class="component-risk"><strong>Failure pattern:</strong> a locally faster fusion increases live memory, forces DRAM spills, and makes the complete graph slower because schedule and allocation were optimized independently.</p>
+            </article>
+
+            <article class="stack-detail-item" id="detail-packager">
+              <header class="component-heading">
+                <h4>Artifact packager</h4>
+                <span class="plane-chip plane-both">Offline/runtime hinge</span>
+              </header>
+              <p class="component-purpose">
+                Serializes compiler decisions into a bounded, versioned object that a runtime can validate and load
+                without reconstructing compiler intent. The format is a product ABI, even when only one compiler emits it.
+              </p>
+              <dl class="component-contract">
+                <div><dt>Consumes</dt><dd>Code and microcode, constants, command templates, buffer plan, relocations, entry points, ABI schemas, debug map, and build provenance.</dd></div>
+                <div><dt>Produces</dt><dd>A deterministic artifact with aligned sections, manifest, feature requirements, integrity data, signatures when required, and a stable build ID.</dd></div>
+                <div><dt>Owns</dt><dd>Section layout, bounds, compression, relocation records, target/ABI compatibility ranges, hashes, schema evolution, and reproducible serialization.</dd></div>
+                <div><dt>Must expose</dt><dd>Human-readable manifest, section inventory and hashes, compiler/pass revision, model and profile digests, required resources, and debug-symbol availability.</dd></div>
+              </dl>
+              <p class="component-risk"><strong>Failure pattern:</strong> the runtime accepts an opaque blob for the wrong firmware ABI or hardware stepping, then fails after allocation or submission with no safe compatibility diagnosis.</p>
+            </article>
+          </div>
+        </section>
+
+        <section class="stack-detail-group" aria-labelledby="host-plane-details">
+          <header class="stack-group-heading">
+            <span class="stack-group-number">03</span>
+            <h3 id="host-plane-details">Host control</h3>
+            <p>Turns an artifact and application request into isolated, asynchronous device work.</p>
+          </header>
+          <div class="stack-detail-list">
+            <article class="stack-detail-item" id="detail-sdk">
+              <header class="component-heading">
+                <h4>SDK</h4>
+                <span class="plane-chip plane-control">Supported interface</span>
+              </header>
+              <p class="component-purpose">
+                Provides the supported developer path through compilation, packaging, loading, execution, profiling,
+                and diagnosis. Its job is to make correct lifetime and synchronization behavior easier than unsafe shortcuts.
+              </p>
+              <dl class="component-contract">
+                <div><dt>Consumes</dt><dd>Compiler and runtime capabilities, artifact schemas, support matrix, target discovery data, and diagnostic interfaces.</dd></div>
+                <div><dt>Produces</dt><dd>Stable C ABI, C++ RAII wrappers, Python tools, CLI output, examples, headers, packages, compatibility documentation, and reports.</dd></div>
+                <div><dt>Owns</dt><dd>Public handle semantics, ownership rules, error taxonomy, thread-safety contract, binding parity, deprecation policy, and example quality.</dd></div>
+                <div><dt>Must expose</dt><dd>SDK/runtime/driver/firmware versions, target features, artifact inspection, machine-readable errors, trace export, and minimal reproducer tools.</dd></div>
+              </dl>
+              <p class="component-risk"><strong>Failure pattern:</strong> samples bypass the runtime or rely on hidden global state, so customer applications copy patterns that leak buffers, serialize asynchronous work, or break on upgrades.</p>
+            </article>
+
+            <article class="stack-detail-item" id="detail-runtime">
+              <header class="component-heading">
+                <h4>User runtime</h4>
+                <span class="plane-chip plane-both">Execution owner</span>
+              </header>
+              <p class="component-purpose">
+                Owns user-space object lifetime and asynchronous truth. It discovers devices, loads artifacts, manages
+                sessions and buffers, submits work, resolves events, and converts lower-level failures into stable API results.
+              </p>
+              <dl class="component-contract">
+                <div><dt>Consumes</dt><dd>Validated artifact, application tensor bindings, dynamic shapes, queue policy, driver capabilities, and device telemetry.</dd></div>
+                <div><dt>Produces</dt><dd>Executable/session handles, buffer and mapping objects, submissions, dependency events, completions, output bindings, and diagnostics.</dd></div>
+                <div><dt>Owns</dt><dd>Artifact cache and load policy, runtime allocation, imports/exports, queue ordering, batching, event lifetime, timeout, fallback, cancellation, and device-loss recovery.</dd></div>
+                <div><dt>Must expose</dt><dd>Session/queue/command IDs, hidden-copy count, allocation and cache statistics, queue delay, submit/complete timestamps, fallback, timeout, and terminal device state.</dd></div>
+              </dl>
+              <p class="component-risk"><strong>Failure pattern:</strong> a buffer is destroyed while commands still reference it, or a convenience call performs a hidden device-wide synchronization that destroys pipeline overlap.</p>
+            </article>
+
+            <article class="stack-detail-item" id="detail-driver">
+              <header class="component-heading">
+                <h4>Kernel driver</h4>
+                <span class="plane-chip plane-control">Privilege boundary</span>
+              </header>
+              <p class="component-purpose">
+                Converts untrusted user requests into isolated hardware resources. It is the authority for process
+                ownership, DMA-visible memory, queue access, interrupt delivery, firmware lifecycle, power, and reset.
+              </p>
+              <dl class="component-contract">
+                <div><dt>Consumes</dt><dd>System calls or ioctls, object handles, buffer import requests, validated submission descriptors, fences, and administrator policy.</dd></div>
+                <div><dt>Produces</dt><dd>Contexts, IOMMU mappings, pinned or imported buffers, queue slots, doorbell access, completion fences, fault reports, and reset results.</dd></div>
+                <div><dt>Owns</dt><dd>Isolation, handle validation, DMA mapping lifetime, cache maintenance, interrupt routing, scheduler admission, firmware loading, power transitions, and reset escalation.</dd></div>
+                <div><dt>Must expose</dt><dd>Process/context identity, mapped bytes, submissions and interrupts, IOMMU faults, firmware health, power state, reset generation, and stable kernel error codes.</dd></div>
+              </dl>
+              <p class="component-risk"><strong>Failure pattern:</strong> a stale handle or mapping survives context teardown and lets later work DMA into released memory, creating both a correctness fault and a security boundary violation.</p>
+            </article>
+          </div>
+        </section>
+
+        <section class="stack-detail-group" aria-labelledby="device-plane-details">
+          <header class="stack-group-heading">
+            <span class="stack-group-number">04</span>
+            <h3 id="device-plane-details">Device control</h3>
+            <p>Validates host intent, schedules finite resources, manages the SoC, and reports device truth.</p>
+          </header>
+          <div class="stack-detail-list">
+            <article class="stack-detail-item" id="detail-firmware">
+              <header class="component-heading">
+                <h4>Firmware scheduler</h4>
+                <span class="plane-chip plane-both">Device authority</span>
+              </header>
+              <p class="component-purpose">
+                Receives queue work after the kernel boundary and turns it into legal engine sequences. It protects the
+                device from malformed descriptors, arbitrates shared resources, watches progress, and owns first-stage recovery.
+              </p>
+              <dl class="component-contract">
+                <div><dt>Consumes</dt><dd>Command-ring descriptors, dependency tokens, buffer mappings, queue/context metadata, deadlines, and negotiated feature bits.</dd></div>
+                <div><dt>Produces</dt><dd>Engine dispatches, DMA sequences, resource reservations, completion records, performance snapshots, and structured fault reports.</dd></div>
+                <div><dt>Owns</dt><dd>Descriptor validation, dependency scheduling, fairness, preemption points, SRAM/DMA/engine reservations, watchdogs, queue quarantine, and warm-reset policy.</dd></div>
+                <div><dt>Must expose</dt><dd>Queue and command generation, scheduler state, wait reason, resource occupancy, heartbeat, last completed unit, faulting descriptor, and recovery action.</dd></div>
+              </dl>
+              <p class="component-risk"><strong>Failure pattern:</strong> reset leaves a stale producer generation or dependency token visible, so new commands wait on work that belonged to the previous firmware epoch.</p>
+            </article>
+
+            <article class="stack-detail-item" id="detail-services">
+              <header class="component-heading">
+                <h4>SoC services</h4>
+                <span class="plane-chip plane-both">Shared infrastructure</span>
+              </header>
+              <p class="component-purpose">
+                Supplies address translation, data movement, communication, time, clocks, resets, and power domains to
+                the NPU. These services determine whether an otherwise correct accelerator can operate predictably inside the SoC.
+              </p>
+              <dl class="component-contract">
+                <div><dt>Consumes</dt><dd>Device virtual addresses, transfer descriptors, NoC routes and priorities, clock requests, power votes, reset requests, and timer operations.</dd></div>
+                <div><dt>Produces</dt><dd>IOMMU translations, DMA completions, coherent or explicitly synchronized data, NoC delivery, stable clocks, powered domains, timestamps, and fault interrupts.</dd></div>
+                <div><dt>Owns</dt><dd>Initialization order, translation context, burst and alignment limits, coherency protocol, bandwidth/QoS policy, DVFS sequencing, clock gating, and reset dependencies.</dd></div>
+                <div><dt>Must expose</dt><dd>Bytes and latency per path, page faults, NoC congestion, DMA utilization, clock frequency, voltage/power state, temperature, throttling, and reset cause.</dd></div>
+              </dl>
+              <p class="component-risk"><strong>Failure pattern:</strong> a compiler schedule assumes bandwidth that the shared NoC cannot provide under camera or ISP traffic, causing deadline misses that never appear in isolated NPU tests.</p>
+            </article>
+
+            <article class="stack-detail-item" id="detail-trace">
+              <header class="component-heading">
+                <h4>Trace and counters</h4>
+                <span class="plane-chip plane-control">Observability plane</span>
+              </header>
+              <p class="component-purpose">
+                Preserves identity and time across graph nodes, artifacts, queues, firmware commands, engines, memory,
+                and host APIs. Counters without units, scope, correlation, and loss accounting are not actionable telemetry.
+              </p>
+              <dl class="component-contract">
+                <div><dt>Consumes</dt><dd>Compiler debug IDs, runtime correlation IDs, firmware events, engine counters, DMA/NoC events, power changes, faults, and clock-sync samples.</dd></div>
+                <div><dt>Produces</dt><dd>A versioned bounded-overhead event stream, counter samples, host/device time conversion, layer timeline, fault bundle, and profiler database.</dd></div>
+                <div><dt>Owns</dt><dd>ID propagation, timestamp width and wrap, clock-domain alignment, event schema, units, sampling and trigger policy, buffer overflow behavior, and privacy controls.</dd></div>
+                <div><dt>Must expose</dt><dd>Lost-event count, sampling interval, counter scope, conversion uncertainty, frequency epoch, schema version, source engine, and trace buffer pressure.</dd></div>
+              </dl>
+              <p class="component-risk"><strong>Failure pattern:</strong> a layer is slow, but command, DMA, and engine records cannot be joined because each layer generated unrelated IDs and used a different clock without synchronization metadata.</p>
+            </article>
+          </div>
+        </section>
+
+        <section class="stack-detail-group" aria-labelledby="data-plane-details">
+          <header class="stack-group-heading">
+            <span class="stack-group-number">05</span>
+            <h3 id="data-plane-details">NPU data plane</h3>
+            <p>Fetches the frozen program, performs numerical work, and moves tensors through the memory hierarchy.</p>
+          </header>
+          <div class="stack-detail-list">
+            <article class="stack-detail-item" id="detail-command">
+              <header class="component-heading">
+                <h4>Command processors</h4>
+                <span class="plane-chip plane-data">Dispatch data path</span>
+              </header>
+              <p class="component-purpose">
+                Fetches and decodes validated command buffers or microcode, resolves dependencies, programs engines,
+                and emits completion events. It is the hardware realization of the compiler and firmware command model.
+              </p>
+              <dl class="component-contract">
+                <div><dt>Consumes</dt><dd>Command buffers, microcode, queue pointers, dependency tokens, tensor descriptors, addresses, engine masks, and execution modes.</dd></div>
+                <div><dt>Produces</dt><dd>Register or descriptor writes to engines, DMA launches, barriers, event updates, completion status, and precise command faults.</dd></div>
+                <div><dt>Owns</dt><dd>Fetch/decode, queue arbitration, branch or loop semantics, barrier ordering, dependency-scoreboard behavior, legal opcode handling, and forward progress.</dd></div>
+                <div><dt>Must expose</dt><dd>Current queue/opcode, commands retired, dependency wait cycles, decode faults, issue stalls, event state, and last known forward-progress point.</dd></div>
+              </dl>
+              <p class="component-risk"><strong>Failure pattern:</strong> a malformed length or unsupported opcode advances the queue incorrectly, turning one bad command into an unrecoverable device hang rather than a bounded fault.</p>
+            </article>
+
+            <article class="stack-detail-item" id="detail-compute">
+              <header class="component-heading">
+                <h4>Compute engines</h4>
+                <span class="plane-chip plane-data">Numerical data path</span>
+              </header>
+              <p class="component-purpose">
+                Performs matrix, vector, scalar, activation, reduction, conversion, and optional sparse operations.
+                The contract includes exact numeric behavior for every precision mode, not just nominal throughput.
+              </p>
+              <dl class="component-contract">
+                <div><dt>Consumes</dt><dd>Input tensor tiles, weights, accumulator state, tensor views, masks, strides, precision mode, rounding mode, saturation policy, and kernel parameters.</dd></div>
+                <div><dt>Produces</dt><dd>Output tiles, partial sums or reductions, exception/status bits, dependency events, utilization counters, and numerical debug checkpoints.</dd></div>
+                <div><dt>Owns</dt><dd>Operation semantics, accumulator width, rounding and saturation, NaN/Inf policy where relevant, tail handling, sparse metadata, pipeline hazards, and deterministic modes.</dd></div>
+                <div><dt>Must expose</dt><dd>Active and issued cycles, lane utilization, operand starvation, pipeline stalls, overflow/saturation count, sparse skips, and per-mode error status.</dd></div>
+              </dl>
+              <p class="component-risk"><strong>Failure pattern:</strong> the main matrix shape passes, but tail channels use a different rounding or mask rule, creating small layer errors that accumulate only on production tensor shapes.</p>
+            </article>
+
+            <article class="stack-detail-item" id="detail-memory">
+              <header class="component-heading">
+                <h4>Memory system</h4>
+                <span class="plane-chip plane-data">Storage + movement</span>
+              </header>
+              <p class="component-purpose">
+                Delivers constants, activations, commands, and intermediate state through local SRAM, caches, DRAM,
+                and the fabric. Capacity, bank topology, alignment, ordering, and contention shape the achievable schedule.
+              </p>
+              <dl class="component-contract">
+                <div><dt>Consumes</dt><dd>Compiler buffer plan, engine load/store traffic, DMA requests, cache operations, physical or device virtual addresses, priorities, and coherency actions.</dd></div>
+                <div><dt>Produces</dt><dd>Data with defined visibility and ordering, allocation capacity, bandwidth and latency service, cache responses, fabric transactions, and memory faults.</dd></div>
+                <div><dt>Owns</dt><dd>Address spaces, SRAM bank mapping, cacheability, replacement and write policy, DRAM channels, arbitration/QoS, coherency, ECC, and memory protection.</dd></div>
+                <div><dt>Must expose</dt><dd>Bytes per level, hit/miss rate, bank conflicts, queue occupancy, DRAM and NoC stalls, peak live memory, ECC events, page faults, and spill traffic.</dd></div>
+              </dl>
+              <p class="component-risk"><strong>Failure pattern:</strong> tensors fit in total SRAM capacity but collide in the same banks during concurrent compute and DMA, so the realized throughput is far below the compiler estimate.</p>
+            </article>
+          </div>
+        </section>
+      </div>
+
+      <div class="artifact-anatomy" id="artifact-anatomy">
+        <div class="section-heading">
+          <p class="eyebrow">Deployable artifact anatomy</p>
+          <h3>The runtime should load decisions, not rediscover them</h3>
+          <p class="section-note">
+            The artifact carries the compiler-to-runtime contract across machines, releases, and trust boundaries.
+            Each section needs explicit bounds, alignment, integrity, compatibility, and ownership rules.
+          </p>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr><th scope="col">Artifact section</th><th scope="col">Required contents</th><th scope="col">Loader validation question</th></tr>
+            </thead>
+            <tbody>
+              <tr><th scope="row">Identity and compatibility</th><td>Magic, format version, target family/revision, required feature bits, runtime and firmware ABI ranges, endianness, build ID.</td><td>Can this runtime, firmware, and hardware revision execute every required feature without reinterpretation?</td></tr>
+              <tr><th scope="row">Entry points and tensor ABI</th><td>Named entry points, tensor count, shape classes or bounds, dtype, layout, quantization, stride/alignment, mutability, binding index.</td><td>Do application bindings match the compiled interface before any device work is submitted?</td></tr>
+              <tr><th scope="row">Code and microcode</th><td>Engine payloads, kernel IDs, ISA revision, command templates, patch locations, execution permissions, required scratch state.</td><td>Are all opcodes, payload sizes, alignments, and executable regions legal for the negotiated target?</td></tr>
+              <tr><th scope="row">Constants</th><td>Weights, lookup tables, scales, zero points, compression/encryption flags, placement hints, alignment, content hashes.</td><td>Are constant bytes intact, trusted when policy requires it, and mapped into legal address classes?</td></tr>
+              <tr><th scope="row">Mutable buffers</th><td>Static arena size, offsets, lifetimes, alias groups, access permissions, bank/address class, host visibility, dynamic allocation requirements.</td><td>Can every buffer be materialized without overlap, overflow, illegal aliasing, or an unsupported memory class?</td></tr>
+              <tr><th scope="row">Command and dependency graph</th><td>DMA operations, engine commands, barriers, event/token IDs, queue requirements, patchable tensor addresses, timeout classes.</td><td>Are dependencies acyclic and bounded, descriptors well formed, and all referenced resources declared?</td></tr>
+              <tr><th scope="row">Relocations and resources</th><td>Symbols, addends, section references, address widths, SRAM banks, DMA channels, queue count, firmware scratch, counter requirements.</td><td>Can relocation arithmetic be checked without truncation, out-of-range access, or resource overcommit?</td></tr>
+              <tr><th scope="row">Debug, provenance, and trust</th><td>Graph-to-partition/kernel/command map, tensor checkpoints, compiler revision, pass configuration, model/profile digests, section hashes, optional signature.</td><td>Can the build be reproduced, faults mapped back to the graph, and every loaded byte authenticated according to policy?</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="engineering-flow artifact-load-flow" aria-label="Artifact loading sequence">
+          <article class="flow-step"><b>1</b><strong>Parse</strong><span>Check header, sizes, offsets, integer arithmetic, required and optional sections</span></article>
+          <article class="flow-step"><b>2</b><strong>Negotiate</strong><span>Match target revision, feature bits, runtime ABI, firmware ABI, and policy</span></article>
+          <article class="flow-step"><b>3</b><strong>Verify</strong><span>Validate hashes or signatures, permissions, tensor ABI, commands, and dependency bounds</span></article>
+          <article class="flow-step"><b>4</b><strong>Materialize</strong><span>Allocate arenas, map constants, apply checked relocations, and patch runtime bindings</span></article>
+          <article class="flow-step"><b>5</b><strong>Register</strong><span>Create executable handle, publish debug IDs, and make submission atomically visible</span></article>
+        </div>
+        <div class="callout caution" style="margin-top:12px">
+          <p><strong>Failure must be atomic:</strong> a rejected artifact must not leave executable memory, DMA mappings, queue state, or partially registered debug identities behind. Loading either produces one valid executable object or rolls back every resource.</p>
+        </div>
       </div>
     </section>
 
