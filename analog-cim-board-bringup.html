@@ -7,7 +7,7 @@
   <title>Analog CIM Board Bring-Up | NPU Study Guide</title>
   <link rel="stylesheet" href="analog-cim.css">
   <link rel="stylesheet" href="npu-engineering.css">
-  <link rel="stylesheet" href="analog-cim-bringup.css?v=20260712-3">
+  <link rel="stylesheet" href="analog-cim-bringup.css?v=20260712-5">
   <script src="npu-engineering.js" defer></script>
 </head>
 <body>
@@ -1857,6 +1857,56 @@ out/edge-board-release/
         <article class="delivery-phase-summary compute"><b>Phase C | milestones 6-8</b><strong>Analog compute and model</strong><span>Correlate one MVM, a subgraph, then the complete workload.</span><code>calibrated simulator | silicon</code></article>
         <article class="delivery-phase-summary product"><b>Phase D | milestone 9</b><strong>Product operations</strong><span>Package, isolate, recover, update, and diagnose supported systems.</span><code>platform matrix | qualification</code></article>
       </div>
+
+      <h3 class="subheading" id="delivery-data-flow">Dependency graph: each exit artifact becomes the next milestone's input</h3>
+      <div class="delivery-dataflow-row five" role="group" aria-label="Delivery milestones one through five data flow">
+        <div class="delivery-data-node foundation"><b>M1 | Contract</b><strong>Protocol package</strong><span>Registers, UAPI, queues, faults, trace schema, fixtures, and compatibility rules.</span><code>feeds simulator + KMD + firmware + RTL</code></div>
+        <div class="delivery-data-node foundation"><b>M2 | Virtual device</b><strong>Transport behavior</strong><span>MMIO/BAR state, DMA address spaces, interrupts, reset, ordering, and injected faults.</span><code>feeds physical probe expectations</code></div>
+        <div class="delivery-data-node transport"><b>M3 | Boot</b><strong>READY device</strong><span>Identity, mapped resources, firmware/control ABI, capabilities, health, and reset epoch.</span><code>feeds memory and queue setup</code></div>
+        <div class="delivery-data-node transport"><b>M4 | Memory</b><strong>Verified data path</strong><span>BO ownership, IOVA mappings, exact payloads, cache rules, DMA counters, and fault cleanup.</span><code>feeds trusted ring memory</code></div>
+        <div class="delivery-data-node transport"><b>M5 | Commands</b><strong>Reliable execution path</strong><span>SQ/CQ ownership, doorbells, IRQ/MSI-X, timeout, abort, and one terminal completion.</span><code>feeds analog command transport</code></div>
+      </div>
+      <div class="delivery-flow-bridge" role="note" aria-label="Transport to compute handoff">
+        <span>Transport foundation</span>
+        <div><strong>Exact bytes + deterministic completion</strong><span>required before numerical correlation</span></div>
+        <span>Compute foundation</span>
+      </div>
+      <div class="delivery-dataflow-row four" role="group" aria-label="Delivery milestones six through nine data flow">
+        <div class="delivery-data-node compute"><b>M6 | One MVM</b><strong>Calibrated operation</strong><span>Resident weight program, chip profile, raw ADC, reconstructed output, error distribution, and mitigation cost.</span><code>feeds legal analog placement</code></div>
+        <div class="delivery-data-node compute"><b>M7 | Subgraph</b><strong>Hybrid device island</strong><span>Partition, SRAM schedule, boundary tensors, analog/digital trace, fallback, and resident program handle.</span><code>feeds complete model assembly</code></div>
+        <div class="delivery-data-node compute"><b>M8 | Full model</b><strong>Qualified workload</strong><span>Accuracy, placement, latency percentiles, throughput, energy, thermal behavior, and recovery evidence.</span><code>feeds product regression baseline</code></div>
+        <div class="delivery-data-node product"><b>M9 | Operations</b><strong>Release evidence</strong><span>Packages, compatibility matrix, isolation, updates, rollback, recovery, health, and support bundles.</span><code>feeds release qualification</code></div>
+      </div>
+
+      <h3 class="subheading" id="delivery-sequence">Sequence graph: code, commands, tensors, and evidence cross different owners</h3>
+      <div class="sequence-wrap" tabindex="0" aria-label="Scrollable ACiM delivery sequence graph">
+        <div class="sequence-diagram" role="group" aria-label="Milestone sequence across build host device data plane and evidence actors">
+          <div></div>
+          <div class="sequence-lane">Build / compiler / CI</div>
+          <div class="sequence-lane">Host runtime / KMD</div>
+          <div class="sequence-lane">Device control</div>
+          <div class="sequence-lane">DMA + ACiM + digital</div>
+          <div class="sequence-lane">Evidence store</div>
+
+          <div class="sequence-number">M1</div><div class="sequence-event span-1-2">Generate protocol package -&gt; compile host consumers</div><div class="sequence-empty"></div><div class="sequence-empty"></div><div class="sequence-event evidence">ABI/layout report</div>
+          <div class="sequence-number">M2</div><div class="sequence-empty"></div><div class="sequence-event span-2-3">Submit conformance suite -&gt; virtual device</div><div class="sequence-empty"></div><div class="sequence-event evidence">Deterministic protocol/fault trace</div>
+          <div class="sequence-number">M3</div><div class="sequence-empty"></div><div class="sequence-event span-2-3">Probe resources, reset, load/start control plane -&gt;</div><div class="sequence-empty"></div><div class="sequence-event evidence">Boot stages and image/ABI hashes</div>
+          <div class="sequence-number">M3</div><div class="sequence-empty"></div><div class="sequence-event device span-2-3">&lt;- READY, caps, health, calibration and reset generation</div><div class="sequence-empty"></div><div class="sequence-event evidence">Cold-boot and failure bundle</div>
+          <div class="sequence-number">M4</div><div class="sequence-empty"></div><div class="sequence-event span-2-3">Register BO/IOVA + submit loopback command -&gt;</div><div class="sequence-empty"></div><div class="sequence-event evidence">Mapping, ownership and command record</div>
+          <div class="sequence-number">M4</div><div class="sequence-empty"></div><div class="sequence-empty"></div><div class="sequence-event device span-3-4">DMA pattern H2D/D2H -&gt; verify guards -&gt; unmap</div><div class="sequence-event evidence">Pattern, guard, counter and fault result</div>
+          <div class="sequence-number">M5</div><div class="sequence-empty"></div><div class="sequence-event span-2-3">Publish SQ + doorbell + deadline -&gt;</div><div class="sequence-empty"></div><div class="sequence-event evidence">Descriptor and ordering trace</div>
+          <div class="sequence-number">M5</div><div class="sequence-empty"></div><div class="sequence-event device span-2-3">&lt;- CQ status + IRQ/MSI-X + wake event</div><div class="sequence-empty"></div><div class="sequence-event evidence">One terminal status per cookie</div>
+          <div class="sequence-number">M6</div><div class="sequence-empty"></div><div class="sequence-event span-2-3">Program weights + bind chip profile -&gt;</div><div class="sequence-empty"></div><div class="sequence-event evidence">Program/verify, placement and profile IDs</div>
+          <div class="sequence-number">M6</div><div class="sequence-empty"></div><div class="sequence-empty"></div><div class="sequence-event device span-3-4">Start MVM -&gt; DAC/array/ADC/reconstruct</div><div class="sequence-event evidence">Raw values, error, cycles and energy</div>
+          <div class="sequence-number">M7</div><div class="sequence-empty"></div><div class="sequence-event span-2-3">Load and dispatch hybrid subgraph -&gt;</div><div class="sequence-empty"></div><div class="sequence-event evidence">Partition and SRAM schedule</div>
+          <div class="sequence-number">M7</div><div class="sequence-empty"></div><div class="sequence-empty"></div><div class="sequence-event device span-3-4">Execute analog + digital island -&gt;</div><div class="sequence-event evidence">Boundary tensors and fallback trace</div>
+          <div class="sequence-number">M8</div><div class="sequence-empty"></div><div class="sequence-event span-2-3">Dispatch declared validation and performance scenarios -&gt;</div><div class="sequence-empty"></div><div class="sequence-event evidence">Run manifest, placement and scenario IDs</div>
+          <div class="sequence-number">M8</div><div class="sequence-empty"></div><div class="sequence-empty"></div><div class="sequence-event device span-3-4">Execute full graph -&gt; return detections and counters</div><div class="sequence-event evidence">mAP, latency, power, thermal, recovery</div>
+          <div class="sequence-number">M9</div><div class="sequence-event span-1-2">Install/update qualification set -&gt; exercise supported host</div><div class="sequence-empty"></div><div class="sequence-empty"></div><div class="sequence-event evidence">Compatibility and support bundle</div>
+          <div class="sequence-number">M9</div><div class="sequence-empty"></div><div class="sequence-empty"></div><div class="sequence-empty"></div><div class="sequence-empty"></div><div class="sequence-event evidence">Release gate accepts or rejects the evidence set</div>
+        </div>
+      </div>
+      <p class="sequence-caption">Each row is an ownership handoff. The evidence lane stores machine-readable records keyed by build, artifact, device, reset generation, and run/correlation IDs.</p>
 
       <h3 class="subheading" id="delivery-crosswalk">Detailed implementation and exit gates</h3>
       <div class="delivery-roadmap">
