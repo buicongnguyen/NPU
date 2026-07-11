@@ -1,0 +1,481 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="A source-critical deep read of Intelligent HW's analog compute-in-memory patents: positional digit-sliced weights, adaptive ADC range, grouped quantization, signed-weight current cancellation, remaining accuracy limits, and compiler/runtime consequences.">
+  <title>iHW Analog CIM Patent Study | NPU Study Guide</title>
+  <link rel="stylesheet" href="analog-cim.css">
+  <link rel="stylesheet" href="npu-engineering.css">
+  <link rel="stylesheet" href="analog-cim-codesign.css">
+  <link rel="stylesheet" href="analog-cim-mythic.css">
+  <script src="npu-engineering.js" defer></script>
+</head>
+<body>
+  <header class="site-header">
+    <a class="brand" href="index.html" aria-label="NPU Study Guide home">
+      <img src="https://avatars.githubusercontent.com/u/72680210?v=4" alt="Bui Cong Nguyen avatar">
+      <span>NPU Study Guide</span>
+    </a>
+    <nav class="site-nav" aria-label="Analog CIM learning path">
+      <a href="analog-cim-architecture.html">Architecture</a>
+      <a href="analog-cim-evidence.html">Evidence</a>
+      <a href="analog-cim-hardware-software-codesign.html">Co-design</a>
+      <a href="analog-cim-ihw-patents.html" aria-current="page">iHW patents</a>
+      <a href="analog-cim-tenstorrent-reuse.html">Reuse</a>
+      <a href="analog-cim-interview.html">Interview</a>
+      <a href="analog-cim-quiz.html">MCQ Lab</a>
+    </nav>
+  </header>
+
+  <main>
+    <section class="hero">
+      <div class="hero-copy">
+        <p class="eyebrow">Patent deep read | research snapshot 2026-07-11</p>
+        <h1>iHW's ACiM Patent Stack: What It Solves and What It Does Not</h1>
+        <p class="lede">
+          Intelligent HW's granted hybrid-computing patent attacks a real analog-memory problem: asking one physical
+          cell to hold many precise conductance levels. Its answer is to build one logical weight from simpler digits,
+          accumulate each positional slice in analog, then reconstruct precision digitally. Later applications add
+          adaptive converter range, grouped quantization, and signed-current cancellation. Together they form a
+          credible accuracy architecture, but they are not public proof that end-to-end analog error is solved.
+        </p>
+        <div class="hero-actions">
+          <a class="button" href="#verdict">Read the verdict</a>
+          <a class="button secondary" href="#core-mechanism">Trace the core patent</a>
+          <a class="button secondary" href="#accuracy-budget">Audit the accuracy budget</a>
+          <a class="button secondary" href="#software">Map it into software</a>
+        </div>
+        <div class="summary-strip" aria-label="iHW patent study summary">
+          <div><strong>Core US grant</strong><span>US 12,586,636 B2, granted March 24, 2026</span></div>
+          <div><strong>Main mechanism</strong><span>Positional digit slices plus digital reconstruction</span></div>
+          <div><strong>Supporting layer</strong><span>Adaptive ADC, grouped scales, signed cancellation</span></div>
+          <div><strong>Research verdict</strong><span>Partial mitigation; system-level proof remains open</span></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="verdict">
+      <div class="section-heading">
+        <p class="eyebrow">Evidence boundary</p>
+        <h2>A real granted architecture claim is not the same as a verified product result</h2>
+      </div>
+      <div class="callout verdict">
+        <p>
+          <strong>Best-supported conclusion:</strong> iHW has a technically meaningful way to avoid depending on a
+          single highly precise multilevel memory cell. The granted architecture can make logical weight encoding more
+          controllable, while the newer applications address converter range, quantization range, and signed-weight
+          peripheral cost. Public records still do not establish full-model accuracy, yield, energy, latency, or
+          lifetime behavior across production chips.
+        </p>
+      </div>
+      <div class="case-verdict-grid top-gap">
+        <article>
+          <span class="evidence-label independent">Confirmed legal record</span>
+          <strong>The core US patent is active</strong>
+          <p>US 12,586,636 B2 was granted on March 24, 2026. Its independent claims cover a particular hybrid line-significance and reconstruction architecture, not every form of bit-sliced CIM.</p>
+        </article>
+        <article>
+          <span class="evidence-label company">Company-originated claim</span>
+          <strong>8-bit ACiM silicon and MobileNet</strong>
+          <p>An iHW recruiting page claims a world-first 8-bit-weight ACiM silicon verification and MobileNet demonstration. No public independent benchmark methodology accompanies that statement.</p>
+        </article>
+        <article>
+          <span class="evidence-label inference">Still unproven publicly</span>
+          <strong>Production accuracy and efficiency</strong>
+          <p>The patent record does not report complete datasets, chip populations, PVT corners, aging, yield, full-chip energy, or end-to-end latency.</p>
+        </article>
+      </div>
+      <div class="evidence-key" aria-label="Evidence labels used on this page">
+        <span class="independent">Patent or official record</span>
+        <span class="company">Company disclosure</span>
+        <span class="inference">Engineering interpretation</span>
+      </div>
+      <div class="boundary-band">
+        <h3>Read &quot;8-bit&quot; carefully</h3>
+        <p>
+          In the core patent, an 8-bit logical weight may be reconstructed from eight robust binary slices or from
+          fewer multi-bit slices. It does not require one physical cell to reproduce 256 ideal conductance states.
+          Logical precision, converter precision, analog effective precision, and end-task accuracy are four different
+          quantities and should never be reported as if they were interchangeable.
+        </p>
+      </div>
+    </section>
+
+    <section class="section" id="landscape">
+      <div class="section-heading">
+        <p class="eyebrow">Patent landscape</p>
+        <h2>One granted representation architecture plus a surrounding accuracy stack</h2>
+        <p class="section-note">
+          Status below is the US public-record status at this research snapshot. A pending application describes a
+          proposed invention; it must not be presented as a granted right or as proof that the mechanism ships in silicon.
+        </p>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th scope="col">Document</th><th scope="col">Status</th><th scope="col">Problem addressed</th><th scope="col">Proposed mechanism</th><th scope="col">Evidence limit</th></tr>
+          </thead>
+          <tbody>
+            <tr>
+              <th scope="row" class="evidence-title"><a href="https://patents.google.com/patent/US12586636B2/en">US 12,586,636 B2</a><span class="muted">Hybrid computing method and neuromorphic system</span></th>
+              <td><span class="status-pill status-measured">Granted 2026-03-24</span></td>
+              <td>Multilevel-cell nonlinearity, poor repeatability, and unary-cell density cost</td>
+              <td>Represent a logical weight as positional digits; perform analog accumulation per slice; digitally shift, scale, and add</td>
+              <td>Architecture claims, not a public full-chip benchmark</td>
+            </tr>
+            <tr>
+              <th scope="row" class="evidence-title"><a href="https://patents.google.com/patent/US20250348726A1/en">US 2025/0348726 A1</a><span class="muted">High-accuracy analog computing</span></th>
+              <td><span class="status-pill status-conditional">Pending application</span></td>
+              <td>ADC saturation or wasted resolution across wide output-current ranges</td>
+              <td>Classify current magnitude and select a matching I-V conversion or ADC range</td>
+              <td>No public product implementation or end-to-end cost result</td>
+            </tr>
+            <tr>
+              <th scope="row" class="evidence-title"><a href="https://patents.google.com/patent/US20250348716A1/en">US 2025/0348716 A1</a><span class="muted">Weight quantization for analog computing</span></th>
+              <td><span class="status-pill status-conditional">Pending application</span></td>
+              <td>Accuracy loss when one quantization scale covers a layer with uneven channel ranges</td>
+              <td>Use multiple quantization groups and dequantize each group with its own scale</td>
+              <td>Compiler policy and measured model benefit are not public</td>
+            </tr>
+            <tr>
+              <th scope="row" class="evidence-title"><a href="https://patents.justia.com/patent/20260023963">US 2026/0023963 A1</a><span class="muted">Negative-weight analog computing unit</span></th>
+              <td><span class="status-pill status-conditional">Pending application</span></td>
+              <td>Peripheral duplication for positive and negative weight paths</td>
+              <td>Alternate positive and negative split-gate cells on one bitline so currents cancel before conversion</td>
+              <td>Claims fewer ADCs; cancellation accuracy and residual range remain design risks</td>
+            </tr>
+            <tr>
+              <th scope="row" class="evidence-title"><a href="https://patents.google.com/patent/US20260024581A1/en">US 2026/0024581 A1</a><span class="muted">Negative-weight array arrangement</span></th>
+              <td><span class="status-pill status-conditional">Pending application</span></td>
+              <td>ADC count and positive/negative read overhead</td>
+              <td>Rearrange control-line directions and alternate paired read modes</td>
+              <td>One-quarter-ADC claim is an application claim, not a measured product result</td>
+            </tr>
+            <tr>
+              <th scope="row" class="evidence-title"><a href="https://patents.justia.com/patent/12268104">US 12,268,104 B2</a><span class="muted">Chalcogenide memory-cell composition and operation</span></th>
+              <td><span class="status-pill status-measured">Granted 2025-04-01</span></td>
+              <td>Threshold drift, read window, stable composition, and manufacturability</td>
+              <td>Material composition plus initialization and read techniques</td>
+              <td>A separate device path; it does not prove the flash ACiM product uses this material</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="section" id="core-mechanism">
+      <div class="section-heading">
+        <p class="eyebrow">Core patent mechanism</p>
+        <h2>Trade one fragile analog level for several simpler positional digits</h2>
+        <p class="section-note">
+          The architecture is hybrid by construction. Memory cells provide parallel analog multiply-accumulate work;
+          converters and digital logic recover the significance of each slice.
+        </p>
+      </div>
+      <div class="engineering-flow six" aria-label="iHW positional digit-slice execution flow">
+        <article class="flow-step"><b>1. Quantize</b><strong>Logical weight</strong><span>Choose a signed fixed-point or integer representation.</span></article>
+        <article class="flow-step"><b>2. Decompose</b><strong>Weight digits</strong><span>Split the value into binary or mixed-radix digits.</span></article>
+        <article class="flow-step"><b>3. Program</b><strong>Cells and lines</strong><span>Map each digit to a cell state and a positional output line.</span></article>
+        <article class="flow-step"><b>4. Accumulate</b><strong>Analog MVM</strong><span>Apply encoded inputs and sum current independently per slice.</span></article>
+        <article class="flow-step"><b>5. Convert</b><strong>ADC per slice</strong><span>Digitize each output-line current in a suitable range.</span></article>
+        <article class="flow-step"><b>6. Rebuild</b><strong>Shift and add</strong><span>Scale by positional significance, combine signs, and accumulate.</span></article>
+      </div>
+
+      <div class="card-grid two top-gap">
+        <article class="learning-card">
+          <span class="card-label">Conventional pressure point</span>
+          <h3>One cell, many conductance levels</h3>
+          <p>A dense direct mapping asks each device to separate many analog states despite program variation, read noise, nonlinear response, drift, temperature, aging, and process spread. More nominal bits do not automatically produce the same number of effective bits.</p>
+        </article>
+        <article class="learning-card">
+          <span class="card-label">Patent response</span>
+          <h3>Several cells or lines, fewer states each</h3>
+          <p>Each slice can use a small, robust state set, including on/off. Positional significance carries the high precision, and deterministic digital arithmetic reconstructs the logical value after conversion.</p>
+        </article>
+      </div>
+
+      <div class="code-panel top-gap">
+        <header><strong>Abstracted computation</strong><span>Notation distilled from the patent architecture</span></header>
+        <pre><code>W[i,j] = sum_k d[i,j,k] * R[k]
+
+I[k,j] ~= alpha * sum_i X[i] * d[i,j,k]
+
+Y[j] = sum_k R[k] * ADC(I[k,j])
+
+d[i,j,k]  digit stored in a physical memory state
+R[k]      positional significance, such as 1, 2, 4, 8 ...
+I[k,j]    analog output current for significance slice k</code></pre>
+      </div>
+
+      <div class="callout top-gap">
+        <h3>Worked example from the disclosed idea</h3>
+        <p>
+          If three digit-line currents convert to 9, 1, and 3, and their positional weights are 1, 2, and 4,
+          digital reconstruction produces <code>9 x 1 + 1 x 2 + 3 x 4 = 23</code>. The analog array need not create
+          one current that directly encodes 23 with a single precise cell state.
+        </p>
+      </div>
+    </section>
+
+    <section class="section" id="reliability">
+      <div class="section-heading">
+        <p class="eyebrow">Reliability policy</p>
+        <h2>Mixed radix lets significance determine how much cell reliability to buy</h2>
+      </div>
+      <div class="hybrid-flow" aria-label="Mixed-radix reliability policy">
+        <article><b>Low significance</b><strong>Dense storage</strong><span>Lower-order digits may tolerate denser MLC, TLC, or QLC states because their errors contribute less to the final value.</span></article>
+        <article><b>Middle digits</b><strong>Balanced mapping</strong><span>Choose radix and cell state count from measured programming spread, ADC range, and array cost.</span></article>
+        <article><b>High significance</b><strong>Robust storage</strong><span>Use fewer levels or SLC-like states because an error is multiplied by a larger positional weight.</span></article>
+        <article><b>Positive path</b><strong>Signed magnitude</strong><span>Map positive contributions onto a matched physical or logical path.</span></article>
+        <article><b>Negative path</b><strong>Differential term</strong><span>Subtract a negative path digitally or cancel paired currents before the ADC.</span></article>
+        <article><b>Digital boundary</b><strong>Exact recombination</strong><span>Shifts, scales, sign handling, and accumulation are deterministic after conversion.</span></article>
+        <article><b>Residual risk</b><strong>MSB amplification</strong><span>A high-significance slice error is also amplified, so robust storage and converter headroom matter most there.</span></article>
+      </div>
+      <div class="callout caution top-gap">
+        <p>
+          <strong>The cost does not disappear.</strong> More slices can require more cells, output lines, ADC phases,
+          routing, input cycles, digital shift-add work, and calibration metadata. Fewer slices save area and cycles but
+          reintroduce multilevel-cell variability. The engineering problem becomes an explicit accuracy-area-energy-latency tradeoff.
+        </p>
+      </div>
+    </section>
+
+    <section class="section" id="supporting-stack">
+      <div class="section-heading">
+        <p class="eyebrow">Supporting inventions</p>
+        <h2>The later applications target costs left around digit-sliced representation</h2>
+      </div>
+      <div class="paper-grid">
+        <article class="paper-card claim-card" data-domain="company">
+          <span class="evidence-label company">Pending application</span>
+          <h3>Adaptive output and ADC range</h3>
+          <p>A multiplexer selects an output current, a grading step estimates its magnitude, and the circuit selects a matching I-V resistance/capacitance, ADC reference, or oscillator capacitance.</p>
+          <p><strong>Benefit:</strong> reduce saturation on large sums and avoid wasting ADC codes on small sums.</p>
+          <p class="paper-boundary"><strong>Moved cost:</strong> grading, references, calibration, extra control, and possible multiplexing latency.</p>
+        </article>
+        <article class="paper-card claim-card" data-domain="company">
+          <span class="evidence-label company">Pending application</span>
+          <h3>Grouped weight quantization</h3>
+          <p>A layer is split into several quantization groups, often aligned with output channels or output-line groups. Each group receives its own scale for quantization and dequantization.</p>
+          <p><strong>Benefit:</strong> reduce error caused by one outlier-dominated scale covering a heterogeneous layer.</p>
+          <p class="paper-boundary"><strong>Moved cost:</strong> more scale metadata, grouping constraints, compiler decisions, and digital dequantization.</p>
+        </article>
+        <article class="paper-card claim-card" data-domain="company">
+          <span class="evidence-label company">Pending applications</span>
+          <h3>Signed-current cancellation</h3>
+          <p>Positive and negative split-gate flash cells alternate on a shared bitline so the ADC measures a residual current rather than two independently converted sums. A related arrangement changes control-line direction and paired read modes.</p>
+          <p><strong>Benefit claimed:</strong> reduce the ADC count to one-half or one-quarter of a prior separate-path design.</p>
+          <p class="paper-boundary"><strong>Moved cost:</strong> device matching, bias control, cancellation accuracy, small-residual resolution, and common-mode headroom.</p>
+        </article>
+        <article class="paper-card claim-card" data-domain="independent">
+          <span class="evidence-label independent">Granted device patent</span>
+          <h3>Chalcogenide drift and read window</h3>
+          <p>A separate patent addresses composition, initialization, and read behavior for a chalcogenide memory cell, including threshold drift and stable operation.</p>
+          <p><strong>Benefit:</strong> improve a device-level memory path that could support analog computation.</p>
+          <p class="paper-boundary"><strong>Boundary:</strong> do not infer that the disclosed flash ACiM product uses this separate material system.</p>
+        </article>
+      </div>
+    </section>
+
+    <section class="section" id="accuracy-budget">
+      <div class="section-heading">
+        <p class="eyebrow">Accuracy budget</p>
+        <h2>Trace every error source instead of asking whether &quot;analog accuracy&quot; is solved</h2>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th scope="col">Error or cost source</th><th scope="col">iHW mechanism that helps</th><th scope="col">What remains</th><th scope="col">Where the cost moves</th></tr>
+          </thead>
+          <tbody>
+            <tr><th scope="row">Many levels in one cell</th><td>Positional digit slicing permits fewer robust states per cell.</td><td>Each state still has program and read variation.</td><td>Cells, lines, ADC phases, or cycles plus shift-add logic.</td></tr>
+            <tr><th scope="row">High-significance error</th><td>Mixed-radix mapping can assign more reliable cells to larger digits.</td><td>An MSB error is multiplied by its significance.</td><td>Area or density is spent on robust high-order storage.</td></tr>
+            <tr><th scope="row">ADC range and resolution</th><td>Adaptive output-range application selects conversion settings by current grade.</td><td>Offset, gain, noise, nonlinearity, reference drift, and grading error.</td><td>Range sensing, references, calibration, multiplexing, and control.</td></tr>
+            <tr><th scope="row">Outlier-dominated quantization</th><td>Group-specific scales narrow the represented range.</td><td>Group boundaries, scale quantization, activation error, and model sensitivity.</td><td>Metadata, compiler search, and digital dequantization.</td></tr>
+            <tr><th scope="row">Signed weights</th><td>Differential reconstruction or pre-ADC current cancellation.</td><td>Mismatch and residual-current precision.</td><td>Matched devices, bias circuitry, and common-mode control.</td></tr>
+            <tr><th scope="row">Array parasitics</th><td>No complete solution established by the reviewed claims.</td><td>IR drop, line resistance, sneak paths, coupling, and location-dependent gain.</td><td>Smaller arrays, models, compensation, remapping, or extra conversion.</td></tr>
+            <tr><th scope="row">PVT and lifetime</th><td>Device patent addresses one drift path; calibration may compensate some effects.</td><td>Temperature, voltage, process spread, retention, endurance, aging, and read disturb.</td><td>Characterization, sensors, refresh, redundancy, field policy, and yield loss.</td></tr>
+            <tr><th scope="row">Whole-model execution</th><td>Digital reconstruction makes the matrix primitive usable by a conventional stack.</td><td>Activations, normalization, reductions, attention, routing, fallback, and communication.</td><td>Digital engines, SRAM, interconnect, firmware, compiler, and runtime.</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="callout top-gap">
+        <p>
+          <strong>Accuracy is a budget, not a bit label:</strong> task error combines model quantization, cell state,
+          input encoding, array transfer, conversion, digital accumulation, calibration age, and unsupported-operation
+          handling. A defensible result reports each contribution and the hardware or software paid to reduce it.
+        </p>
+      </div>
+    </section>
+
+    <section class="section" id="software">
+      <div class="section-heading">
+        <p class="eyebrow">Compiler and runtime consequences</p>
+        <h2>The backend must expose the physical accuracy contract</h2>
+        <p class="section-note">
+          A target-neutral frontend can still import PyTorch, ONNX, or StableHLO. The ACiM backend cannot pretend the
+          device is an ordinary digital matrix unit: placement, digit significance, converter range, calibration, and
+          reconstruction are part of executable semantics.
+        </p>
+      </div>
+      <div class="engineering-flow six" aria-label="iHW-style ACiM compiler and runtime flow">
+        <article class="flow-step"><b>Import</b><strong>Graph and ranges</strong><span>Preserve shapes, dtypes, constants, calibration data, and sensitivity.</span></article>
+        <article class="flow-step"><b>Quantize</b><strong>Groups and digits</strong><span>Select scales, radix, signed encoding, and per-slice reliability.</span></article>
+        <article class="flow-step"><b>Map</b><strong>Arrays and lines</strong><span>Allocate cells, output lines, ADC ranges, digital fallback, and fault spares.</span></article>
+        <article class="flow-step"><b>Package</b><strong>Executable artifact</strong><span>Carry weight images, commands, scales, range tables, calibration, and debug maps.</span></article>
+        <article class="flow-step"><b>Execute</b><strong>Program and infer</strong><span>Validate ABI, bind buffers, issue MVM slices, read ADCs, and reconstruct.</span></article>
+        <article class="flow-step"><b>Maintain</b><strong>Observe and recover</strong><span>Track saturation, drift, faults, refresh, recalibration, and fallback.</span></article>
+      </div>
+
+      <div class="table-wrap top-gap">
+        <table>
+          <thead><tr><th scope="col">Software layer</th><th scope="col">Required ACiM contract</th><th scope="col">Failure if hidden</th></tr></thead>
+          <tbody>
+            <tr><th scope="row">Quantizer</th><td>Group boundaries, scale format, clipping, rounding, signed policy, and sensitivity budget</td><td>Software-equivalent accuracy does not match mapped hardware.</td></tr>
+            <tr><th scope="row">Compiler IR</th><td>Logical weight digits, radix/significance, positive/negative paths, converter mode, calibration dependency</td><td>Optimization passes reorder or fuse operations illegally.</td></tr>
+            <tr><th scope="row">Mapper and scheduler</th><td>Array geometry, line limits, ADC sharing, pulse cycles, fault maps, digital engines, and synchronization</td><td>Latency, energy, and numerical behavior become unpredictable.</td></tr>
+            <tr><th scope="row">Artifact packager</th><td>Target/ABI, cell programming image, scales, range grades, commands, buffer plan, calibration version, provenance</td><td>A binary blob cannot be validated, reproduced, cached, or upgraded safely.</td></tr>
+            <tr><th scope="row">Runtime and firmware</th><td>Program/verify lifecycle, queue semantics, saturation and drift counters, refresh, reset, rollback, and fallback</td><td>Lab accuracy cannot survive deployment or field aging.</td></tr>
+            <tr><th scope="row">Debugger and profiler</th><td>Per-line current, ADC code, positional contribution, reconstructed output, timing, saturation, and calibration ID</td><td>The first divergent layer and physical cause remain invisible.</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="code-panel top-gap">
+        <header><strong>Minimum deployable-artifact sketch</strong><span>Conceptual schema, not a disclosed iHW ABI</span></header>
+        <pre><code>acim_artifact:
+  target: {device, revision, firmware_abi, compiler_version}
+  graph: {partitions, tensor_contracts, fallback_edges, debug_map}
+  weights: {cell_image, digit_radix, significance, signed_mapping}
+  numerics: {group_scales, clipping, adc_ranges, accumulators}
+  schedule: {program_steps, mvm_slices, convert, shift_add, events}
+  memory: {host_buffers, device_sram, constants, mutable_state}
+  calibration: {schema, version, temperature_window, expiry_policy}
+  provenance: {model_hash, dataset_id, options, build_id}</code></pre>
+      </div>
+    </section>
+
+    <section class="section" id="tenstorrent">
+      <div class="section-heading">
+        <p class="eyebrow">Tenstorrent reuse boundary</p>
+        <h2>Reuse compiler engineering patterns; replace the hardware meaning</h2>
+      </div>
+      <div class="card-grid">
+        <article class="learning-card">
+          <span class="card-label">Useful reference</span>
+          <h3>Frontend and infrastructure</h3>
+          <p>Model import, MLIR pass organization, differential tests, artifact versioning, runtime API patterns, CI, profiling UX, and model-corpus practices can shorten development after license and dependency review.</p>
+        </article>
+        <article class="learning-card">
+          <span class="card-label">Target-specific replacement</span>
+          <h3>Tensix execution assumptions</h3>
+          <p>Tile grids, circular buffers, NoC transfers, digital kernel scheduling, TT-Metal device semantics, UMD, and KMD do not describe cells, digit lines, ADC ranges, calibration, drift, or program/verify behavior.</p>
+        </article>
+        <article class="learning-card">
+          <span class="card-label">New backend vocabulary</span>
+          <h3>ACiM operations</h3>
+          <p>A practical backend needs concepts such as <code>program_array</code>, <code>mvm_slice</code>, <code>adc_read</code>, <code>shift_accumulate</code>, <code>calibrate</code>, <code>refresh</code>, and digital fallback.</p>
+        </article>
+      </div>
+      <div class="callout top-gap">
+        <p>
+          If Tenstorrent built this type of ACiM device, its existing discipline around explicit dataflow, compilation,
+          testing, and observability would still be valuable. The central optimization target would change from mainly
+          moving tiles between DRAM, SRAM, and core grids to jointly controlling analog error, conversion, slicing,
+          programming, calibration, and digital escape paths. See the <a href="analog-cim-tenstorrent-reuse.html">full reuse decision guide</a>.
+        </p>
+      </div>
+    </section>
+
+    <section class="section" id="review-answers">
+      <div class="section-heading">
+        <p class="eyebrow">Paper and patent review checklist</p>
+        <h2>Ten questions answered from the public iHW record</h2>
+        <p class="section-note">
+          &quot;Not disclosed&quot; is an answer. It prevents an architecture document or company statement from quietly becoming
+          evidence for a stronger accuracy or efficiency claim.
+        </p>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th scope="col">Review question</th><th scope="col">Answer for the reviewed iHW record</th><th scope="col">Confidence</th></tr></thead>
+          <tbody>
+            <tr><th scope="row">1. Fabricated silicon, device traces, or simulation?</th><td>The patents describe architectures. A company recruiting page claims 8-bit-weight ACiM silicon verification and a MobileNet demo, but no independent silicon report or raw trace set was found.</td><td><span class="status-pill status-partial">Mixed evidence</span></td></tr>
+            <tr><th scope="row">2. Did the complete validation dataset run through hardware?</th><td>Not disclosed. &quot;MobileNet demo&quot; does not establish dataset coverage, which layers ran in analog, sample count, or repeated-chip testing.</td><td><span class="status-pill status-open">Open</span></td></tr>
+            <tr><th scope="row">3. What accuracy baseline was used?</th><td>Not disclosed in the reviewed public claim. Require FP32, production digital quantized, software-equivalent ACiM, and measured silicon results on the same model and data.</td><td><span class="status-pill status-open">Open</span></td></tr>
+            <tr><th scope="row">4. Which work remained off-chip or digital?</th><td>The patent explains matrix representation and reconstruction, not complete-network placement. Activation, normalization, pooling, attention, routing, partial sums, and host work are not quantified.</td><td><span class="status-pill status-open">Open</span></td></tr>
+            <tr><th scope="row">5. How much retraining, calibration, redundancy, or refresh?</th><td>Digit slicing, range selection, and grouped quantization imply software and calibration support, but the training recipe, chip-in-loop burden, spare capacity, refresh interval, and field policy are not public.</td><td><span class="status-pill status-open">Open</span></td></tr>
+            <tr><th scope="row">6. Are energy and latency end to end?</th><td>No public end-to-end result was identified for this patent stack. Count programming, input encoding, all ADC phases, digital reconstruction, companion operations, SRAM/interconnect, host traffic, calibration, and idle power.</td><td><span class="status-pill status-open">Open</span></td></tr>
+            <tr><th scope="row">7. Accuracy across chips, PVT, defects, and time?</th><td>No public population distribution, process-corner sweep, voltage/temperature sweep, defect policy, retention curve, endurance result, or calibration-age curve was identified.</td><td><span class="status-pill status-open">Open</span></td></tr>
+            <tr><th scope="row">8. Does mitigation preserve density and efficiency?</th><td>Not automatically. Digit slices, adaptive ranges, group scales, matched signed paths, and digital recombination can move cost into cells, lines, converters, cycles, metadata, calibration, or digital logic.</td><td><span class="status-pill status-conditional">Conditional</span></td></tr>
+            <tr><th scope="row">9. Inference, training, or both?</th><td>The reviewed architecture is most directly supported as an inference-weight path. Static inference weights avoid the update-linearity and endurance burden of on-chip training; do not treat the patents as training proof.</td><td><span class="status-pill status-partial">Inference focus</span></td></tr>
+            <tr><th scope="row">10. Can it scale to the target model?</th><td>Not established for large LLM parameter counts, irregular tensor shapes, long context, KV-cache traffic, attention, communication, or multi-chip execution. A 4-bit LLM weight format alone does not answer these system questions.</td><td><span class="status-pill status-open">Open</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="section" id="due-diligence">
+      <div class="section-heading">
+        <p class="eyebrow">Interview and technical due diligence</p>
+        <h2>Questions that turn patent language into a product contract</h2>
+      </div>
+      <div class="proof-grid">
+        <article><b>Precision</b><strong>What exactly is 8-bit?</strong><p>Logical weights after reconstruction, cell states, ADC output, accumulator, software-equivalent model, or measured effective precision?</p></article>
+        <article><b>Physical cost</b><strong>How many resources per MAC?</strong><p>Report cells, lines, ADCs, read phases, input pulses, shift-add operations, and spare capacity.</p></article>
+        <article><b>Implementation</b><strong>Which claims are in silicon?</strong><p>Separate the granted core patent from pending ADC, quantization, and signed-weight applications and identify the implemented revision.</p></article>
+        <article><b>Accuracy</b><strong>Where is the full ablation?</strong><p>Compare FP32, digital INT8/INT4, software ACiM, measured raw ACiM, calibrated ACiM, and hybrid fallback.</p></article>
+        <article><b>Population</b><strong>What are the tails?</strong><p>Ask for lot count, chip count, weak arrays, rejected devices, remapping rate, yield, and worst-case accuracy.</p></article>
+        <article><b>Lifecycle</b><strong>Who owns calibration?</strong><p>Define factory, boot, thermal, periodic, workload, aging, refresh, rollback, and field-update responsibilities.</p></article>
+        <article><b>System</b><strong>What remains digital?</strong><p>Quantify analog coverage, unsupported operators, transfer boundaries, digital correction, SRAM, DRAM, and host work.</p></article>
+        <article><b>Software</b><strong>What is the stable ABI?</strong><p>Inspect importer, IR, compiler, simulator, artifact, runtime, firmware, driver, profiler, debugger, and version negotiation.</p></article>
+      </div>
+    </section>
+
+    <section class="section" id="final-verdict">
+      <div class="section-heading">
+        <p class="eyebrow">Final assessment</p>
+        <h2>Technically plausible, complementary, and still evidence-limited</h2>
+      </div>
+      <div class="callout verdict">
+        <p>
+          The core iHW grant solves a narrower and more defensible problem than &quot;analog accuracy&quot;: it reduces reliance
+          on fragile high-level-count cells by moving precision into positional representation and digital reconstruction.
+          The pending ADC, grouped-quantization, and signed-current ideas address important adjacent costs. This is a
+          coherent hardware/software strategy. It becomes a product-level accuracy solution only when the company shows
+          complete models, analog coverage, correction cost, chip distributions, PVT and lifetime behavior, yield, and
+          end-to-end energy and latency against clear digital baselines.
+        </p>
+      </div>
+    </section>
+
+    <section class="section" id="sources">
+      <div class="section-heading">
+        <p class="eyebrow">Sources</p>
+        <h2>Patent records first; company claims labeled separately</h2>
+      </div>
+      <div class="source-grid">
+        <article class="source-card"><a href="https://patents.google.com/patent/US12586636B2/en">US 12,586,636 B2</a><span>Granted core patent: positional output-line significance, analog accumulation, digital reconstruction, mixed-radix reliability, signed paths, and input encoding.</span></article>
+        <article class="source-card"><a href="https://patentsgazette.uspto.gov/week12/OG/html/1544-4/US12586636-20260324.html">USPTO Official Gazette entry</a><span>Official March 24, 2026 grant record for the hybrid computing method and neuromorphic system.</span></article>
+        <article class="source-card"><a href="https://patents.google.com/patent/US20250348726A1/en">US 2025/0348726 A1</a><span>Pending adaptive output-range application covering current grading and selectable conversion or ADC settings.</span></article>
+        <article class="source-card"><a href="https://patents.google.com/patent/US20250348716A1/en">US 2025/0348716 A1</a><span>Pending grouped weight-quantization application with group-specific scaling and dequantization.</span></article>
+        <article class="source-card"><a href="https://patents.justia.com/patent/20260023963">US 2026/0023963 A1</a><span>Pending signed-weight application using alternating positive and negative split-gate cells and pre-ADC current cancellation.</span></article>
+        <article class="source-card"><a href="https://patents.google.com/patent/US20260024581A1/en">US 2026/0024581 A1</a><span>Pending signed-weight array arrangement with changed line directions and paired read modes.</span></article>
+        <article class="source-card"><a href="https://patents.justia.com/patent/12268104">US 12,268,104 B2</a><span>Granted chalcogenide memory composition and operating method; a separate device-level path rather than proof of the flash ACiM implementation.</span></article>
+        <article class="source-card"><a href="https://www.wanted.co.kr/wd/372180">iHW recruiting and company profile</a><span>Company-originated 8-bit-weight ACiM silicon, MobileNet demonstration, and patent-count statements. Treat as claims pending independent evidence.</span></article>
+        <article class="source-card"><a href="analog-cim-evidence.html">Analog CIM evidence review</a><span>Independent paper checklist, measured-silicon evidence, accuracy limits, and claims that should not be generalized across devices.</span></article>
+        <article class="source-card"><a href="analog-cim-tenstorrent-reuse.html">Tenstorrent reuse decision guide</a><span>Component-level study, adapt, reuse, and replace decisions for an ACiM compiler and runtime.</span></article>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <p>Source-critical iHW patent study. Patent status, company statements, and engineering inference are labeled separately.</p>
+    <div class="footer-links">
+      <a href="npu.html#analog-cim">Back to the NPU learning path</a>
+      <a href="https://github.com/buicongnguyen/NPU">Source</a>
+    </div>
+  </footer>
+</body>
+</html>

@@ -143,11 +143,12 @@
     <section id="analog-cim" class="section">
       <div class="section-heading">
         <p class="eyebrow">Analog compute-in-memory case study</p>
-        <h2>Mythic Architecture, Accuracy Evidence, Acquisition Strategy, and NPU Engineering</h2>
+        <h2>Mythic and iHW Architectures, Accuracy Evidence, and NPU Engineering</h2>
         <p class="section-note">
           A separate learning path traces Mythic's flash-based matrix engine from device physics through ADCs,
           tile dataflow, quantization, and graph compilation. It also audits Nature-family accuracy claims and keeps
-          measured results distinct from vendor roadmap statements, including the 2026 Videantis acquisition.
+          measured results distinct from vendor roadmap statements, including the 2026 Videantis acquisition and
+          iHW's positional digit-slice, adaptive-ADC, grouped-quantization, and signed-weight patent stack.
         </p>
       </div>
       <div class="evidence-grid compact">
@@ -174,6 +175,12 @@
           <h3>Why did Mythic acquire Videantis?</h3>
           <p>Audit Mythic's disclosed accuracy techniques, identify what Videantis adds to the digital half, score the build-versus-buy decision, and define the evidence still needed.</p>
           <a href="analog-cim-mythic-videantis.html">Open Mythic and Videantis study</a>
+        </article>
+        <article>
+          <span>Patent deep read</span>
+          <h3>How does iHW claim to improve ACiM accuracy?</h3>
+          <p>Trace positional digit-sliced weights, adaptive ADC range, grouped quantization, signed-current cancellation, their software consequences, and the product evidence still missing.</p>
+          <a href="analog-cim-ihw-patents.html">Open iHW patent study</a>
         </article>
         <article>
           <span>Reuse decision</span>
