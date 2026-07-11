@@ -312,11 +312,12 @@ I[k,j]    analog output current for significance slice k</code></pre>
     <section class="section" id="software">
       <div class="section-heading">
         <p class="eyebrow">Compiler and runtime consequences</p>
-        <h2>The backend must expose the physical accuracy contract</h2>
+        <h2>Build the toolchain around a physical accuracy contract</h2>
         <p class="section-note">
           A target-neutral frontend can still import PyTorch, ONNX, or StableHLO. The ACiM backend cannot pretend the
           device is an ordinary digital matrix unit: placement, digit significance, converter range, calibration, and
-          reconstruction are part of executable semantics.
+          reconstruction are part of executable semantics. The design below is a proposed production toolchain, not a
+          disclosure of iHW's internal software.
         </p>
       </div>
       <div class="engineering-flow six" aria-label="iHW-style ACiM compiler and runtime flow">
@@ -326,6 +327,149 @@ I[k,j]    analog output current for significance slice k</code></pre>
         <article class="flow-step"><b>Package</b><strong>Executable artifact</strong><span>Carry weight images, commands, scales, range tables, calibration, and debug maps.</span></article>
         <article class="flow-step"><b>Execute</b><strong>Program and infer</strong><span>Validate ABI, bind buffers, issue MVM slices, read ADCs, and reconstruct.</span></article>
         <article class="flow-step"><b>Maintain</b><strong>Observe and recover</strong><span>Track saturation, drift, faults, refresh, recalibration, and fallback.</span></article>
+      </div>
+
+      <div class="section-heading top-gap">
+        <h3>Four compile inputs define one reproducible deployment</h3>
+        <p class="section-note">A model file alone is insufficient because two chips of the same product can have different usable arrays, calibration state, and numerical limits.</p>
+      </div>
+      <div class="formula-grid">
+        <article class="formula-card"><strong>Model contract</strong><code>graph + tensors</code><span>Operations, shapes, dynamic dimensions, dtypes, constants, control flow, ranges, and reference outputs.</span></article>
+        <article class="formula-card"><strong>Deployment policy</strong><code>quality + service goals</code><span>Accuracy floor, latency percentile, power mode, batch, analog coverage target, fallback allowance, and model lifetime.</span></article>
+        <article class="formula-card"><strong>Target descriptor</strong><code>device + ABI</code><span>Array geometry, memory, NoC, digital engines, ADC sharing, pulse modes, firmware features, and command limits.</span></article>
+        <article class="formula-card"><strong>Characterization database</strong><code>measured transfer model</code><span>Per-array gain, offset, noise, saturation, IR-drop model, weak cells, PVT curves, drift, and calibration validity.</span></article>
+      </div>
+
+      <div class="section-heading top-gap">
+        <p class="eyebrow">Multi-level IR</p>
+        <h3>Keep graph meaning separate from physical array decisions</h3>
+        <p class="section-note">
+          A staged MLIR design allows target-neutral optimization to finish before hardware commitments become explicit.
+          Each lowering boundary should make previously implicit numerical behavior visible and verifiable.
+        </p>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th scope="col">IR level</th><th scope="col">What it represents</th><th scope="col">Required ACiM information</th><th scope="col">Examples of legal transformations</th></tr></thead>
+          <tbody>
+            <tr><th scope="row">Framework IR</th><td>PyTorch export, ONNX, StableHLO, or another frontend graph</td><td>Framework semantics, symbolic shapes, constants, state, and reference numerics</td><td>Constant folding, shape inference, canonicalization, and framework decomposition</td></tr>
+            <tr><th scope="row">ACiM graph IR</th><td>Target-independent tensor operations plus support and sensitivity annotations</td><td>Candidate precision, error budget, legal fallback, calibration dataset identity, and fusion barriers</td><td>Operator decomposition, algebraic simplification, fusion, layout-neutral partitioning, and quantization preparation</td></tr>
+            <tr><th scope="row">ACiM tensor IR</th><td>Analog and digital partitions with explicit tensor layouts and scale domains</td><td>Group scales, clipping, signed representation, partial-sum format, residency, and conversion boundaries</td><td>Scale propagation, requantization removal, channel grouping, tiling, sharding, and buffer reuse</td></tr>
+            <tr><th scope="row">ACiM physical IR</th><td>Logical tensors placed onto physical cells, lines, converters, and digital units</td><td>Digit/radix slices, positive and negative paths, fault remap, ADC grade, input pulses, and calibration key</td><td>Array packing, slice co-location, spare substitution, ADC assignment, phase merging, and digital residual placement</td></tr>
+            <tr><th scope="row">Command IR</th><td>Firmware-visible queues, dependencies, synchronization, and state transitions</td><td>Program/verify, MVM phase, convert, shift-add, DMA, barrier, health check, refresh, and fallback commands</td><td>Command fusion, asynchronous overlap, double buffering, converter pipelining, and event elimination</td></tr>
+            <tr><th scope="row">Executable artifact</th><td>Versioned binary delivered to the runtime</td><td>Target contract, cell image, command streams, buffers, calibration schema, debug maps, and provenance</td><td>Serialization, signing, compatibility validation, caching, and deterministic rebuild comparison</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="section-heading top-gap">
+        <p class="eyebrow">Pass pipeline</p>
+        <h3>The backend should fail early, then lower in measurable steps</h3>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th scope="col">Order</th><th scope="col">Compiler pass</th><th scope="col">Main decision</th><th scope="col">Emitted evidence</th></tr></thead>
+          <tbody>
+            <tr><th scope="row">1</th><td>Import and semantic normalization</td><td>Resolve framework-specific operators into a stable supported operation set without changing model meaning.</td><td>Importer diagnostics, normalized graph, unsupported semantic list, and reference tensor names</td></tr>
+            <tr><th scope="row">2</th><td>Shape, range, and sensitivity analysis</td><td>Infer symbolic shapes and collect activation ranges, outliers, per-layer error sensitivity, and representative data coverage.</td><td>Range histograms, sensitivity score, calibration dataset hash, and dynamic-shape constraints</td></tr>
+            <tr><th scope="row">3</th><td>Capability and legality analysis</td><td>Enumerate analog, digital, and host implementations for every operation and reject impossible tensor shapes or modes.</td><td>Support report with reason codes and the legal implementation set per operation</td></tr>
+            <tr><th scope="row">4</th><td>Quantization and scale-domain planning</td><td>Select group boundaries, weight/activation precision, clipping, rounding, accumulator width, and dequantization placement.</td><td>Quantization manifest and software-equivalent accuracy result</td></tr>
+            <tr><th scope="row">5</th><td>Analog/digital partitioning</td><td>Choose ACiM regions only when saved movement and MVM time exceed conversion, correction, and boundary costs.</td><td>Partition graph, analog coverage, fallback edges, and boundary tensor costs</td></tr>
+            <tr><th scope="row">6</th><td>Weight decomposition</td><td>Convert each logical weight into radix digits, significance slices, and signed paths under reliability constraints.</td><td>Logical-to-physical weight map with reconstruction equation</td></tr>
+            <tr><th scope="row">7</th><td>Array placement and fault remap</td><td>Pack slices into arrays while respecting geometry, weak-cell maps, current limits, locality, and spare capacity.</td><td>Array occupancy, rejected capacity, remap table, and utilization report</td></tr>
+            <tr><th scope="row">8</th><td>ADC and phase planning</td><td>Select range grade, converter sharing, one- or multi-phase reads, repeated sensitive reads, and saturation guard bands.</td><td>Per-output conversion plan, predicted ENOB/error, phases, and saturation risk</td></tr>
+            <tr><th scope="row">9</th><td>Memory and schedule planning</td><td>Allocate SRAM and host buffers; overlap input encoding, MVM, conversion, shift-add, digital work, DMA, and NoC traffic.</td><td>Static arena, queue schedule, lifetime graph, bandwidth estimate, and critical path</td></tr>
+            <tr><th scope="row">10</th><td>Calibration binding</td><td>Bind placement to a compatible calibration class or a specific device calibration without embedding stale measurements blindly.</td><td>Calibration requirements, accepted versions, temperature window, and expiry policy</td></tr>
+            <tr><th scope="row">11</th><td>Command lowering and packaging</td><td>Generate firmware descriptors, program images, digital kernels, debug correlation IDs, and ABI-versioned metadata.</td><td>Inspectable artifact plus deterministic build manifest</td></tr>
+            <tr><th scope="row">12</th><td>Differential verification</td><td>Compare framework, quantized, physical-simulator, RTL/model, and silicon checkpoints at graph boundaries.</td><td>Accuracy deltas, first divergent operation, tolerance decision, and release gate result</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="section-heading top-gap">
+        <p class="eyebrow">Candidate search</p>
+        <h3>Optimize latency and energy under an explicit error constraint</h3>
+      </div>
+      <div class="code-panel">
+        <header><strong>Conceptual cost model</strong><span>Measured coefficients should replace hand-tuned guesses</span></header>
+        <pre><code>minimize candidate_cost =
+    latency_weight       * predicted_latency
+  + energy_weight        * predicted_energy
+  + boundary_weight      * analog_digital_transfer
+  + programming_weight   * weight_program_cost
+  + wear_weight          * expected_refresh_and_endurance_cost
+  + risk_weight          * numerical_uncertainty
+
+subject to:
+  predicted_accuracy_loss &lt;= deployment.error_budget
+  array_current           &lt;= adc_range_limit
+  buffers                 &lt;= available_sram
+  cells + spares          &lt;= usable_array_capacity
+  phases                  &lt;= latency_policy.max_phases
+  calibration             is compatible and not expired
+  firmware_abi            supports every emitted command</code></pre>
+      </div>
+      <div class="formula-grid top-gap">
+        <article class="formula-card"><strong>Latency</strong><code>T = phases x read + ADC + digital + NoC</code><span>Use measured queue overlap and contention, not a sum of isolated peak timings.</span></article>
+        <article class="formula-card"><strong>Energy</strong><code>E = input + array + ADC + SRAM + NoC</code><span>Include calibration, refresh, fallback, idle power, and converter under-utilization.</span></article>
+        <article class="formula-card"><strong>Error risk</strong><code>R = quant + cell + wire + ADC + drift</code><span>Combine characterized distributions and model sensitivity rather than nominal bit counts.</span></article>
+        <article class="formula-card"><strong>Coverage</strong><code>C = useful analog work / total work</code><span>Report actual model coverage after fallback and boundary operations.</span></article>
+      </div>
+
+      <div class="section-heading top-gap">
+        <p class="eyebrow">Physical operation contract</p>
+        <h3>One MVM operation needs more attributes than shape and dtype</h3>
+      </div>
+      <div class="code-panel">
+        <header><strong>Illustrative ACiM IR</strong><span>Proposed syntax, not an iHW or Tenstorrent interface</span></header>
+        <pre><code>%result = acim.mvm %activation, %weight_image {
+  logical_type      = i8,
+  activation_mode   = #acim.pulse&lt;bits = 4, phases = 2&gt;,
+  weight_digits     = [#acim.digit&lt;radix = 4, significance = 1&gt;,
+                       #acim.digit&lt;radix = 2, significance = 4&gt;],
+  signed_mapping    = #acim.differential&lt;positive = 12, negative = 13&gt;,
+  placement         = #acim.array&lt;tile = [3, 2], rows = 0:128, cols = 0:64&gt;,
+  adc               = #acim.adc&lt;grade = 2, bits = 6, saturation_guard = 0.12&gt;,
+  accumulator       = #acim.accum&lt;i24, round = nearest_even, saturate = true&gt;,
+  calibration_key   = "family7/revB/tile3x2/class4",
+  fallback          = #acim.digital&lt;engine = vector1, trigger = saturation&gt;
+} : tensor&lt;1x128xi4&gt; -&gt; tensor&lt;1x64xi24&gt;</code></pre>
+      </div>
+
+      <div class="section-heading top-gap">
+        <p class="eyebrow">Tool suite</p>
+        <h3>The compiler is one tool inside a closed measurement loop</h3>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th scope="col">Tool</th><th scope="col">Purpose</th><th scope="col">Required output</th></tr></thead>
+          <tbody>
+            <tr><th scope="row"><code>acim-import</code></th><td>Import and normalize ONNX, StableHLO, or framework export while retaining source locations.</td><td>Graph IR, support diagnostics, shape constraints, and reference tensor manifest</td></tr>
+            <tr><th scope="row"><code>acim-characterize</code></th><td>Turn wafer, production, and lab measurements into signed target profiles.</td><td>Versioned per-family and per-device transfer models, PVT curves, fault maps, and confidence intervals</td></tr>
+            <tr><th scope="row"><code>acim-calibrate</code></th><td>Collect representative activation ranges and optionally run hardware-in-loop measurements.</td><td>Dataset hash, ranges, clipping choices, sensitivity metrics, and calibration provenance</td></tr>
+            <tr><th scope="row"><code>acim-opt</code></th><td>Run IR verification, quantization, partitioning, mapping, scheduling, and command lowering passes.</td><td>Intermediate IR dumps, pass statistics, candidate comparison, and selected plan</td></tr>
+            <tr><th scope="row"><code>acim-sim</code></th><td>Execute functional, statistical analog, cycle, and command-level models through one API.</td><td>Outputs, error distributions, saturation events, cycles, bytes, and model-version identity</td></tr>
+            <tr><th scope="row"><code>acim-pack</code></th><td>Serialize cell images, commands, metadata, digital kernels, and debug maps.</td><td>Signed and inspectable executable artifact with target and ABI compatibility fields</td></tr>
+            <tr><th scope="row"><code>acim-run</code></th><td>Load, validate, program, execute, and collect structured runtime results.</td><td>Result tensors, health state, calibration ID, timing, faults, and recovery actions</td></tr>
+            <tr><th scope="row"><code>acim-prof</code></th><td>Correlate graph operations with arrays, converter phases, queues, SRAM, NoC, and digital fallback.</td><td>Timeline, utilization, bandwidth, phase count, converter occupancy, and critical path</td></tr>
+            <tr><th scope="row"><code>acim-debug</code></th><td>Stop at operation boundaries and compare logical, quantized, simulated, and measured tensors.</td><td>First divergence, per-slice ADC values, reconstruction trace, and source-level location</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="section-heading top-gap">
+        <p class="eyebrow">Validation ladder</p>
+        <h3>One operation should run through every model with the same artifact semantics</h3>
+      </div>
+      <div class="proof-grid">
+        <article><b>Level 1</b><strong>Framework reference</strong><p>Capture deterministic tensors and source locations before quantization.</p></article>
+        <article><b>Level 2</b><strong>Quantized reference</strong><p>Prove scales, clipping, rounding, saturation, and accumulator behavior in software.</p></article>
+        <article><b>Level 3</b><strong>Statistical analog model</strong><p>Inject measured cell, wire, converter, temperature, and drift distributions.</p></article>
+        <article><b>Level 4</b><strong>Cycle and command model</strong><p>Validate resource conflicts, phases, buffers, dependencies, timeout, and recovery.</p></article>
+        <article><b>Level 5</b><strong>RTL or C++ model</strong><p>Correlate command fields, fixed-point arithmetic, interrupts, and firmware state.</p></article>
+        <article><b>Level 6</b><strong>Single-array silicon</strong><p>Compare per-line ADC values and reconstructed outputs against characterization.</p></article>
+        <article><b>Level 7</b><strong>Full-chip silicon</strong><p>Measure contention, thermal gradients, cross-array spread, fallback, and PVT tails.</p></article>
+        <article><b>Level 8</b><strong>Model release gate</strong><p>Require full-dataset accuracy, latency percentiles, energy, coverage, and lifetime policy.</p></article>
       </div>
 
       <div class="table-wrap top-gap">
@@ -346,13 +490,14 @@ I[k,j]    analog output current for significance slice k</code></pre>
         <header><strong>Minimum deployable-artifact sketch</strong><span>Conceptual schema, not a disclosed iHW ABI</span></header>
         <pre><code>acim_artifact:
   target: {device, revision, firmware_abi, compiler_version}
-  graph: {partitions, tensor_contracts, fallback_edges, debug_map}
-  weights: {cell_image, digit_radix, significance, signed_mapping}
-  numerics: {group_scales, clipping, adc_ranges, accumulators}
-  schedule: {program_steps, mvm_slices, convert, shift_add, events}
+  graph: {partitions, tensor_contracts, fallback_edges, source_debug_map}
+  weights: {cell_image, digit_radix, significance, signed_mapping, fault_remap}
+  numerics: {group_scales, clipping, adc_ranges, accumulators, error_budget}
+  schedule: {program_steps, mvm_slices, convert, shift_add, dma, events}
   memory: {host_buffers, device_sram, constants, mutable_state}
-  calibration: {schema, version, temperature_window, expiry_policy}
-  provenance: {model_hash, dataset_id, options, build_id}</code></pre>
+  calibration: {schema, accepted_classes, version, temperature_window, expiry_policy}
+  recovery: {saturation_action, weak_array_action, timeout_action, digital_fallback}
+  provenance: {model_hash, dataset_id, target_profile_hash, options, build_id}</code></pre>
       </div>
     </section>
 
@@ -377,6 +522,36 @@ I[k,j]    analog output current for significance slice k</code></pre>
           <h3>ACiM operations</h3>
           <p>A practical backend needs concepts such as <code>program_array</code>, <code>mvm_slice</code>, <code>adc_read</code>, <code>shift_accumulate</code>, <code>calibrate</code>, <code>refresh</code>, and digital fallback.</p>
         </article>
+      </div>
+      <div class="table-wrap top-gap">
+        <table>
+          <thead><tr><th scope="col">Tenstorrent component or pattern</th><th scope="col">Initial decision</th><th scope="col">ACiM use</th><th scope="col">Required change</th></tr></thead>
+          <tbody>
+            <tr><th scope="row">MLIR infrastructure and TTIR layering</th><td><span class="status-pill status-partial">Adapt</span></td><td>Preserve a high-level tensor IR, source locations, pass pipelines, verification, and dialect conversion structure.</td><td>Define target-neutral ACiM graph semantics rather than importing TTNN layouts or Tensix execution meaning.</td></tr>
+            <tr><th scope="row">TTNN optimizer pattern</th><td><span class="status-pill status-partial">Adapt</span></td><td>Generate legal per-operation candidates and select layouts/configurations with an operation model.</td><td>Add precision, ADC, characterization, phase, wear, fault-map, calibration, and fallback dimensions to the search.</td></tr>
+            <tr><th scope="row">System descriptor and device attributes</th><td><span class="status-pill status-partial">Adapt</span></td><td>Cross-compile against a captured physical target and validate executable compatibility at runtime.</td><td>Describe arrays, converters, pulse modes, digital companions, calibration classes, firmware commands, and health capabilities.</td></tr>
+            <tr><th scope="row">FlatBuffer and <code>ttrt</code> pattern</th><td><span class="status-pill status-partial">Adapt</span></td><td>Use versioned, inspectable artifacts plus read, run, check, perf, and debug tools.</td><td>Serialize cell images, reconstruction plans, calibration requirements, recovery policy, and physical debug correlation.</td></tr>
+            <tr><th scope="row">TT-Explorer workflow</th><td><span class="status-pill status-partial">Adapt</span></td><td>Visualize graphs, compiler overrides, execution traces, memory, and operation results.</td><td>Add array maps, digit slices, ADC phases, error budget, saturation, drift, faults, and analog coverage views.</td></tr>
+            <tr><th scope="row">TTNN, TTMetal, and TTKernel dialect semantics</th><td><span class="status-pill status-conditional">Study only</span></td><td>Learn explicit layouts, dataflow, queues, kernels, synchronization, and performance engineering.</td><td>Replace Tensix-specific operations with program, pulse, MVM, convert, reconstruct, calibrate, refresh, and fallback operations.</td></tr>
+            <tr><th scope="row">Metalium device runtime, UMD, and KMD</th><td><span class="status-pill status-open">Replace</span></td><td>Reuse only proven target-neutral utilities after license and dependency review.</td><td>Implement the ACiM command ABI, DMA, interrupts, isolation, power, reset, programming, health, and recovery stack.</td></tr>
+            <tr><th scope="row">IBM AIHWKit concepts</th><td><span class="status-pill status-partial">Reference</span></td><td>Model device variation, ADC/DAC bounds, noise, hardware-aware training, input scaling, and analog inference.</td><td>Calibrate models to iHW silicon and connect simulator parameters to compiler IR, target profiles, and release thresholds.</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="code-panel top-gap">
+        <header><strong>Suggested repository ownership</strong><span>Keep physical policy out of framework frontends</span></header>
+        <pre><code>acim-toolchain/
+  frontend/          ONNX, StableHLO, and framework import adapters
+  dialect/           Graph, tensor, physical, and command IR definitions
+  analysis/          Shape, range, sensitivity, legality, and error propagation
+  optimizer/         Candidate generation, cost model, partition, map, schedule
+  target/            System descriptors and characterization database schemas
+  codegen/           Firmware commands, digital kernels, and artifact serialization
+  simulator/         Functional, statistical analog, cycle, and command models
+  runtime/           Session, buffers, queues, programming, health, and recovery
+  firmware/          Descriptor validation, scheduling, telemetry, reset, and refresh
+  tools/             Import, characterize, calibrate, inspect, run, profile, and debug
+  tests/             IR, golden, differential, silicon, PVT, aging, and model suites</code></pre>
       </div>
       <div class="callout top-gap">
         <p>
@@ -453,7 +628,7 @@ I[k,j]    analog output current for significance slice k</code></pre>
     <section class="section" id="sources">
       <div class="section-heading">
         <p class="eyebrow">Sources</p>
-        <h2>Patent records first; company claims labeled separately</h2>
+        <h2>Patent records and primary toolchain documentation; company claims labeled separately</h2>
       </div>
       <div class="source-grid">
         <article class="source-card"><a href="https://patents.google.com/patent/US12586636B2/en">US 12,586,636 B2</a><span>Granted core patent: positional output-line significance, analog accumulation, digital reconstruction, mixed-radix reliability, signed paths, and input encoding.</span></article>
@@ -464,6 +639,13 @@ I[k,j]    analog output current for significance slice k</code></pre>
         <article class="source-card"><a href="https://patents.google.com/patent/US20260024581A1/en">US 2026/0024581 A1</a><span>Pending signed-weight array arrangement with changed line directions and paired read modes.</span></article>
         <article class="source-card"><a href="https://patents.justia.com/patent/12268104">US 12,268,104 B2</a><span>Granted chalcogenide memory composition and operating method; a separate device-level path rather than proof of the flash ACiM implementation.</span></article>
         <article class="source-card"><a href="https://www.wanted.co.kr/wd/372180">iHW recruiting and company profile</a><span>Company-originated 8-bit-weight ACiM silicon, MobileNet demonstration, and patent-count statements. Treat as claims pending independent evidence.</span></article>
+        <article class="source-card"><a href="https://docs.tenstorrent.com/tt-mlir/overview.html">TT-MLIR architecture and dialect overview</a><span>Official TTIR, TTNN, D2M, TTKernel, and TTMetal layering used as a compiler-architecture reference, not as an ACiM target definition.</span></article>
+        <article class="source-card"><a href="https://docs.tenstorrent.com/tt-mlir/optimizer.html">TT-MLIR optimizer</a><span>Official legal-layout generation, operation-model integration, memory-layout analysis, and configuration search used to motivate ACiM candidate selection.</span></article>
+        <article class="source-card"><a href="https://docs.tenstorrent.com/tt-mlir/specs/device.html">TT-MLIR device representation</a><span>Official system descriptor, logical/physical grid, and target-lowering concepts used as a cross-compilation reference.</span></article>
+        <article class="source-card"><a href="https://docs.tenstorrent.com/tt-mlir/flatbuffers.html">TT-MLIR FlatBuffer formats</a><span>Official target description and compiled-artifact formats used as a versioned packaging reference.</span></article>
+        <article class="source-card"><a href="https://docs.tenstorrent.com/tt-mlir/ttrt.html">Tenstorrent runtime tool</a><span>Official inspect, run, query, performance, checking, golden-tensor, debugger, and strict-versioning workflow used as a tool-suite reference.</span></article>
+        <article class="source-card"><a href="https://github.com/IBM/aihwkit">IBM Analog Hardware Acceleration Kit</a><span>Open-source analog device simulation, ADC/DAC bounds, statistical noise, input scaling, hardware-aware training, and inference concepts.</span></article>
+        <article class="source-card"><a href="https://mlir.llvm.org/docs/DialectConversion/">MLIR dialect conversion</a><span>Official conversion-target, legality, rewrite-pattern, and type-conversion infrastructure supporting staged lowering.</span></article>
         <article class="source-card"><a href="analog-cim-evidence.html">Analog CIM evidence review</a><span>Independent paper checklist, measured-silicon evidence, accuracy limits, and claims that should not be generalized across devices.</span></article>
         <article class="source-card"><a href="analog-cim-tenstorrent-reuse.html">Tenstorrent reuse decision guide</a><span>Component-level study, adapt, reuse, and replace decisions for an ACiM compiler and runtime.</span></article>
       </div>
