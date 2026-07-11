@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="A detailed implementation guide for bringing up a PCIe Analog CIM board: host and device requirements, UMD/KMD boundaries, BAR and queue contracts, DMA and MSI-X ordering, firmware boot, YOLO dataflow, calibration, recovery, security, tests, and staged delivery.">
+  <meta name="description" content="A detailed implementation guide for testing and bringing up an Analog CIM system: QEMU and co-simulation boundaries, host and device images, SD-card deployment, UMD/KMD communication, firmware boot, PCIe DMA and MSI-X, correlated logs, diagnosis, YOLO, and staged qualification.">
   <title>Analog CIM Board Bring-Up | NPU Study Guide</title>
   <link rel="stylesheet" href="analog-cim.css">
   <link rel="stylesheet" href="npu-engineering.css">
@@ -33,7 +33,7 @@
   <main>
     <section class="hero">
       <div class="hero-copy">
-        <p class="eyebrow">Implementation guide | reviewed 2026-07-11</p>
+        <p class="eyebrow">Implementation guide | reviewed 2026-07-12</p>
         <h1>Analog CIM Board Bring-Up: <abbr class="term" title="You Only Look Once object-detection model family">YOLO</abbr>, <abbr class="term" title="Peripheral Component Interconnect Express">PCIe</abbr>, <abbr class="term" title="User-Mode Driver">UMD</abbr>, <abbr class="term" title="Kernel-Mode Driver">KMD</abbr>, and Firmware</h1>
         <p class="lede">
           This is the missing bridge between a compiled <code>.acx</code> artifact and a controlled physical board. It
@@ -46,6 +46,7 @@
           <a class="button" href="#decision">Choose the driver path</a>
           <a class="button secondary" href="#terminology">Terminology</a>
           <a class="button secondary" href="#system">Trace the system</a>
+          <a class="button secondary" href="#full-chain">Test the whole chain</a>
           <a class="button secondary" href="#pcie">Implement PCIe</a>
           <a class="button secondary" href="#delivery">Open the delivery plan</a>
         </div>
@@ -105,6 +106,11 @@
           <span>A proposed YOLO compile, program, execute, postprocess, profile, and accuracy-correlation path with analog and digital placement gates.</span>
           <a href="#yolo">Open YOLO dataflow</a>
         </article>
+        <article class="gap-item missing">
+          <strong>Added: whole-chain verification</strong>
+          <span>Choose PCIe-card or embedded-SoC deployment; build the correct host, driver, firmware, and model artifacts; use QEMU only for modeled hardware; correlate host/device logs; and stop at explicit gates before advancing.</span>
+          <a href="#full-chain">Open the full-chain procedure</a>
+        </article>
       </div>
     </section>
 
@@ -125,6 +131,7 @@
         <a href="#terms-compiler">Models and compiler</a>
         <a href="#terms-pcie">Host and device I/O</a>
         <a href="#terms-hardware">Digital hardware</a>
+        <a href="#terms-boot-sim">Boot, simulation, and debug</a>
         <a href="#terms-analog">Analog and numerics</a>
         <a href="#terms-license">Licensing and provenance</a>
       </nav>
@@ -268,6 +275,22 @@
             <div class="term-entry" id="term-h2d"><dt><abbr class="term" title="Host-to-Device">H2D</abbr></dt><dd><strong>Host-to-Device transfer</strong><span>Inputs, commands, constants, or firmware moving from host memory to the accelerator.</span></dd></div>
             <div class="term-entry" id="term-d2h"><dt><abbr class="term" title="Device-to-Host">D2H</abbr></dt><dd><strong>Device-to-Host transfer</strong><span>Outputs, traces, or status moving from the accelerator to host memory.</span></dd></div>
             <div class="term-entry" id="term-sku"><dt><abbr class="term" title="Stock Keeping Unit">SKU</abbr></dt><dd><strong>Stock Keeping Unit</strong><span>A sellable board or device configuration with a defined chip count, memory, power envelope, firmware support, and qualification status.</span></dd></div>
+          </dl>
+        </section>
+
+        <section class="term-group" aria-labelledby="terms-boot-sim">
+          <h3 id="terms-boot-sim">Boot, system images, simulation, and low-level debug</h3>
+          <dl class="term-grid">
+            <div class="term-entry" id="term-qemu"><dt>QEMU</dt><dd><strong>Machine emulator and virtualizer</strong><span>System emulation runs a guest CPU, memory, and only the devices implemented by the selected QEMU machine. A generic Arm or RISC-V <code>virt</code> board does not automatically contain an ACiM endpoint.</span></dd></div>
+            <div class="term-entry" id="term-bsp"><dt><abbr class="term" title="Board Support Package">BSP</abbr></dt><dd><strong>Board Support Package</strong><span>The bootloader, kernel configuration, device tree, drivers, firmware, root-filesystem integration, and build metadata needed to boot a specific board.</span></dd></div>
+            <div class="term-entry" id="term-bootloader"><dt>Bootloader</dt><dd><strong>Software that starts the host operating system</strong><span>Initializes enough platform hardware to select and load the host Linux kernel, device tree, and optional initramfs. It is separate from ACiM controller firmware.</span></dd></div>
+            <div class="term-entry" id="term-rootfs"><dt>Rootfs</dt><dd><strong>Root filesystem</strong><span>The Linux userspace image containing libraries, configuration, UMD, runtime, tools, services, and applications. An initramfs is a rootfs held in memory during early boot.</span></dd></div>
+            <div class="term-entry" id="term-cross-compile"><dt>Cross-compile</dt><dd><strong>Build on one architecture for another</strong><span>For example, build Arm64 Linux userspace on an x86 workstation or RISC-V controller firmware with a freestanding target toolchain and linker script.</span></dd></div>
+            <div class="term-entry" id="term-jtag"><dt><abbr class="term" title="Joint Test Action Group">JTAG</abbr></dt><dd><strong>Board-level debug and programming interface</strong><span>Lets a debugger halt a supported target, inspect registers and memory, and load or flash images through a tool such as OpenOCD. It is a bring-up path, not the normal application transport.</span></dd></div>
+            <div class="term-entry" id="term-remoteproc"><dt><code>remoteproc</code></dt><dd><strong>Linux remote-processor framework</strong><span>Platform mechanism for loading firmware, powering, starting, stopping, and reporting crashes for an on-SoC remote core. It is relevant when the ACiM controller is a heterogeneous SoC processor rather than a PCIe card controller.</span></dd></div>
+            <div class="term-entry" id="term-cosim"><dt>Co-simulation</dt><dd><strong>Several models executing one protocol</strong><span>A host or QEMU machine model forwards MMIO, DMA, queues, and interrupts to a functional, cycle, RTL, or analog model so the complete software chain runs before silicon.</span></dd></div>
+            <div class="term-entry" id="term-elf"><dt><abbr class="term" title="Executable and Linkable Format">ELF</abbr></dt><dd><strong>Executable and Linkable Format</strong><span>A structured binary containing loadable segments, symbols, relocations, and an entry point. Linux executables, kernel modules, and controller firmware may all use ELF but target different machines and loaders.</span></dd></div>
+            <div class="term-entry" id="term-device-tree"><dt><abbr class="term" title="Device Tree Blob">DTB</abbr></dt><dd><strong>Device Tree Blob</strong><span>Binary hardware description passed to Linux on many embedded systems. It declares platform devices, MMIO ranges, interrupts, clocks, resets, IOMMUs, reserved memory, and relationships such as remote processors.</span></dd></div>
           </dl>
         </section>
 
@@ -490,6 +513,318 @@
         <article class="contract-card"><strong>Artifact ABI</strong><span>Application Binary Interface from compiler to runtime and firmware.</span><code>target + program + constants + commands + debug map</code></article>
         <article class="contract-card"><strong>Linux UAPI</strong><span>User-space API from User-Mode Driver (UMD) to Kernel-Mode Driver (KMD).</span><code>caps + contexts + buffers + queues + waits + faults</code></article>
         <article class="contract-card"><strong>Firmware ABI</strong><span>Application Binary Interface from KMD queues to device validation and execution.</span><code>SQ/CQ + mailbox + opcodes + status + trace</code></article>
+      </div>
+    </section>
+
+    <section class="section" id="full-chain">
+      <div class="section-heading">
+        <p class="eyebrow">Whole-chain verification</p>
+        <h2>Test one contract at a time before asking the complete board to run a model</h2>
+        <p class="section-note">
+          QEMU is useful, but it is not an analog Compute-in-Memory (CIM) simulator by default. Use it to boot a
+          supported host or controller CPU and its software. Add a custom device model, fake transport, or co-simulation
+          bridge when the Kernel-Mode Driver (KMD), firmware, queue protocol, and analog model must run together.
+        </p>
+      </div>
+      <div class="term-reminder" role="note" aria-label="Terminology used in the whole-chain verification section">
+        <strong>Terms here</strong>
+        <span><abbr class="term" title="Board Support Package">BSP</abbr> = bootloader, kernel, device tree, and board support</span>
+        <span><abbr class="term" title="Root File System">rootfs</abbr> = Linux userspace files</span>
+        <span><abbr class="term" title="Hardware Abstraction Layer">HAL</abbr> = transport-neutral device interface</span>
+        <span><abbr class="term" title="Joint Test Action Group">JTAG</abbr> = low-level hardware debug port</span>
+        <span>Co-simulation = coordinated execution of two or more simulator models</span>
+      </div>
+
+      <div class="verdict-banner">
+        <div>
+          <span class="evidence-tag design">Direct answer</span>
+          <strong>There is no universal "QEMU, SD card, then device kernel" sequence</strong>
+          <span>Choose the deployment topology first; build, load, and debug each artifact through its actual owner.</span>
+        </div>
+        <p>
+          A desktop PCIe card normally needs no SD card: Linux is already running, the KMD loads controller firmware
+          when the device has a programmable controller, and the runtime submits a compiled model artifact. An embedded
+          host may boot a BSP image from SD/eMMC and then load accelerator firmware, when present, through
+          <code>remoteproc</code> or a vendor driver. A device compute kernel or
+          microcode payload is not the Linux kernel, and should be named separately.
+        </p>
+      </div>
+
+      <div class="requirements-grid top-gap">
+        <article class="requirement-panel">
+          <header><strong>Topology A: Linux host + PCIe card</strong><span>Typical workstation, server, or evaluation-card setup</span></header>
+          <ul class="requirement-list">
+            <li><strong>Host boot</strong><span>Boot the existing x86-64 or AArch64 Linux installation. Do not prepare an SD card unless the host platform itself requires one.</span></li>
+            <li><strong>Install</strong><span>Install the signed KMD, udev rules, controller firmware under the configured firmware search path, UMD/runtime, compiler, and diagnostics.</span></li>
+            <li><strong>Discover</strong><span>PCIe enumerates the endpoint. The KMD claims BARs, configures DMA masks and MSI-X, creates an IOMMU-protected context, and exposes a device node.</span></li>
+            <li><strong>Boot device</strong><span>If a programmable controller exists, the KMD obtains firmware with the Linux firmware API, verifies compatibility, transfers it through BAR or DMA boot windows, starts it, and waits for READY. A fixed RTL controller instead publishes its ROM/logic ABI directly.</span></li>
+            <li><strong>Run</strong><span>The application loads a compiled <code>.acx</code> artifact and tensors through the runtime. The model image is usually session data, not permanently flashed firmware.</span></li>
+            <li><strong>Recover</strong><span>Collect host and device evidence before reset; then use context reset, Function Level Reset (FLR), secondary-bus reset, or power cycle according to fault scope.</span></li>
+          </ul>
+        </article>
+        <article class="requirement-panel">
+          <header><strong>Topology B: embedded Linux host SoC</strong><span>Typical camera, robot, appliance, or edge-module setup</span></header>
+          <ul class="requirement-list">
+            <li><strong>Build BSP</strong><span>Cross-compile the bootloader, Linux kernel, Device Tree Blob (DTB), root filesystem, KMD, UMD/runtime, application, and board diagnostics.</span></li>
+            <li><strong>Deploy host image</strong><span>Write the vendor-defined boot image to SD, eMMC, UFS, or network boot media. Verify the physical target before using any imaging tool.</span></li>
+            <li><strong>Boot host</strong><span>Capture bootloader and early kernel serial output. Confirm clocks, regulators, reset GPIOs, IOMMU, reserved memory, PCIe or on-chip interconnect, and device-tree bindings.</span></li>
+            <li><strong>Boot controller</strong><span>Use Linux <code>remoteproc</code>, a platform KMD, or a boot ROM to load the controller Executable and Linkable Format (ELF) image and create messaging/queue resources.</span></li>
+            <li><strong>Feed input</strong><span>The host application receives camera, network, sensor, or storage input, preprocesses it, and submits buffers through the same runtime/HAL contract used in simulation.</span></li>
+            <li><strong>Field update</strong><span>Version and update host BSP, controller firmware, model artifact, and calibration independently, with an atomic rollback policy for compatible sets.</span></li>
+          </ul>
+        </article>
+      </div>
+
+      <div class="table-wrap top-gap">
+        <table>
+          <thead><tr><th scope="col">Question</th><th scope="col">PCIe card</th><th scope="col">Embedded host SoC</th><th scope="col">Engineering rule</th></tr></thead>
+          <tbody>
+            <tr><th scope="row">Make QEMU first?</th><td>Optional for host driver and protocol tests</td><td>Useful when QEMU supports the selected host CPU/board</td><td>Start with native functional tests; add QEMU where CPU/OS behavior matters.</td></tr>
+            <tr><th scope="row">What does QEMU simulate?</th><td>Host CPU/Linux plus only implemented virtual devices</td><td>Host or controller CPU and modeled peripherals</td><td>A generic QEMU machine does not contain the custom ACiM endpoint or analog physics.</td></tr>
+            <tr><th scope="row">Flash an SD card?</th><td>Normally no</td><td>Often yes, if SD/eMMC is the board boot source</td><td>The boot source comes from the board design and BSP, not from ACiM itself.</td></tr>
+            <tr><th scope="row">Build a host binary?</th><td colspan="2">Yes: application, compiler tools, runtime/UMD, diagnostics, and possibly KMD module</td><td>Cross-compile when the target architecture differs from the development machine.</td></tr>
+            <tr><th scope="row">Build a device kernel?</th><td colspan="2">Build controller firmware and compute microcode/kernels if the architecture has programmable engines</td><td>Reserve "Linux kernel" for the host OS; call device payloads firmware or compute kernels.</td></tr>
+            <tr><th scope="row">How does input reach ACiM?</th><td>Application buffer to UMD/KMD to PCIe DMA</td><td>Application buffer through shared memory, DMA, NoC, or PCIe</td><td>The runtime owns live buffer bindings; the compiler artifact owns logical dataflow.</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3 class="subheading">Name and version the deployable artifacts</h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th scope="col">Artifact</th><th scope="col">Built for</th><th scope="col">Loaded by</th><th scope="col">Typical deployment</th><th scope="col">Required identity</th></tr></thead>
+          <tbody>
+            <tr><th scope="row">Host boot image</th><td>Host CPU</td><td>Boot ROM / bootloader</td><td>SD, eMMC, UFS, SPI flash, or network; embedded only</td><td>BSP version, DTB, kernel config, rootfs hash</td></tr>
+            <tr><th scope="row">KMD</th><td>Host kernel and CPU</td><td>Kernel module loader or built into Linux</td><td><code>.ko</code>, package, initramfs, or kernel image</td><td>Kernel release, UAPI major/minor, device IDs</td></tr>
+            <tr><th scope="row">Runtime / UMD / app</th><td>Host userspace CPU</td><td>Dynamic loader and service manager</td><td>Rootfs package, container, or development tree</td><td>Build ID, UAPI range, artifact ABI range</td></tr>
+            <tr><th scope="row">Controller firmware, if present</th><td>Device RISC-V/Arm/controller CPU; omitted for fixed RTL control</td><td>KMD, remoteproc, boot ROM, or JTAG in the lab</td><td>Firmware directory, dedicated partition, or RAM load</td><td>Firmware ABI, register-map version, image hash, entry point</td></tr>
+            <tr><th scope="row">Compute program</th><td>Device digital engines and ACiM arrays</td><td>Runtime and controller firmware</td><td>Inside <code>.acx</code> or a versioned kernel package</td><td>Opcode ISA, array geometry, precision, scratch requirements</td></tr>
+            <tr><th scope="row">Model artifact</th><td>Named accelerator target</td><td>Runtime session</td><td>Application data partition or model store</td><td>Compiler provenance, target ID, ABI, graph and constant hashes</td></tr>
+            <tr><th scope="row">Calibration / health profile</th><td>Chip, board, voltage, and temperature domain</td><td>Firmware/runtime under controlled policy</td><td>Protected per-device state with factory/default fallback</td><td>Chip serial, profile version, conditions, age, integrity hash</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3 class="subheading">The top-level build, boot, and test flow</h3>
+      <div class="pipeline-flow" role="group" aria-label="Whole-chain ACiM build and test flow chart">
+        <div class="pipeline-stage host"><b>1. Freeze contracts</b><strong>One version set</strong><span>Register map, queues, UAPI, firmware ABI, artifact ABI, memory map, fault and trace schema.</span></div>
+        <div class="pipeline-stage host"><b>2. Build host</b><strong>BSP + KMD + UMD</strong><span>Compile for the host CPU; retain symbols, manifests, reproducible presets, and test utilities.</span></div>
+        <div class="pipeline-stage digital"><b>3. Build device</b><strong>Firmware + kernels</strong><span>Link the controller memory map; emit ELF, binary, map file, symbols, and image metadata.</span></div>
+        <div class="pipeline-stage host"><b>4. Emulate</b><strong>HAL + QEMU + co-sim</strong><span>Prove CPU software, queues, DMA semantics, faults, reset, and numerical reference before a board.</span></div>
+        <div class="pipeline-stage digital"><b>5. Bring up transport</b><strong>Enumerate + boot</strong><span>Power, clock, reset, PCIe/interconnect, BAR, IOMMU, DMA, MSI-X, firmware READY.</span></div>
+        <div class="pipeline-stage analog"><b>6. Correlate workload</b><strong>One MVM to full model</strong><span>Compare tensors, counters, timestamps, energy, temperature, calibration, and recovery.</span></div>
+      </div>
+
+      <h3 class="subheading">Ten-stage verification ladder</h3>
+      <p class="section-note">
+        Do not advance because a demo looks plausible. Advance when the stated output, timeout, error behavior, and
+        evidence bundle pass automatically. Every later stage reruns the earlier contract tests.
+      </p>
+      <div class="boot-flow" role="group" aria-label="Pre-silicon verification stages zero through four">
+        <div class="boot-stage"><b>0</b><strong>Contract lint</strong><span>Generated headers agree; ABI sizes, IDs, endianness, reserved fields, and compatibility tests pass.</span></div>
+        <div class="boot-stage"><b>1</b><strong>Golden model</strong><span>Native host functional HAL matches reference tensors and injects saturation, defects, drift, and timeouts.</span></div>
+        <div class="boot-stage"><b>2</b><strong>Queue model</strong><span>Fake PCIe/MMIO/DMA backend proves ownership, wraparound, ordering, interrupt, reset, and malformed descriptors.</span></div>
+        <div class="boot-stage"><b>3</b><strong>Host OS in QEMU</strong><span>BSP, KMD lifecycle, UAPI, service startup, permissions, and fake/custom device probe pass.</span></div>
+        <div class="boot-stage"><b>4</b><strong>Controller ISA sim</strong><span>Firmware boots on a matching CPU/machine model; GDB reaches READY and queue unit tests complete.</span></div>
+      </div>
+      <div class="boot-flow top-gap" role="group" aria-label="Co-simulation and hardware verification stages five through nine">
+        <div class="boot-stage"><b>5</b><strong>Host-device co-sim</strong><span>KMD and firmware exchange real descriptors while the analog backend supplies deterministic MVM results and faults.</span></div>
+        <div class="boot-stage"><b>6</b><strong>RTL / FPGA</strong><span>Register, DMA, interrupt, boot, queue, and reset behavior correlates with the protocol model under stress.</span></div>
+        <div class="boot-stage"><b>7</b><strong>Board transport</strong><span>Enumeration, firmware boot, loopback DMA, MSI-X, IOMMU isolation, teardown, and recovery pass on silicon.</span></div>
+        <div class="boot-stage"><b>8</b><strong>One analog MVM</strong><span>Raw ADC, reconstructed output, calibration ID, temperature, and error distribution match the acceptance envelope.</span></div>
+        <div class="boot-stage"><b>9</b><strong>Model + operations</strong><span>Subgraph and full model pass accuracy, latency, throughput, power, soak, reset, and support-bundle gates.</span></div>
+      </div>
+
+      <h3 class="subheading">Choose the QEMU boundary deliberately</h3>
+      <div class="decision-grid">
+        <article class="decision-option recommended">
+          <b>Start here</b><strong>Native process + functional HAL</strong>
+          <span>Run compiler, runtime, queue library, numerical model, and fault injection as ordinary host processes.</span>
+          <code>Fastest correctness and continuous integration loop</code>
+        </article>
+        <article class="decision-option prototype">
+          <b>Host OS</b><strong>QEMU host + fake/custom device</strong>
+          <span>Boot Linux to test BSP, KMD, UAPI, packaging, startup, and permissions. Implement the ACiM PCIe model or use a fake transport.</span>
+          <code>Generic virt alone cannot probe the real endpoint</code>
+        </article>
+        <article class="decision-option prototype">
+          <b>Controller CPU</b><strong>QEMU firmware target</strong>
+          <span>Run device firmware only when the chosen QEMU machine matches the controller ISA, address map, interrupt controller, timer, and modeled peripherals.</span>
+          <code>CPU emulation does not reproduce analog variation</code>
+        </article>
+        <article class="decision-option caution">
+          <b>Whole chain</b><strong>QEMU + co-simulation bridge</strong>
+          <span>Forward MMIO, DMA, queues, and interrupts to functional, cycle, RTL, or analog models through a defined socket/shared-memory protocol.</span>
+          <code>Highest pre-silicon fidelity; also highest integration cost</code>
+        </article>
+      </div>
+      <div class="table-wrap top-gap">
+        <table>
+          <thead><tr><th scope="col">Environment</th><th scope="col">It can prove</th><th scope="col">It cannot prove alone</th><th scope="col">Required exit evidence</th></tr></thead>
+          <tbody>
+            <tr><th scope="row">Native functional model</th><td>Graph semantics, quantization, command construction, error policy</td><td>Kernel behavior, real timing, PCIe, analog distributions</td><td>Golden tensor diff and deterministic fault tests</td></tr>
+            <tr><th scope="row">QEMU host</th><td>Host architecture, Linux boot, KMD/UAPI lifecycle, packages</td><td>Unimplemented ACiM device and real DMA/interrupt timing</td><td>Automated boot/probe/open/submit/reset test</td></tr>
+            <tr><th scope="row">QEMU controller</th><td>Firmware CPU code, exceptions, memory map, modeled IRQ and timer behavior</td><td>Custom engines and analog physics unless explicitly modeled</td><td>Firmware unit tests, READY handshake, GDB-readable fault state</td></tr>
+            <tr><th scope="row">Cycle/RTL co-sim</th><td>Protocol ordering, contention, queue and engine timing, RTL behavior</td><td>Unmodeled package/board effects and silicon variation</td><td>Trace correlation and bounded cycle deltas</td></tr>
+            <tr><th scope="row">Real board</th><td>Physical link, DMA, interrupts, converters, arrays, power and thermal behavior</td><td>Broad corner coverage from one device</td><td>Population-aware correctness, performance, soak, and recovery reports</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="code-panel top-gap">
+        <header><strong>Build and emulator command templates</strong><span>Replace target presets and machine names with the versioned BSP; proposed names are not existing QEMU devices</span></header>
+        <pre><code># 1. Fast host loop: compiler/runtime/fake HAL
+cmake --preset host-debug
+cmake --build --preset host-debug
+ctest --preset host-debug --output-on-failure
+./build/host-debug/bin/acim-run --hal functional --model smoke.acx
+
+# 2. Embedded host Linux in QEMU. This boots the host BSP only.
+qemu-system-aarch64 -M virt -cpu cortex-a72 -m 4096 -nographic \
+  -kernel out/host/Image -initrd out/host/rootfs.cpio.gz \
+  -append "console=ttyAMA0 earlycon"
+
+# A KMD can probe ACiM only after implementing a custom/fake endpoint, for example:
+#   -device acim-pcie,backend=unix:/tmp/acim-model.sock
+# "acim-pcie" above is a proposed project device model, not built into QEMU.
+
+# 3. Device controller firmware. The machine must match the real controller map.
+qemu-system-riscv64 -M acim-controller -nographic -bios none \
+  -kernel out/device/acim-fw.elf -S -gdb tcp::1234
+riscv64-unknown-elf-gdb out/device/acim-fw.elf \
+  -ex "target remote :1234"
+
+# "acim-controller" is also a proposed custom machine name. Until it exists,
+# run firmware libraries as host tests or use the vendor ISA/RTL simulator.</code></pre>
+      </div>
+      <div class="callout caution top-gap">
+        <p>
+          <strong>Embedded image safety:</strong> use Buildroot, Yocto, or the vendor BSP to produce deployable images,
+          and use the board vendor's imaging procedure for SD/eMMC. Record the output image hash and confirm the target
+          device path before writing. The files in a Buildroot <code>output/images/</code> directory are deployment
+          artifacts; intermediate build directories are not.
+        </p>
+      </div>
+
+      <h3 class="subheading">Board boot and capability handshake</h3>
+      <div class="boot-flow" role="group" aria-label="Host and ACiM device boot handshake flow chart">
+        <div class="boot-stage"><b>1</b><strong>Power and reset</strong><span>Rails, clocks, reset, refclk, link training, boot straps; UART emits a ROM identifier.</span></div>
+        <div class="boot-stage"><b>2</b><strong>Enumerate</strong><span>Host finds endpoint or platform device; IDs, BAR sizes, IOMMU, DMA width, MSI-X, and AER match the specification.</span></div>
+        <div class="boot-stage"><b>3</b><strong>Start control plane</strong><span>KMD/remoteproc loads and starts compatible firmware when present; otherwise it verifies the fixed ROM/RTL control ABI and optional microcode.</span></div>
+        <div class="boot-stage"><b>4</b><strong>Negotiate</strong><span>Firmware reports READY, boot epoch, ABI, capabilities, memory/array health, calibration state, trace clock, and fatal status.</span></div>
+        <div class="boot-stage"><b>5</b><strong>Publish device</strong><span>KMD enables queues and userspace node; UMD queries caps, creates context, verifies artifact compatibility, and starts a session.</span></div>
+      </div>
+      <div class="table-wrap top-gap">
+        <table>
+          <thead><tr><th scope="col">Checkpoint</th><th scope="col">Host evidence</th><th scope="col">Device evidence</th><th scope="col">Timeout action</th></tr></thead>
+          <tbody>
+            <tr><th scope="row">Physical discovery</th><td><code>lspci -nnvv</code> or platform-device sysfs, link width/speed, AER</td><td>ROM UART banner or JTAG halt state</td><td>Inspect power, clocks, reset, straps, refclk, lanes, DTB</td></tr>
+            <tr><th scope="row">KMD probe</th><td>Driver-bound sysfs path, BAR resources, DMA mask, MSI-X vectors, IOMMU group</td><td>Mailbox visible, ROM state readable</td><td>Check IDs, BAR mapping, endian/access width, IOMMU and module log</td></tr>
+            <tr><th scope="row">Firmware READY</th><td>Requested image/hash, transfer bytes, boot command, deadline and response</td><td>Last boot stage, exception registers, crash buffer, firmware ABI</td><td>Halt with JTAG/GDB before reset; dump mailbox and load memory</td></tr>
+            <tr><th scope="row">Userspace open</th><td>Device node, permissions, UAPI query, context and queue IDs</td><td>Context table and queue generation</td><td>Compare UMD/KMD ABI, udev rules, health and reset epoch</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3 class="subheading">One inference request and completion</h3>
+      <div class="pipeline-flow" role="group" aria-label="Host to ACiM request data flow chart">
+        <div class="pipeline-stage host"><b>1. Application</b><strong>Prepare input</strong><span>Capture/preprocess tensor; assign run, request, graph, and correlation IDs.</span></div>
+        <div class="pipeline-stage host"><b>2. Runtime / UMD</b><strong>Bind buffers</strong><span>Load <code>.acx</code>, select compatible profile, allocate/import Buffer Objects (BOs), create dependencies.</span></div>
+        <div class="pipeline-stage host"><b>3. KMD</b><strong>Map and submit</strong><span>Validate handles/ranges; map scatter-gather pages to IOVA; publish SQ entry; ring MMIO doorbell.</span></div>
+        <div class="pipeline-stage digital"><b>4. Firmware</b><strong>Validate and schedule</strong><span>Check generation, context, opcode, bounds, program, health, deadline, and dependency state.</span></div>
+        <div class="pipeline-stage analog"><b>5. ACiM data plane</b><strong>Transfer and compute</strong><span>DMA to SRAM; DAC/input encoding; array MVM; ADC; reconstruction; digital operators and partial sums.</span></div>
+        <div class="pipeline-stage host"><b>6. Completion</b><strong>Return result</strong><span>DMA output; write CQ; raise MSI-X; KMD wakes poll/event; UMD resolves event; app consumes tensor.</span></div>
+      </div>
+      <div class="table-wrap top-gap">
+        <table>
+          <thead><tr><th scope="col">Boundary</th><th scope="col">Control path</th><th scope="col">Data path</th><th scope="col">Ordering proof</th></tr></thead>
+          <tbody>
+            <tr><th scope="row">App to UMD</th><td>API call, session, event, timeout</td><td>Tensor views or imported dma-buf</td><td>Buffer lifetime and dependency test</td></tr>
+            <tr><th scope="row">UMD to KMD</th><td>ioctl, mmap, poll/eventfd</td><td>Buffer handles resolved to pinned/imported pages</td><td>UAPI conformance, process-exit and malicious-input tests</td></tr>
+            <tr><th scope="row">KMD to device</th><td>SQ, CQ, doorbell, mailbox, MSI-X</td><td>DMA over IOVA mappings</td><td>Publish descriptor before doorbell; write result before CQ and interrupt</td></tr>
+            <tr><th scope="row">Firmware to engines</th><td>Command processor, dependencies, watchdog</td><td>SRAM/NoC streams, array inputs/outputs, partial sums</td><td>Cycle trace with command and tile IDs</td></tr>
+            <tr><th scope="row">Analog to digital</th><td>Profile, calibration, range and retry policy</td><td>DAC code, cell current/charge, ADC code, reconstructed value</td><td>Raw/reconstructed sample capture and golden-model correlation</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3 class="subheading">Capture one causally connected log, not five unrelated files</h3>
+      <div class="pipeline-flow" role="group" aria-label="Whole-system log collection and analysis flow chart">
+        <div class="pipeline-stage host"><b>1. Identify</b><strong>Create run manifest</strong><span>Run/correlation IDs, git commits, hashes, ABIs, serial, clocks, voltage, temperature, calibration.</span></div>
+        <div class="pipeline-stage host"><b>2. Arm host</b><strong>Tracing before submit</strong><span>App JSONL, Tracy, UMD events, KMD tracepoints/ftrace, kernel journal, PCIe AER and IOMMU faults.</span></div>
+        <div class="pipeline-stage digital"><b>3. Arm device</b><strong>UART + trace ring</strong><span>Firmware stages, queue events, DMA, engine cycles, counters, ADC flags, watchdog and crash buffer.</span></div>
+        <div class="pipeline-stage analog"><b>4. Run workload</b><strong>Known request IDs</strong><span>Warm-up separately; execute fixed inputs; preserve first fault; avoid reset until evidence is drained.</span></div>
+        <div class="pipeline-stage host"><b>5. Correlate</b><strong>Join clocks and IDs</strong><span>Use synchronization markers and an affine clock transform; align host, firmware, engine, and instrument timelines.</span></div>
+        <div class="pipeline-stage host"><b>6. Diagnose</b><strong>Find first divergence</strong><span>Compare expected/observed state, tensors, queue positions, bytes, cycles, faults, power and temperature.</span></div>
+      </div>
+      <div class="code-panel top-gap">
+        <header><strong>Proposed support-bundle layout and capture interface</strong><span>Make this one command in the SDK; paths and utility names form a product contract</span></header>
+        <pre><code>support/run-20260712T103000Z-7f3a/
+  manifest.json                 # versions, hashes, ABIs, topology, serial, environment
+  host/app.jsonl                # request and graph correlation IDs
+  host/runtime.jsonl            # sessions, buffers, submissions, waits, fallback
+  host/tracy.tracy              # host spans and optional imported device zones
+  host/kernel.dat               # trace-cmd/ftrace events: acim, irq, iommu, sched
+  host/journal-kernel.txt        # probe, firmware, reset, AER and IOMMU messages
+  host/pci.txt                   # config space, link, BAR and AER snapshot
+  device/uart.txt               # ROM and early firmware boot
+  device/trace.bin              # timestamped firmware/engine trace schema
+  device/crash.bin              # preserved first-fault context
+  device/counters.json          # DMA, NoC, SRAM, array, ADC, DSP, stalls, energy
+  model/artifact-manifest.json  # target, graph, constants, compiler and debug-map hashes
+  model/input.npz               # reproducible non-sensitive test input
+  model/output-device.npz       # observed tensors or selected checkpoints
+  analysis/timeline.json        # normalized clock domain and decoded events
+  analysis/tensor-diff.json     # golden comparison and first divergent operation
+
+# Proposed SDK command: implementation should gather data without manual copying.
+acim-smi support collect --run-id 7f3a --include-trace --output support/
+
+# Useful host evidence while reproducing a failure.
+lspci -nnvv -s "$ACIM_BDF"
+journalctl -k --since "$RUN_START"
+trace-cmd record -e acim -e irq -e iommu ./acim-smoke --run-id 7f3a
+
+# Device evidence should be read through a versioned KMD/firmware interface.
+acim-smi trace snapshot --run-id 7f3a
+acim-smi health show --json</code></pre>
+      </div>
+      <div class="callout top-gap">
+        <p>
+          <strong>Clock correlation:</strong> a host timestamp and device cycle counter are different clocks. Emit
+          repeated synchronization pairs around the run, fit <code>host_ns = a * device_cycles + b</code>, report fit
+          error, and keep raw timestamps. A single offset hides drift and makes a long trace look causally wrong.
+        </p>
+      </div>
+
+      <h3 class="subheading">Diagnose from the first failed boundary</h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th scope="col">Observed symptom</th><th scope="col">First layer to inspect</th><th scope="col">Evidence to compare</th><th scope="col">Focused experiment</th></tr></thead>
+          <tbody>
+            <tr><th scope="row">No device enumeration</th><td>Board power/reset/PCIe or platform DTB</td><td>Rails, clocks, reset, refclk, link state, boot straps, root-port AER</td><td>Hold controller in ROM; reduce link speed/width; inspect endpoint with JTAG</td></tr>
+            <tr><th scope="row">Enumerates but no device node</th><td>KMD probe</td><td>IDs, BAR resources, DMA mask, MSI-X, IOMMU group, firmware request</td><td>Bind driver manually in a lab; enable dynamic debug and probe tracepoints</td></tr>
+            <tr><th scope="row">Device node exists but open fails</th><td>UMD/KMD contract</td><td>Permissions, UAPI major/minor, device health, reset generation</td><td>Run capability query as the service user; compare expected ioctl sizes</td></tr>
+            <tr><th scope="row">Submit succeeds but firmware never starts</th><td>SQ publication and doorbell</td><td>Producer/consumer indices, descriptor bytes, barriers, MMIO readback, generation</td><td>Submit one no-op command; poll rather than interrupt; inspect queue memory on both sides</td></tr>
+            <tr><th scope="row">Device completes but host never wakes</th><td>CQ and MSI-X path</td><td>CQ entry visibility, interrupt cause/mask/vector, KMD handler and wakeup</td><td>Use interrupt self-test; switch to CQ polling; verify write-before-interrupt ordering</td></tr>
+            <tr><th scope="row">DMA corruption or IOMMU fault</th><td>Buffer mapping</td><td>IOVA, scatter/gather segments, length/alignment, direction, cache ownership</td><td>Use one coherent page and loopback; add guard patterns; reduce transfer size</td></tr>
+            <tr><th scope="row">Stable transport but wrong tensor</th><td>Compiler/artifact/analog boundary</td><td>Layout, quantization, scale/zero point, program/profile ID, calibration, ADC saturation, remap</td><td>Run one MVM with fixed operands; capture raw ADC and reconstructed values; bypass fusion</td></tr>
+            <tr><th scope="row">Correct but slow</th><td>Timeline and counters</td><td>Host queue, H2D, SRAM/NoC, DAC, MVM, ADC, reconstruction, DSP, D2H and postprocess time</td><td>Sweep batch/shape; force resident weights; disable retries; compare full and partial utilization</td></tr>
+            <tr><th scope="row">Intermittent after many runs</th><td>Lifetime, thermal, drift, and reset</td><td>Epoch, queue wrap, leaked mappings, temperature, voltage, calibration age, corrected faults</td><td>Run soak with periodic known-answer tests and fault injection; preserve the first failing bundle</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="verdict-banner top-gap">
+        <div>
+          <span class="evidence-tag design">Whole-chain exit gate</span>
+          <strong>A reproducible run survives both success and deliberate failure</strong>
+          <span>One command builds, deploys, tests, collects, and decodes a versioned evidence bundle.</span>
+        </div>
+        <p>
+          The minimum convincing result is not merely a YOLO image. It is a cold boot, capability negotiation, one
+          known-answer MVM, one model inference, tensor correlation, latency breakdown, injected timeout, context or
+          function recovery, and a support bundle that identifies the first failed boundary without guessing.
+        </p>
       </div>
     </section>
 
@@ -1427,6 +1762,15 @@ readl(adev-&gt;bar0 + ACIM_DEVICE_STATUS);</code></pre>
         <article class="source-card"><a href="https://docs.kernel.org/PCI/pcieaer-howto.html">Linux PCIe AER</a><span>Error classes, counters and driver recovery callback requirement.</span></article>
         <article class="source-card"><a href="https://docs.kernel.org/PCI/pci-error-recovery.html">Linux PCI error recovery</a><span><code>error_detected</code>, reset, resume, permanent failure and interrupt behavior during recovery.</span></article>
         <article class="source-card"><a href="https://docs.kernel.org/driver-api/firmware/request_firmware.html">Linux firmware loading</a><span><code>request_firmware()</code> lifecycle and synchronous/asynchronous image loading APIs.</span></article>
+        <article class="source-card"><a href="https://www.qemu.org/docs/master/system/introduction.html">QEMU system emulation</a><span>Full-system CPU, memory, and device emulation; the virtual machine contains the devices implemented by its selected machine model.</span></article>
+        <article class="source-card"><a href="https://www.qemu.org/docs/master/system/target-riscv.html">QEMU RISC-V system target</a><span>Board selection, firmware behavior, and the warning that an image built for unsupported real hardware is unlikely to boot on a different virtual machine.</span></article>
+        <article class="source-card"><a href="https://www.qemu.org/docs/master/system/riscv/virt.html">QEMU RISC-V <code>virt</code> machine</a><span>Generic virtual platform capabilities, including its PCIe host bridge; it is not a model of a private ACiM controller or endpoint.</span></article>
+        <article class="source-card"><a href="https://www.qemu.org/docs/master/system/gdb.html">QEMU GDB usage</a><span><code>-s -S</code>, remote debugging, breakpoints, registers, and memory inspection for emulated CPU bring-up.</span></article>
+        <article class="source-card"><a href="https://buildroot.org/downloads/manual/manual.html">Buildroot manual</a><span>Cross-toolchain, bootloader, Linux kernel, root filesystem, images directory, deployment, and QEMU runtime-test workflow.</span></article>
+        <article class="source-card"><a href="https://docs.kernel.org/staging/remoteproc.html">Linux remoteproc</a><span>Loading and starting remote-processor firmware, ELF images, resource tables, trace buffers, virtio, and RPMsg integration.</span></article>
+        <article class="source-card"><a href="https://openocd.org/doc/html/Flash-Programming.html">OpenOCD flash programming</a><span>Lab-oriented image programming, verification, reset, and scripted startup through a debug adapter.</span></article>
+        <article class="source-card"><a href="https://docs.kernel.org/trace/ftrace.html">Linux ftrace</a><span>Kernel tracing through tracefs for latency, event, interrupt, driver, and scheduling correlation.</span></article>
+        <article class="source-card"><a href="https://docs.kernel.org/trace/tracepoints.html">Linux tracepoints</a><span>Low-overhead static instrumentation hooks suitable for a versioned accelerator event vocabulary.</span></article>
         <article class="source-card"><a href="https://www.kernel.org/doc/html/latest/admin-guide/abi.html">Linux ABI documentation</a><span>Kernel ABI stability categories and the requirement to document interfaces exposed to userspace.</span></article>
         <article class="source-card"><a href="https://onnx.ai/onnx/intro/concepts.html">ONNX concepts</a><span>Official definitions for models, graphs, nodes, tensors, attributes, types, shapes, and versioned operator sets.</span></article>
         <article class="source-card"><a href="https://openxla.org/stablehlo/spec">StableHLO specification</a><span>Normative syntax, verification, and semantics for the versioned high-level ML operation set.</span></article>
