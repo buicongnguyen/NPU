@@ -59,6 +59,133 @@ progress.progress-bar::-moz-progress-bar {
   color: var(--amber);
 }
 
+abbr.term {
+  color: inherit;
+  text-decoration: underline dotted var(--teal);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
+  cursor: help;
+}
+
+.term-groups {
+  display: grid;
+  gap: 22px;
+}
+
+.term-group {
+  min-width: 0;
+  padding-top: 18px;
+  border-top: 1px solid var(--line);
+}
+
+.term-group:first-child {
+  padding-top: 0;
+  border-top: 0;
+}
+
+.term-group > h3 {
+  margin-bottom: 11px;
+}
+
+.term-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1px;
+  margin: 0;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--line);
+}
+
+.term-entry {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: 84px minmax(0, 1fr);
+  gap: 10px;
+  align-items: start;
+  padding: 12px;
+  background: var(--surface);
+}
+
+.term-entry dt,
+.term-entry dd {
+  margin: 0;
+}
+
+.term-entry dt {
+  color: var(--teal);
+  font-size: 14px;
+  font-weight: 900;
+  overflow-wrap: anywhere;
+}
+
+.term-entry dd strong,
+.term-entry dd span {
+  display: block;
+  overflow-wrap: anywhere;
+}
+
+.term-entry dd strong {
+  font-size: 14px;
+}
+
+.term-entry dd span {
+  margin-top: 3px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.term-reminder {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px 12px;
+  align-items: center;
+  margin: 0 0 13px;
+  padding: 8px 0;
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.term-reminder > strong {
+  color: var(--ink);
+  text-transform: uppercase;
+}
+
+.term-reminder span {
+  white-space: normal;
+}
+
+.term-reminder .term {
+  color: var(--teal);
+  font-weight: 900;
+}
+
+.confusion-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.confusion-item {
+  min-width: 0;
+  padding: 13px 0;
+  border-top: 3px solid var(--blue);
+}
+
+.confusion-item strong,
+.confusion-item span {
+  display: block;
+}
+
+.confusion-item span {
+  margin-top: 5px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
 .verdict-banner {
   display: grid;
   grid-template-columns: minmax(230px, 0.62fr) minmax(0, 1.38fr);
@@ -754,6 +881,10 @@ progress.progress-bar::-moz-progress-bar {
 }
 
 @media (max-width: 1080px) {
+  .term-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .decision-grid,
   .proof-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -815,6 +946,15 @@ progress.progress-bar::-moz-progress-bar {
 }
 
 @media (max-width: 620px) {
+  .term-grid,
+  .confusion-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .term-entry {
+    grid-template-columns: 70px minmax(0, 1fr);
+  }
+
   .gap-grid,
   .decision-grid,
   .contract-grid,

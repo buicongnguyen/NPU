@@ -34,22 +34,24 @@
     <section class="hero">
       <div class="hero-copy">
         <p class="eyebrow">Implementation guide | reviewed 2026-07-11</p>
-        <h1>Analog CIM Board Bring-Up: YOLO, PCIe, UMD, KMD, and Firmware</h1>
+        <h1>Analog CIM Board Bring-Up: <abbr class="term" title="You Only Look Once object-detection model family">YOLO</abbr>, <abbr class="term" title="Peripheral Component Interconnect Express">PCIe</abbr>, <abbr class="term" title="User-Mode Driver">UMD</abbr>, <abbr class="term" title="Kernel-Mode Driver">KMD</abbr>, and Firmware</h1>
         <p class="lede">
           This is the missing bridge between a compiled <code>.acx</code> artifact and a controlled physical board. It
-          defines a proposed Linux host stack, PCIe endpoint contract, queue and DMA protocol, device firmware loop,
+          defines a proposed Linux host stack, Peripheral Component Interconnect Express (PCIe) endpoint contract,
+          queue and Direct Memory Access (DMA) protocol, device firmware loop,
           hybrid YOLO placement, analog programming and calibration lifecycle, fault recovery, and a staged path from
           simulator to silicon.
         </p>
         <div class="hero-actions">
           <a class="button" href="#decision">Choose the driver path</a>
+          <a class="button secondary" href="#terminology">Terminology</a>
           <a class="button secondary" href="#system">Trace the system</a>
           <a class="button secondary" href="#pcie">Implement PCIe</a>
           <a class="button secondary" href="#delivery">Open the delivery plan</a>
         </div>
         <div class="summary-strip" role="group" aria-label="Bring-up guide summary">
           <div><strong>4</strong><span>deployment modes with different trust boundaries</span></div>
-          <div><strong>3</strong><span>versioned interfaces: UAPI, firmware ABI, artifact</span></div>
+          <div><strong>3</strong><span>versioned interfaces: user-space API (UAPI), firmware ABI, artifact</span></div>
           <div><strong>9</strong><span>incremental hardware milestones</span></div>
           <div><strong>1</strong><span>correlation ID from graph node to board trace</span></div>
         </div>
@@ -66,7 +68,8 @@
         <p class="eyebrow">Gap audit</p>
         <h2>What the existing documents cover, and what this page adds</h2>
         <p class="section-note">
-          The compiler, artifact, HAL, SoC, and scale-out contracts already exist. Their missing implementation boundary
+          The compiler, artifact, Hardware Abstraction Layer (HAL), System-on-Chip (SoC), and scale-out contracts already
+          exist. Their missing implementation boundary
           was how Linux safely discovers a board, transfers buffers, starts firmware work, receives completion, and
           recovers a device without exposing arbitrary host memory.
         </p>
@@ -74,27 +77,27 @@
       <div class="gap-grid">
         <article class="gap-item">
           <strong>Already covered: model build</strong>
-          <span>ONNX import, MLIR dialects and passes, partitioning, calibration inputs, scheduling, artifact packaging, and framework plugins.</span>
+          <span><abbr class="term" title="Open Neural Network Exchange">ONNX</abbr> import, <abbr class="term" title="Multi-Level Intermediate Representation">MLIR</abbr> dialects and passes, partitioning, calibration inputs, scheduling, artifact packaging, and framework plugins.</span>
           <a href="analog-cim-sdk-toolchain.html">SDK and compiler guide</a>
         </article>
         <article class="gap-item">
           <strong>Already covered: platform roles</strong>
-          <span>Runtime, driver, firmware, command processors, memory, control plane, data plane, observability, and ABI principles.</span>
+          <span>Runtime, driver, firmware, command processors, memory, control plane, data plane, observability, and Application Binary Interface (ABI) principles.</span>
           <a href="npu-soc-software-architecture.html">NPU/SoC software architecture</a>
         </article>
         <article class="gap-item">
           <strong>Already covered: logical device</strong>
-          <span>Fault hierarchy, topology epochs, placement, collectives, recovery, hybrid LLM partition, and scale-out descriptors.</span>
+          <span>Fault hierarchy, topology epochs, placement, collectives, recovery, hybrid Large Language Model (LLM) partition, and scale-out descriptors.</span>
           <a href="analog-cim-scaleout-llm.html">Scale-out and LLM design</a>
         </article>
         <article class="gap-item missing">
           <strong>Added: physical board contract</strong>
-          <span>PCI IDs and capabilities, BAR layout, doorbells, DMA masks, MSI-X, reset, firmware mailbox, health, trace, and AER behavior.</span>
+          <span><abbr class="term" title="Peripheral Component Interconnect Express">PCIe</abbr> IDs and capabilities, Base Address Register (BAR) layout, doorbells, Direct Memory Access (DMA) masks, Message Signaled Interrupts Extended (MSI-X), reset, firmware mailbox, health, trace, and Advanced Error Reporting (AER) behavior.</span>
           <a href="#pcie">Open PCIe implementation</a>
         </article>
         <article class="gap-item missing">
           <strong>Added: protected execution path</strong>
-          <span>UMD and KMD APIs, buffer ownership, IOMMU mapping, submission and completion rings, memory ordering, interrupts, and cleanup.</span>
+          <span>User-Mode Driver (UMD) and Kernel-Mode Driver (KMD) APIs, buffer ownership, Input-Output Memory Management Unit (IOMMU) mapping, submission and completion rings, memory ordering, interrupts, and cleanup.</span>
           <a href="#queues">Open queue contracts</a>
         </article>
         <article class="gap-item missing">
@@ -105,10 +108,124 @@
       </div>
     </section>
 
+    <section class="section" id="terminology">
+      <div class="section-heading">
+        <p class="eyebrow">Terminology map</p>
+        <h2>Expand the acronym before reasoning about the boundary</h2>
+        <p class="section-note">
+          These terms identify different software layers, transport mechanisms, or numerical operations. Short
+          reminders appear again beside the sections that use them so an acronym does not silently change meaning.
+        </p>
+      </div>
+      <div class="term-groups">
+        <section class="term-group" aria-labelledby="terms-software">
+          <h3 id="terms-software">Software stack and contracts</h3>
+          <dl class="term-grid">
+            <div class="term-entry" id="term-api"><dt><abbr class="term" title="Application Programming Interface">API</abbr></dt><dd><strong>Application Programming Interface</strong><span>Source-level functions and objects that one software component calls.</span></dd></div>
+            <div class="term-entry" id="term-abi"><dt><abbr class="term" title="Application Binary Interface">ABI</abbr></dt><dd><strong>Application Binary Interface</strong><span>Binary layout and behavior contract: structure bytes, opcodes, calling rules, versions, and compatibility.</span></dd></div>
+            <div class="term-entry" id="term-uapi"><dt><abbr class="term" title="User-space Application Programming Interface">UAPI</abbr></dt><dd><strong>User-space API</strong><span>The Linux kernel/userspace contract, including ioctl numbers, structures, flags, handles, and error values.</span></dd></div>
+            <div class="term-entry" id="term-sdk"><dt><abbr class="term" title="Software Development Kit">SDK</abbr></dt><dd><strong>Software Development Kit</strong><span>Headers, libraries, compiler tools, examples, diagnostics, documentation, and packaging for developers.</span></dd></div>
+            <div class="term-entry" id="term-hal"><dt><abbr class="term" title="Hardware Abstraction Layer">HAL</abbr></dt><dd><strong>Hardware Abstraction Layer</strong><span>A stable interface hiding whether execution uses a simulator, VFIO prototype, Linux KMD, or another transport.</span></dd></div>
+            <div class="term-entry" id="term-umd"><dt><abbr class="term" title="User-Mode Driver">UMD</abbr></dt><dd><strong>User-Mode Driver</strong><span>An unprivileged userspace library that discovers devices, manages runtime objects, and translates HAL calls into UAPI calls.</span></dd></div>
+            <div class="term-entry" id="term-kmd"><dt><abbr class="term" title="Kernel-Mode Driver">KMD</abbr></dt><dd><strong>Kernel-Mode Driver</strong><span>Privileged kernel code that owns PCIe resources, DMA isolation, interrupts, reset, firmware loading, and device lifetime.</span></dd></div>
+            <div class="term-entry" id="term-firmware"><dt>Firmware</dt><dd><strong>Device-resident control software</strong><span>Code running on the accelerator's controller, below the KMD, that validates commands and schedules device engines.</span></dd></div>
+            <div class="term-entry" id="term-runtime"><dt>Runtime</dt><dd><strong>Execution orchestration library</strong><span>Loads artifacts, creates sessions, binds buffers, selects queues, submits work, waits, retries, and reports faults.</span></dd></div>
+            <div class="term-entry" id="term-soc"><dt><abbr class="term" title="System-on-Chip">SoC</abbr></dt><dd><strong>System-on-Chip</strong><span>A device integrating processors, memory controllers, interconnect, accelerators, and peripherals on one chip.</span></dd></div>
+            <div class="term-entry" id="term-ci"><dt><abbr class="term" title="Continuous Integration">CI</abbr></dt><dd><strong>Continuous Integration</strong><span>Automated build and test gates run whenever code or generated contracts change.</span></dd></div>
+            <div class="term-entry" id="term-dkms"><dt><abbr class="term" title="Dynamic Kernel Module Support">DKMS</abbr></dt><dd><strong>Dynamic Kernel Module Support</strong><span>Linux packaging mechanism that rebuilds an out-of-tree kernel module for installed kernels.</span></dd></div>
+            <div class="term-entry" id="term-mvp"><dt><abbr class="term" title="Minimum Viable Product">MVP</abbr></dt><dd><strong>Minimum Viable Product</strong><span>The smallest end-to-end implementation that proves the essential workflow and its measured value.</span></dd></div>
+            <div class="term-entry" id="term-slo"><dt><abbr class="term" title="Service-Level Objective">SLO</abbr></dt><dd><strong>Service-Level Objective</strong><span>A measurable reliability or performance target, such as a tail-latency limit.</span></dd></div>
+            <div class="term-entry" id="term-vfio"><dt><abbr class="term" title="Virtual Function I/O">VFIO</abbr></dt><dd><strong>Virtual Function I/O</strong><span>Linux framework for IOMMU-protected direct device access from a trusted userspace driver.</span></dd></div>
+            <div class="term-entry" id="term-uio"><dt><abbr class="term" title="Userspace I/O">UIO</abbr></dt><dd><strong>Userspace I/O</strong><span>Small Linux framework exposing simple MMIO and interrupts; it does not provide VFIO-style IOMMU protection.</span></dd></div>
+            <div class="term-entry" id="term-ioctl"><dt><code>ioctl</code></dt><dd><strong>Linux device-control system call</strong><span>Transfers a numbered request and a defined UAPI structure between userspace and a kernel driver.</span></dd></div>
+            <div class="term-entry" id="term-onnx"><dt><abbr class="term" title="Open Neural Network Exchange">ONNX</abbr></dt><dd><strong>Open Neural Network Exchange</strong><span>Portable model graph format used here as the compiler's input contract.</span></dd></div>
+            <div class="term-entry" id="term-mlir"><dt><abbr class="term" title="Multi-Level Intermediate Representation">MLIR</abbr></dt><dd><strong>Multi-Level Intermediate Representation</strong><span>Compiler infrastructure for progressively lowering model operations into target-specific commands.</span></dd></div>
+            <div class="term-entry" id="term-ort"><dt><abbr class="term" title="ONNX Runtime">ORT</abbr></dt><dd><strong>ONNX Runtime</strong><span>Model runtime that partitions supported subgraphs to a hardware Execution Provider.</span></dd></div>
+            <div class="term-entry" id="term-ep"><dt><abbr class="term" title="Execution Provider">EP</abbr></dt><dd><strong>Execution Provider</strong><span>ONNX Runtime plugin that claims supported graph regions and invokes the accelerator compiler/runtime.</span></dd></div>
+          </dl>
+        </section>
+
+        <section class="term-group" aria-labelledby="terms-pcie">
+          <h3 id="terms-pcie">PCIe, memory, queues, and interrupts</h3>
+          <dl class="term-grid">
+            <div class="term-entry" id="term-pcie"><dt><abbr class="term" title="Peripheral Component Interconnect Express">PCIe</abbr></dt><dd><strong>Peripheral Component Interconnect Express</strong><span>The host/device interconnect carrying configuration, MMIO, DMA transactions, and message-signaled interrupts.</span></dd></div>
+            <div class="term-entry" id="term-bar"><dt><abbr class="term" title="Base Address Register">BAR</abbr></dt><dd><strong>Base Address Register</strong><span>PCIe-discovered address region exposing device control registers or a device-memory aperture to the host.</span></dd></div>
+            <div class="term-entry" id="term-mmio"><dt><abbr class="term" title="Memory-Mapped Input/Output">MMIO</abbr></dt><dd><strong>Memory-Mapped Input/Output</strong><span>CPU loads and stores directed to device registers rather than ordinary RAM.</span></dd></div>
+            <div class="term-entry" id="term-pio"><dt><abbr class="term" title="Programmed Input/Output">PIO</abbr></dt><dd><strong>Programmed Input/Output</strong><span>The CPU directly reads or writes device registers/data instead of asking a DMA engine to transfer a buffer.</span></dd></div>
+            <div class="term-entry" id="term-dma"><dt><abbr class="term" title="Direct Memory Access">DMA</abbr></dt><dd><strong>Direct Memory Access</strong><span>Device-initiated transfer to or from host memory without the CPU copying each byte.</span></dd></div>
+            <div class="term-entry" id="term-iommu"><dt><abbr class="term" title="Input-Output Memory Management Unit">IOMMU</abbr></dt><dd><strong>Input-Output Memory Management Unit</strong><span>Translates and restricts device DMA addresses so a context cannot access arbitrary host memory.</span></dd></div>
+            <div class="term-entry" id="term-iova"><dt><abbr class="term" title="Input-Output Virtual Address">IOVA</abbr></dt><dd><strong>Input-Output Virtual Address</strong><span>The address a device places in a DMA transaction after the kernel establishes an IOMMU/DMA mapping.</span></dd></div>
+            <div class="term-entry" id="term-bo"><dt><abbr class="term" title="Buffer Object">BO</abbr></dt><dd><strong>Buffer Object</strong><span>Driver-managed allocation or imported buffer represented to userspace by an opaque handle.</span></dd></div>
+            <div class="term-entry" id="term-sq"><dt><abbr class="term" title="Submission Queue">SQ</abbr></dt><dd><strong>Submission Queue</strong><span>Ring where the host publishes validated commands for firmware/device consumption.</span></dd></div>
+            <div class="term-entry" id="term-cq"><dt><abbr class="term" title="Completion Queue">CQ</abbr></dt><dd><strong>Completion Queue</strong><span>Ring where the device reports terminal status, fault information, counters, and the matching cookie.</span></dd></div>
+            <div class="term-entry" id="term-doorbell"><dt>Doorbell</dt><dd><strong>MMIO notification register</strong><span>A host write telling the device that a queue producer index has advanced.</span></dd></div>
+            <div class="term-entry" id="term-irq"><dt><abbr class="term" title="Interrupt Request">IRQ</abbr></dt><dd><strong>Interrupt Request</strong><span>Kernel-visible notification that completion, fault, firmware, or health work needs service.</span></dd></div>
+            <div class="term-entry" id="term-msix"><dt><abbr class="term" title="Message Signaled Interrupts Extended">MSI-X</abbr></dt><dd><strong>Message Signaled Interrupts Extended</strong><span>PCIe interrupt mechanism supporting multiple independently configured vectors.</span></dd></div>
+            <div class="term-entry" id="term-flr"><dt><abbr class="term" title="Function Level Reset">FLR</abbr></dt><dd><strong>Function Level Reset</strong><span>PCIe reset of one function without resetting the entire machine or unrelated functions.</span></dd></div>
+            <div class="term-entry" id="term-aer"><dt><abbr class="term" title="Advanced Error Reporting">AER</abbr></dt><dd><strong>Advanced Error Reporting</strong><span>PCIe facility reporting correctable, non-fatal, and fatal link/transaction errors.</span></dd></div>
+            <div class="term-entry" id="term-fd"><dt><abbr class="term" title="File Descriptor">FD</abbr></dt><dd><strong>File Descriptor</strong><span>Per-process Linux handle used for devices, dma-buf objects, events, and other kernel resources.</span></dd></div>
+            <div class="term-entry" id="term-dmabuf"><dt><code>dma-buf</code></dt><dd><strong>Shared DMA buffer framework</strong><span>Linux mechanism for exporting and importing the same buffer across device drivers.</span></dd></div>
+            <div class="term-entry" id="term-register-access"><dt>RO/RW/WO</dt><dd><strong>Register access modes</strong><span>Read-only, read/write, and write-only. RW1C means writing one clears the selected status bit.</span></dd></div>
+            <div class="term-entry" id="term-drm"><dt><abbr class="term" title="Direct Rendering Manager">DRM</abbr></dt><dd><strong>Direct Rendering Manager</strong><span>Linux kernel subsystem reused by <code>drivers/accel</code>; here DRM does not mean digital-rights management.</span></dd></div>
+            <div class="term-entry" id="term-tlb"><dt><abbr class="term" title="Translation Lookaside Buffer">TLB</abbr></dt><dd><strong>Translation Lookaside Buffer</strong><span>Hardware cache of address translations; a vendor-specific TLB programming model is not portable by default.</span></dd></div>
+            <div class="term-entry" id="term-smmu"><dt><abbr class="term" title="System Memory Management Unit">SMMU</abbr></dt><dd><strong>System Memory Management Unit</strong><span>Arm's I/O memory-management architecture used to translate and isolate device accesses.</span></dd></div>
+            <div class="term-entry" id="term-numa"><dt><abbr class="term" title="Non-Uniform Memory Access">NUMA</abbr></dt><dd><strong>Non-Uniform Memory Access</strong><span>Host architecture where memory latency/bandwidth depends on which CPU and memory node are used.</span></dd></div>
+          </dl>
+        </section>
+
+        <section class="term-group" aria-labelledby="terms-analog">
+          <h3 id="terms-analog">Analog CIM, model execution, and measurement</h3>
+          <dl class="term-grid">
+            <div class="term-entry" id="term-acim"><dt><abbr class="term" title="Analog Compute-in-Memory">ACiM</abbr></dt><dd><strong>Analog Compute-in-Memory</strong><span>Performs matrix operations using analog behavior inside or near memory arrays. AiCM and Analog CIM are alternate spellings.</span></dd></div>
+            <div class="term-entry" id="term-npu"><dt><abbr class="term" title="Neural Processing Unit">NPU</abbr></dt><dd><strong>Neural Processing Unit</strong><span>Accelerator specialized for neural-network operations; it may be digital, analog, or hybrid.</span></dd></div>
+            <div class="term-entry" id="term-mvm"><dt><abbr class="term" title="Matrix-Vector Multiplication">MVM</abbr></dt><dd><strong>Matrix-Vector Multiplication</strong><span>Core operation mapping an input vector through a resident weight matrix.</span></dd></div>
+            <div class="term-entry" id="term-mac"><dt><abbr class="term" title="Multiply-Accumulate">MAC</abbr></dt><dd><strong>Multiply-Accumulate</strong><span>Multiply two values and add the product into an accumulator.</span></dd></div>
+            <div class="term-entry" id="term-dac"><dt><abbr class="term" title="Digital-to-Analog Converter">DAC</abbr></dt><dd><strong>Digital-to-Analog Converter</strong><span>Converts encoded digital inputs into analog drive levels for an array.</span></dd></div>
+            <div class="term-entry" id="term-adc"><dt><abbr class="term" title="Analog-to-Digital Converter">ADC</abbr></dt><dd><strong>Analog-to-Digital Converter</strong><span>Digitizes analog column/current results; often a major area, energy, latency, and accuracy cost.</span></dd></div>
+            <div class="term-entry" id="term-sram"><dt><abbr class="term" title="Static Random-Access Memory">SRAM</abbr></dt><dd><strong>Static Random-Access Memory</strong><span>Fast on-chip digital memory used for activations, commands, scratch data, and partial sums.</span></dd></div>
+            <div class="term-entry" id="term-pvt"><dt><abbr class="term" title="Process, Voltage, and Temperature">PVT</abbr></dt><dd><strong>Process, Voltage, and Temperature</strong><span>Variation dimensions that can change timing, analog transfer behavior, and calibration validity.</span></dd></div>
+            <div class="term-entry" id="term-ecc"><dt><abbr class="term" title="Error-Correcting Code">ECC</abbr></dt><dd><strong>Error-Correcting Code</strong><span>Redundant coding used to detect or correct digital memory/data corruption.</span></dd></div>
+            <div class="term-entry" id="term-qdq"><dt><abbr class="term" title="Quantize and Dequantize">QDQ</abbr></dt><dd><strong>Quantize/Dequantize operators</strong><span>Graph nodes that make numerical scale, zero point, and precision transitions explicit.</span></dd></div>
+            <div class="term-entry" id="term-h2d"><dt><abbr class="term" title="Host-to-Device">H2D</abbr></dt><dd><strong>Host-to-Device transfer</strong><span>Input, command, or constant data moving from host memory to the accelerator.</span></dd></div>
+            <div class="term-entry" id="term-d2h"><dt><abbr class="term" title="Device-to-Host">D2H</abbr></dt><dd><strong>Device-to-Host transfer</strong><span>Output, trace, or status data moving from the accelerator to host memory.</span></dd></div>
+            <div class="term-entry" id="term-yolo"><dt><abbr class="term" title="You Only Look Once">YOLO</abbr></dt><dd><strong>You Only Look Once</strong><span>Family of single-stage object-detection models used here as the first end-to-end workload.</span></dd></div>
+            <div class="term-entry" id="term-nms"><dt><abbr class="term" title="Non-Maximum Suppression">NMS</abbr></dt><dd><strong>Non-Maximum Suppression</strong><span>Postprocessing that removes redundant overlapping detections.</span></dd></div>
+            <div class="term-entry" id="term-map"><dt><abbr class="term" title="mean Average Precision">mAP</abbr></dt><dd><strong>mean Average Precision</strong><span>Object-detection accuracy metric computed over classes and intersection-over-union criteria.</span></dd></div>
+            <div class="term-entry" id="term-rtl"><dt><abbr class="term" title="Register-Transfer Level">RTL</abbr></dt><dd><strong>Register-Transfer Level</strong><span>Clocked digital hardware description used to implement and verify the PCIe endpoint and engines.</span></dd></div>
+            <div class="term-entry" id="term-rom"><dt><abbr class="term" title="Read-Only Memory">ROM</abbr></dt><dd><strong>Read-Only Memory</strong><span>Immutable or protected first-stage device code that establishes reset-safe boot and firmware loading.</span></dd></div>
+            <div class="term-entry" id="term-fpga"><dt><abbr class="term" title="Field-Programmable Gate Array">FPGA</abbr></dt><dd><strong>Field-Programmable Gate Array</strong><span>Reconfigurable hardware commonly used to prototype the PCIe endpoint and command protocol before silicon.</span></dd></div>
+            <div class="term-entry" id="term-llm"><dt><abbr class="term" title="Large Language Model">LLM</abbr></dt><dd><strong>Large Language Model</strong><span>Transformer model with large parameter and runtime-state requirements; referenced by the companion scale-out design.</span></dd></div>
+            <div class="term-entry" id="term-fps"><dt><abbr class="term" title="Frames Per Second">FPS</abbr></dt><dd><strong>Frames Per Second</strong><span>Steady-state throughput metric for image/video inference; it must be paired with latency and accuracy.</span></dd></div>
+            <div class="term-entry" id="term-sku"><dt><abbr class="term" title="Stock Keeping Unit">SKU</abbr></dt><dd><strong>Stock Keeping Unit</strong><span>A specific sellable board or device configuration with defined hardware and support characteristics.</span></dd></div>
+          </dl>
+        </section>
+      </div>
+
+      <div class="section-heading top-gap">
+        <p class="eyebrow">Do not confuse</p>
+        <h2>Similar words describe different contracts</h2>
+      </div>
+      <div class="confusion-grid">
+        <article class="confusion-item"><strong>API vs ABI vs UAPI</strong><span>An API is what source code calls. An ABI is the binary representation and behavior. A UAPI is specifically the kernel/userspace API and ABI surface.</span></article>
+        <article class="confusion-item"><strong>Runtime vs UMD vs KMD vs firmware</strong><span>The runtime schedules model execution; the UMD translates userspace objects; the KMD enforces host protection; firmware controls device engines.</span></article>
+        <article class="confusion-item"><strong>BAR/MMIO vs DMA</strong><span>BAR-backed MMIO carries small control/register accesses. DMA moves bulk buffers between host memory and the device.</span></article>
+        <article class="confusion-item"><strong>SQ/CQ vs doorbell/MSI-X</strong><span>SQ and CQ hold durable command/completion records. A doorbell and MSI-X only notify the other side that records are ready.</span></article>
+        <article class="confusion-item"><strong>IOVA vs CPU pointer vs physical address</strong><span>A CPU pointer belongs to a process, a physical address names RAM, and an IOVA is the device-visible address produced by the DMA/IOMMU mapping.</span></article>
+        <article class="confusion-item"><strong>Quantization error vs transport error</strong><span>ADC, low precision, and calibration affect numerical accuracy. PCIe AER, DMA, ECC, and queue faults affect reliable delivery and execution.</span></article>
+      </div>
+    </section>
+
     <section class="section" id="decision">
       <div class="section-heading">
         <p class="eyebrow">Driver decision</p>
-        <h2>Does an Analog CIM board need a UMD and KMD?</h2>
+        <h2>Does an Analog CIM board need a user-mode driver (UMD) and kernel-mode driver (KMD)?</h2>
+      </div>
+      <div class="term-reminder" role="note" aria-label="Terminology used in the driver decision section">
+        <strong>Terms here</strong>
+        <span><abbr class="term" title="User-Mode Driver">UMD</abbr> = User-Mode Driver</span>
+        <span><abbr class="term" title="Kernel-Mode Driver">KMD</abbr> = Kernel-Mode Driver</span>
+        <span><abbr class="term" title="Hardware Abstraction Layer">HAL</abbr> = Hardware Abstraction Layer</span>
+        <span><abbr class="term" title="User-space Application Programming Interface">UAPI</abbr> = kernel/userspace contract</span>
       </div>
       <div class="verdict-banner">
         <div>
@@ -140,7 +257,7 @@
           <b>Narrow prototype</b>
           <strong>UIO only for simple MMIO</strong>
           <span>UIO maps device memory and forwards interrupts, but has no IOMMU protection. Do not make it the product path for unrestricted bus-master DMA.</span>
-          <code>Best for: mailbox or PIO loopback</code>
+          <code>Best for: mailbox or Programmed I/O (PIO) loopback</code>
         </article>
         <article class="decision-option recommended">
           <b>Product path</b>
@@ -168,6 +285,13 @@
           keeps model correctness separate from PCIe, firmware, and analog variation bugs.
         </p>
       </div>
+      <div class="term-reminder" role="note" aria-label="Terminology used in the end-to-end system section">
+        <strong>Terms here</strong>
+        <span><abbr class="term" title="Application Programming Interface">API</abbr> = callable source interface</span>
+        <span><abbr class="term" title="Application Binary Interface">ABI</abbr> = binary layout and behavior</span>
+        <span><abbr class="term" title="Hardware Abstraction Layer">HAL</abbr> = transport-neutral hardware interface</span>
+        <span>Firmware = device-resident control software</span>
+      </div>
       <div class="system-map" role="group" aria-label="Analog CIM host and device architecture">
         <div class="system-tier">
           <div class="tier-label">Model and application</div>
@@ -180,17 +304,17 @@
         <div class="system-tier">
           <div class="tier-label">Host userspace</div>
           <div class="tier-nodes">
-            <div class="tier-node"><strong>Framework plugin</strong><span>ORT EP capability and fallback boundary</span></div>
+            <div class="tier-node"><strong>Framework plugin</strong><span>ONNX Runtime (ORT) Execution Provider (EP) capability and fallback boundary</span></div>
             <div class="tier-node"><strong>Runtime</strong><span>Artifact load, session, buffers, queues, events</span></div>
-            <div class="tier-node"><strong>UMD / hardware HAL</strong><span>Discover, query, allocate, submit, wait, trace</span></div>
+            <div class="tier-node"><strong>User-Mode Driver (UMD) / HAL</strong><span>Hardware Abstraction Layer: discover, query, allocate, submit, wait, trace</span></div>
           </div>
         </div>
-        <div class="system-boundary">Stable Linux UAPI: ioctl + mmap + poll/eventfd + dma-buf</div>
+        <div class="system-boundary">Stable Linux user-space API (UAPI): ioctl + mmap + poll/eventfd + dma-buf</div>
         <div class="system-tier">
           <div class="tier-label">Host kernel</div>
           <div class="tier-nodes">
-            <div class="tier-node control"><strong>KMD contexts</strong><span>Ownership, lifetime, permissions, ABI</span></div>
-            <div class="tier-node control"><strong>Memory manager</strong><span>Pin/import, IOMMU map, IOVA, fence</span></div>
+            <div class="tier-node control"><strong>Kernel-Mode Driver (KMD) contexts</strong><span>Ownership, lifetime, permissions, Application Binary Interface (ABI)</span></div>
+            <div class="tier-node control"><strong>Memory manager</strong><span>Pin/import, IOMMU map, Input-Output Virtual Address (IOVA), fence</span></div>
             <div class="tier-node control"><strong>PCI driver</strong><span>BAR, DMA, MSI-X, reset, AER, firmware</span></div>
           </div>
         </div>
@@ -206,16 +330,16 @@
         <div class="system-tier">
           <div class="tier-label">Device data plane</div>
           <div class="tier-nodes">
-            <div class="tier-node"><strong>DMA + SRAM</strong><span>Stage inputs, outputs, commands, partial sums</span></div>
-            <div class="tier-node"><strong>Analog MVM</strong><span>Program, encode, integrate, ADC, reconstruct</span></div>
+            <div class="tier-node"><strong>DMA + SRAM</strong><span>Direct Memory Access and Static RAM stage inputs, outputs, commands, and partial sums</span></div>
+            <div class="tier-node"><strong>Analog MVM</strong><span>Matrix-Vector Multiplication: program, encode, integrate, ADC, reconstruct</span></div>
             <div class="tier-node"><strong>Digital engines</strong><span>Elementwise, resize, activation, reduction, fallback</span></div>
           </div>
         </div>
       </div>
       <div class="contract-grid top-gap">
-        <article class="contract-card"><strong>Artifact ABI</strong><span>Compiler to runtime and firmware semantics.</span><code>target + program + constants + commands + debug map</code></article>
-        <article class="contract-card"><strong>Linux UAPI</strong><span>UMD to KMD ownership and transport.</span><code>caps + contexts + buffers + queues + waits + faults</code></article>
-        <article class="contract-card"><strong>Firmware ABI</strong><span>KMD queues to device validation and execution.</span><code>SQ/CQ + mailbox + opcodes + status + trace</code></article>
+        <article class="contract-card"><strong>Artifact ABI</strong><span>Application Binary Interface from compiler to runtime and firmware.</span><code>target + program + constants + commands + debug map</code></article>
+        <article class="contract-card"><strong>Linux UAPI</strong><span>User-space API from User-Mode Driver (UMD) to Kernel-Mode Driver (KMD).</span><code>caps + contexts + buffers + queues + waits + faults</code></article>
+        <article class="contract-card"><strong>Firmware ABI</strong><span>Application Binary Interface from KMD queues to device validation and execution.</span><code>SQ/CQ + mailbox + opcodes + status + trace</code></article>
       </div>
     </section>
 
@@ -228,6 +352,13 @@
           The KMD protects host resources. Firmware owns device scheduling. Keeping these decisions separate permits the
           same artifact to run in simulation and on a board.
         </p>
+      </div>
+      <div class="term-reminder" role="note" aria-label="Terminology used in the model compilation section">
+        <strong>Terms here</strong>
+        <span><abbr class="term" title="Open Neural Network Exchange">ONNX</abbr> = model graph format</span>
+        <span><abbr class="term" title="Multi-Level Intermediate Representation">MLIR</abbr> = compiler lowering infrastructure</span>
+        <span><abbr class="term" title="ONNX Runtime">ORT</abbr> = ONNX Runtime</span>
+        <span><abbr class="term" title="Execution Provider">EP</abbr> = framework backend plugin</span>
       </div>
       <div class="pipeline-flow" role="group" aria-label="Model to board flow chart">
         <div class="pipeline-stage host"><b>1. Import</b><strong>ONNX graph</strong><span>Validate opset, infer shapes, normalize layouts and constants.</span></div>
@@ -261,6 +392,14 @@
           final partition. Keep host fallback available until each device segment passes differential tests.
         </p>
       </div>
+      <div class="term-reminder" role="note" aria-label="Terminology used in the YOLO dataflow section">
+        <strong>Terms here</strong>
+        <span><abbr class="term" title="Buffer Object">BO</abbr> = Buffer Object</span>
+        <span><abbr class="term" title="Host-to-Device">H2D</abbr> = Host-to-Device transfer</span>
+        <span><abbr class="term" title="Device-to-Host">D2H</abbr> = Device-to-Host transfer</span>
+        <span><abbr class="term" title="Non-Maximum Suppression">NMS</abbr> = detection deduplication</span>
+        <span><abbr class="term" title="mean Average Precision">mAP</abbr> = detection accuracy metric</span>
+      </div>
       <div class="yolo-flow" role="group" aria-label="Hybrid YOLO host and device data flow">
         <div class="yolo-stage host"><b>Host</b><strong>Capture + preprocess</strong><span>Decode, resize/letterbox, normalize, quantize, pack layout.</span></div>
         <div class="yolo-stage host"><b>PCIe</b><strong>Input DMA</strong><span>Imported or allocated input BO; one H2D transfer per frame.</span></div>
@@ -287,13 +426,13 @@
             <tr><th scope="row">Activation / elementwise</th><td>Digital vector engine or firmware kernel</td><td>Quantization domain and rounding are explicit</td><td>Cycle and numerical checkpoints at each partition boundary</td></tr>
             <tr><th scope="row">Resize / concat / route</th><td>Digital engine; avoid host round-trip</td><td>Layout and memory plan fit SRAM and DMA rules</td><td>No hidden copy; measured bytes and stall reason</td></tr>
             <tr><th scope="row">Detection head</th><td>Hybrid; target profile selects analog-eligible projections</td><td>Tensor shapes and output scale remain compatible with decode</td><td>Layer error distribution plus end-to-end mAP on full validation set</td></tr>
-            <tr><th scope="row">Decode / NMS</th><td>Host for MVP, device only with a measured benefit</td><td>Model-specific anchors/strides and thresholds packaged as metadata</td><td>Deterministic postprocess and identical evaluation configuration</td></tr>
+            <tr><th scope="row">Decode / NMS</th><td>Host for the Minimum Viable Product (MVP), device only with a measured benefit</td><td>Model-specific anchors/strides and thresholds packaged as metadata</td><td>Deterministic postprocess and identical evaluation configuration</td></tr>
           </tbody>
         </table>
       </div>
       <div class="formula-strip top-gap" role="group" aria-label="YOLO system performance equations">
         <div class="formula-item"><code>T_frame = T_pre + T_H2D + T_queue + T_device + T_D2H + T_post</code><span>Report each term, median, and tail latency.</span></div>
-        <div class="formula-item"><code>FPS_steady &lt;= 1 / max(stage_time)</code><span>With pipelining, the slowest non-overlapped stage limits throughput.</span></div>
+        <div class="formula-item"><code>FPS_steady &lt;= 1 / max(stage_time)</code><span>Frames Per Second (FPS): with pipelining, the slowest non-overlapped stage limits throughput.</span></div>
         <div class="formula-item"><code>coverage = device_ops / supported_candidate_ops</code><span>Also report bytes crossing every partition, not only operator count.</span></div>
         <div class="formula-item"><code>accuracy_delta = mAP_device - mAP_reference</code><span>Use the same dataset, preprocessing, decode, and thresholds.</span></div>
       </div>
@@ -308,15 +447,22 @@
           not values to infer from a demo. Encode them in machine-readable target and capability records.
         </p>
       </div>
+      <div class="term-reminder" role="note" aria-label="Terminology used in the platform requirements section">
+        <strong>Terms here</strong>
+        <span><abbr class="term" title="Input-Output Memory Management Unit">IOMMU</abbr> = DMA translation and isolation</span>
+        <span><abbr class="term" title="Input-Output Virtual Address">IOVA</abbr> = device-visible mapped address</span>
+        <span><abbr class="term" title="Function Level Reset">FLR</abbr> = PCIe function reset</span>
+        <span><abbr class="term" title="Advanced Error Reporting">AER</abbr> = PCIe error reporting</span>
+      </div>
       <div class="requirements-grid">
         <article class="requirement-panel">
           <header><strong>Host requirement profile</strong><span>Minimum supported Linux environment</span></header>
           <ul class="requirement-list">
             <li><strong>CPU and OS</strong><span>Document x86-64 and/or AArch64, distribution, kernel range, page size, endianness, and 32-bit userspace policy.</span></li>
             <li><strong>PCIe root</strong><span>Required link generation and width, 64-bit BAR support, MSI-X, AER, hot reset/FLR behavior, and link retraining policy.</span></li>
-            <li><strong>IOMMU</strong><span>Enable Intel VT-d, AMD-Vi, or SMMU for isolation. Qualify IOVA width, page sizes, and IOMMU group topology.</span></li>
-            <li><strong>Memory</strong><span>Locked-memory limits, pinned-memory budget, scatter/gather limits, alignment, NUMA node, and optional hugepage policy.</span></li>
-            <li><strong>Build</strong><span>Compiler, CMake/Ninja, kernel headers, DKMS or in-tree build, packaging, symbols, sanitizers, and reproducible toolchain image.</span></li>
+            <li><strong>IOMMU</strong><span>Enable Intel Virtualization Technology for Directed I/O (VT-d), AMD-Vi, or an Arm System Memory Management Unit (SMMU) for isolation. Qualify IOVA width, page sizes, and IOMMU group topology.</span></li>
+            <li><strong>Memory</strong><span>Locked-memory limits, pinned-memory budget, scatter/gather limits, alignment, Non-Uniform Memory Access (NUMA) node, and optional hugepage policy.</span></li>
+            <li><strong>Build</strong><span>Compiler, CMake/Ninja, kernel headers, Dynamic Kernel Module Support (DKMS) or in-tree build, packaging, symbols, sanitizers, and reproducible toolchain image.</span></li>
             <li><strong>Access</strong><span>udev rules, device group, least-privilege permissions, firmware search path, module signing, and secure-boot policy.</span></li>
             <li><strong>Observability</strong><span><code>lspci</code>, sysfs, debugfs or tracefs, dynamic debug, ftrace, perf, AER counters, and support-bundle command.</span></li>
             <li><strong>Media interop</strong><span>Optional dma-buf import for camera/display pipelines; define synchronization and supported exporters explicitly.</span></li>
@@ -325,7 +471,7 @@
         <article class="requirement-panel">
           <header><strong>Device requirement profile</strong><span>RTL, board, firmware, and analog contract</span></header>
           <ul class="requirement-list">
-            <li><strong>Identity</strong><span>Vendor/device/subsystem IDs, revision, serial, board SKU, capability bits, hardware ABI, and manufacturing state.</span></li>
+            <li><strong>Identity</strong><span>Vendor/device/subsystem IDs, revision, serial, board Stock Keeping Unit (SKU), capability bits, hardware ABI, and manufacturing state.</span></li>
             <li><strong>PCIe endpoint</strong><span>BAR type/size, DMA address width, maximum payload/read request, MSI-X vectors, FLR, AER, and power states.</span></li>
             <li><strong>Boot</strong><span>ROM state, mailbox, firmware image format, authenticity check, load window, entry point, timeout, rollback, and recovery mode.</span></li>
             <li><strong>Queues</strong><span>Submission/completion entry formats, count, depth, alignment, ownership, generation, doorbells, interrupt moderation, and reset.</span></li>
@@ -347,6 +493,14 @@
           from one register specification. It is not a disclosed register map for any company. Generate C, C++, SystemVerilog,
           simulator, and documentation definitions from the same schema.
         </p>
+      </div>
+      <div class="term-reminder" role="note" aria-label="Terminology used in the PCIe implementation section">
+        <strong>Terms here</strong>
+        <span><abbr class="term" title="Base Address Register">BAR</abbr> = device address region</span>
+        <span><abbr class="term" title="Memory-Mapped Input/Output">MMIO</abbr> = register access by CPU load/store</span>
+        <span><abbr class="term" title="Direct Memory Access">DMA</abbr> = bulk device/host transfer</span>
+        <span><abbr class="term" title="Message Signaled Interrupts Extended">MSI-X</abbr> = multi-vector PCIe interrupts</span>
+        <span>RO/RW/WO/RW1C = register access modes</span>
       </div>
       <div class="bar-map">
         <div class="bar-index">
@@ -391,6 +545,14 @@
           context table. Keep fixed-width fields, natural alignment, explicit reserved fields, and static size checks.
           Add a new ioctl or opcode for new semantics instead of silently changing an old one.
         </p>
+      </div>
+      <div class="term-reminder" role="note" aria-label="Terminology used in the queue ABI section">
+        <strong>Terms here</strong>
+        <span><abbr class="term" title="Submission Queue">SQ</abbr> = Submission Queue</span>
+        <span><abbr class="term" title="Completion Queue">CQ</abbr> = Completion Queue</span>
+        <span><abbr class="term" title="Application Binary Interface">ABI</abbr> = binary command contract</span>
+        <span><abbr class="term" title="Input-Output Virtual Address">IOVA</abbr> = mapped DMA address</span>
+        <span>Doorbell = MMIO queue notification</span>
       </div>
       <div class="code-panel">
         <header><strong>Proposed firmware queue entries</strong><span>Illustrative v0 shared header; all fields little-endian</span></header>
@@ -464,6 +626,13 @@ struct acim_submit {
         <p class="eyebrow">UMD, KMD, and firmware split</p>
         <h2>Put mechanisms at the lowest layer that can enforce them</h2>
       </div>
+      <div class="term-reminder" role="note" aria-label="Terminology used in the software ownership section">
+        <strong>Terms here</strong>
+        <span>Runtime = model execution orchestration</span>
+        <span><abbr class="term" title="User-Mode Driver">UMD</abbr> = userspace device library</span>
+        <span><abbr class="term" title="Kernel-Mode Driver">KMD</abbr> = privileged host driver</span>
+        <span>Firmware = device-side scheduler and control</span>
+      </div>
       <div class="table-wrap">
         <table>
           <thead><tr><th scope="col">Responsibility</th><th scope="col">Runtime / UMD</th><th scope="col">KMD</th><th scope="col">Firmware</th><th scope="col">Do not do</th></tr></thead>
@@ -490,12 +659,19 @@ struct acim_submit {
 
     <section class="section" id="kmd">
       <div class="section-heading">
-        <p class="eyebrow">Kernel-mode driver skeleton</p>
+        <p class="eyebrow">Kernel-mode driver (KMD) skeleton</p>
         <h2>Probe in dependency order; remove in reverse after quiescing DMA</h2>
         <p class="section-note">
           The skeleton shows order and failure ownership, not drop-in production code. Select current managed PCI APIs
           for the supported kernel range, implement every unwind path, and test probe failure after each resource acquisition.
         </p>
+      </div>
+      <div class="term-reminder" role="note" aria-label="Terminology used in the kernel-mode driver section">
+        <strong>Terms here</strong>
+        <span><abbr class="term" title="Kernel-Mode Driver">KMD</abbr> = Kernel-Mode Driver</span>
+        <span><abbr class="term" title="Interrupt Request">IRQ</abbr> = Interrupt Request</span>
+        <span><abbr class="term" title="Direct Memory Access">DMA</abbr> = Direct Memory Access</span>
+        <span>Probe = Linux device initialization callback</span>
       </div>
       <div class="code-panel">
         <header><strong>Proposed Linux PCI probe path</strong><span>Enable, claim, map, configure DMA, IRQ, firmware, then expose userspace</span></header>
@@ -601,12 +777,19 @@ err_clear_master:
 
     <section class="section" id="umd">
       <div class="section-heading">
-        <p class="eyebrow">User-mode driver skeleton</p>
+        <p class="eyebrow">User-mode driver (UMD) skeleton</p>
         <h2>Expose a transport-neutral HAL to the runtime</h2>
         <p class="section-note">
           The application should not issue ioctls directly. The UMD translates stable SDK objects into Linux UAPI
           objects and can later support VFIO, simulator, Windows, or an SoC transport without changing model execution.
         </p>
+      </div>
+      <div class="term-reminder" role="note" aria-label="Terminology used in the user-mode driver section">
+        <strong>Terms here</strong>
+        <span><abbr class="term" title="User-Mode Driver">UMD</abbr> = User-Mode Driver</span>
+        <span><abbr class="term" title="Hardware Abstraction Layer">HAL</abbr> = Hardware Abstraction Layer</span>
+        <span><abbr class="term" title="Application Programming Interface">API</abbr> = callable source interface</span>
+        <span><code>ioctl</code> = Linux device-control system call</span>
       </div>
       <div class="code-panel">
         <header><strong>Proposed C HAL surface</strong><span>Opaque handles, explicit ownership, stable status values</span></header>
@@ -653,6 +836,13 @@ void acimClose(AcimDevice *);</code></pre>
           Use coherent DMA for small long-lived queue/control structures and streaming mappings or managed buffer
           objects for payloads. The DMA address returned by the kernel is a device bus address, not a CPU physical address.
         </p>
+      </div>
+      <div class="term-reminder" role="note" aria-label="Terminology used in the DMA and interrupt section">
+        <strong>Terms here</strong>
+        <span><abbr class="term" title="Direct Memory Access">DMA</abbr> = Direct Memory Access</span>
+        <span><abbr class="term" title="Input-Output Memory Management Unit">IOMMU</abbr> = address translation and isolation</span>
+        <span><abbr class="term" title="Input-Output Virtual Address">IOVA</abbr> = device-visible DMA address</span>
+        <span><abbr class="term" title="Message Signaled Interrupts Extended">MSI-X</abbr> = completion/fault notification</span>
       </div>
       <div class="dma-flow" role="group" aria-label="DMA buffer lifecycle flow chart">
         <div class="dma-stage"><b>1. Create/import</b><strong>Buffer object</strong><span>KMD allocates or imports pages and records owner, size, usage and direction.</span></div>
@@ -703,14 +893,21 @@ readl(adev-&gt;bar0 + ACIM_DEVICE_STATUS);</code></pre>
           weights for every frame. A reset or changed placement/calibration epoch invalidates the resident program binding.
         </p>
       </div>
+      <div class="term-reminder" role="note" aria-label="Terminology used in the inference sequence">
+        <strong>Terms here</strong>
+        <span><abbr class="term" title="ONNX Runtime">ORT</abbr> = ONNX Runtime</span>
+        <span><abbr class="term" title="Buffer Object">BO</abbr> = Buffer Object</span>
+        <span><abbr class="term" title="Submission Queue">SQ</abbr>/<abbr class="term" title="Completion Queue">CQ</abbr> = command/completion rings</span>
+        <span><abbr class="term" title="Interrupt Request">IRQ</abbr> = Interrupt Request</span>
+      </div>
       <div class="sequence-wrap" tabindex="0" aria-label="Scrollable first inference sequence diagram">
         <div class="sequence-diagram" role="group" aria-label="Application to Analog CIM inference sequence">
           <div></div>
-          <div class="sequence-lane">Application / ORT</div>
-          <div class="sequence-lane">Runtime / UMD</div>
-          <div class="sequence-lane">KMD</div>
+          <div class="sequence-lane">Application / ONNX Runtime (ORT)</div>
+          <div class="sequence-lane">Runtime / User-Mode Driver (UMD)</div>
+          <div class="sequence-lane">Kernel-Mode Driver (KMD)</div>
           <div class="sequence-lane">Firmware</div>
-          <div class="sequence-lane">DMA + ACiM engines</div>
+          <div class="sequence-lane">Direct Memory Access (DMA) + ACiM engines</div>
 
           <div class="sequence-number">01</div><div class="sequence-event span-1-2">Run(frame, correlation_id) -&gt; bind executable and input</div><div class="sequence-empty"></div><div class="sequence-empty"></div><div class="sequence-empty"></div>
           <div class="sequence-number">02</div><div class="sequence-empty"></div><div class="sequence-event span-2-3">CREATE/IMPORT BO + validate context -&gt;</div><div class="sequence-empty"></div><div class="sequence-empty"></div>
@@ -731,6 +928,13 @@ readl(adev-&gt;bar0 + ACIM_DEVICE_STATUS);</code></pre>
       <div class="section-heading">
         <p class="eyebrow">Firmware implementation</p>
         <h2>Boot establishes trust; the scheduler validates every submission again</h2>
+      </div>
+      <div class="term-reminder" role="note" aria-label="Terminology used in the firmware section">
+        <strong>Terms here</strong>
+        <span><abbr class="term" title="Read-Only Memory">ROM</abbr> = immutable first-stage boot code</span>
+        <span>Firmware = device-resident scheduler/control code</span>
+        <span><abbr class="term" title="Application Binary Interface">ABI</abbr> = host/device binary contract</span>
+        <span>Generation = reset epoch rejecting stale work</span>
       </div>
       <div class="boot-flow" role="group" aria-label="Firmware boot flow chart">
         <div class="boot-stage"><b>ROM</b><strong>Reset-safe state</strong><span>DMA off, IRQ masked, mailbox available, immutable identity readable.</span></div>
@@ -794,6 +998,13 @@ readl(adev-&gt;bar0 + ACIM_DEVICE_STATUS);</code></pre>
           should not be hidden inside an ordinary inference command.
         </p>
       </div>
+      <div class="term-reminder" role="note" aria-label="Terminology used in the analog device contract section">
+        <strong>Terms here</strong>
+        <span><abbr class="term" title="Matrix-Vector Multiplication">MVM</abbr> = Matrix-Vector Multiplication</span>
+        <span><abbr class="term" title="Digital-to-Analog Converter">DAC</abbr> = Digital-to-Analog Converter</span>
+        <span><abbr class="term" title="Analog-to-Digital Converter">ADC</abbr> = Analog-to-Digital Converter</span>
+        <span><abbr class="term" title="Process, Voltage, and Temperature">PVT</abbr> = Process, Voltage, Temperature</span>
+      </div>
       <div class="pipeline-flow" role="group" aria-label="Analog weight deployment flow chart">
         <div class="pipeline-stage host"><b>1. Package</b><strong>Weight program</strong><span>Logical tensor, slices, sign method, target cells, tolerances, hash.</span></div>
         <div class="pipeline-stage analog"><b>2. Program</b><strong>Device operation</strong><span>Erase/program pulse policy and wear budget are device-specific.</span></div>
@@ -829,6 +1040,13 @@ readl(adev-&gt;bar0 + ACIM_DEVICE_STATUS);</code></pre>
         <p class="eyebrow">Fault, reset, and security</p>
         <h2>Every failure has an owner, a containment boundary, and a terminal event</h2>
       </div>
+      <div class="term-reminder" role="note" aria-label="Terminology used in the fault and recovery section">
+        <strong>Terms here</strong>
+        <span><abbr class="term" title="Advanced Error Reporting">AER</abbr> = PCIe Advanced Error Reporting</span>
+        <span><abbr class="term" title="Error-Correcting Code">ECC</abbr> = Error-Correcting Code</span>
+        <span><abbr class="term" title="Function Level Reset">FLR</abbr> = Function Level Reset</span>
+        <span>Fail closed = reject work when compatibility or safety is unknown</span>
+      </div>
       <div class="table-wrap">
         <table>
           <thead><tr><th scope="col">Failure</th><th scope="col">Detect</th><th scope="col">Contain</th><th scope="col">Recover</th><th scope="col">Evidence retained</th></tr></thead>
@@ -857,6 +1075,13 @@ readl(adev-&gt;bar0 + ACIM_DEVICE_STATUS);</code></pre>
       <div class="section-heading">
         <p class="eyebrow">Profiling and correlation</p>
         <h2>A fast array is irrelevant if the frame stalls at a boundary you cannot see</h2>
+      </div>
+      <div class="term-reminder" role="note" aria-label="Terminology used in the profiling section">
+        <strong>Terms here</strong>
+        <span><abbr class="term" title="Host-to-Device">H2D</abbr> = Host-to-Device transfer</span>
+        <span><abbr class="term" title="Device-to-Host">D2H</abbr> = Device-to-Host transfer</span>
+        <span>Correlation ID = identifier joining one request across layers</span>
+        <span>Tail latency = high-percentile slow-request latency</span>
       </div>
       <div class="proof-grid">
         <article><b>Host</b><strong>Queue and copy time</strong><span>CPU preprocessing, BO allocation/import, map, submit, wait, postprocess, scheduler delay.</span></article>
@@ -890,6 +1115,13 @@ readl(adev-&gt;bar0 + ACIM_DEVICE_STATUS);</code></pre>
       <div class="section-heading">
         <p class="eyebrow">Implementation repository</p>
         <h2>Generate shared protocol definitions and test each boundary independently</h2>
+      </div>
+      <div class="term-reminder" role="note" aria-label="Terminology used in the implementation repository section">
+        <strong>Terms here</strong>
+        <span><abbr class="term" title="Register-Transfer Level">RTL</abbr> = Register-Transfer Level hardware</span>
+        <span><abbr class="term" title="User-space Application Programming Interface">UAPI</abbr> = kernel/userspace interface files</span>
+        <span><abbr class="term" title="Continuous Integration">CI</abbr> = Continuous Integration</span>
+        <span>Generated code = mechanical output from the protocol schema</span>
       </div>
       <div class="repository-tree">
         <div class="code-panel">
@@ -948,6 +1180,13 @@ readl(adev-&gt;bar0 + ACIM_DEVICE_STATUS);</code></pre>
           queue wrap, interrupt loss, reset, and one-operation numerical correlation are boring and repeatable.
         </p>
       </div>
+      <div class="term-reminder" role="note" aria-label="Terminology used in the delivery plan">
+        <strong>Terms here</strong>
+        <span>Protocol v0 = first versioned hardware/software contract</span>
+        <span><abbr class="term" title="Field-Programmable Gate Array">FPGA</abbr> = Field-Programmable Gate Array prototype</span>
+        <span><abbr class="term" title="Matrix-Vector Multiplication">MVM</abbr> = Matrix-Vector Multiplication</span>
+        <span>Qualification = evidence required before product release</span>
+      </div>
       <div class="progress-panel" aria-live="polite">
         <div class="progress-track"><progress class="progress-bar" data-progress-bar aria-label="Analog CIM board bring-up progress" max="100" value="0">0%</progress></div>
         <span class="progress-value" data-progress-value>0 / 9 complete</span>
@@ -980,7 +1219,7 @@ readl(adev-&gt;bar0 + ACIM_DEVICE_STATUS);</code></pre>
             <tr><th scope="row">Firmware</th><td>Malformed descriptor, illegal IOVA, unsupported opcode, resource exhaustion, watchdog, panic, reset mid-command</td><td>Bounded fault, captured evidence, generation change, clean reinitialization</td><td>Firmware unit tests plus host fault injection</td></tr>
             <tr><th scope="row">Analog operation</th><td>Program/verify, bad rows/columns, PVT, saturation, drift, calibration mismatch, remap and retry</td><td>Declared tolerance/distribution; stale profile rejected; fallback works</td><td>Statistical simulator and device population</td></tr>
             <tr><th scope="row">YOLO correctness</th><td>Boundary tensors, layer distributions, full validation set, host/device/fallback variants</td><td>Predetermined mAP and per-layer error budgets with identical preprocessing/postprocess</td><td>Nightly model corpus and release run</td></tr>
-            <tr><th scope="row">Performance</th><td>Cold/warm start, single stream, throughput, queue depth, overlap, thermal soak, recovery</td><td>No unexplained gap between stage times and end-to-end latency; tails within SLO</td><td>Scenario harness with raw trace archive</td></tr>
+            <tr><th scope="row">Performance</th><td>Cold/warm start, single stream, throughput, queue depth, overlap, thermal soak, recovery</td><td>No unexplained gap between stage times and end-to-end latency; tails within the Service-Level Objective (SLO)</td><td>Scenario harness with raw trace archive</td></tr>
             <tr><th scope="row">PCIe reliability</th><td>AER correctable/non-fatal/fatal, link retrain, FLR/hot reset, remove during work</td><td>Callbacks quiesce correctly; recover or report permanent device loss without stale DMA</td><td>Lab qualification and platform matrix</td></tr>
           </tbody>
         </table>
