@@ -658,11 +658,85 @@ tbody th {
 
 .question-list {
   margin: 0;
-  padding-left: 22px;
+  padding: 0;
+  list-style: none;
+  counter-reset: claim-counter;
 }
 
-.question-list li + li {
-  margin-top: 8px;
+.claim-item {
+  position: relative;
+  padding: 20px 0 20px 52px;
+  counter-increment: claim-counter;
+}
+
+.claim-item + .claim-item {
+  border-top: 1px solid var(--line);
+}
+
+.claim-item::before {
+  content: counter(claim-counter, decimal-leading-zero);
+  position: absolute;
+  top: 20px;
+  left: 0;
+  display: grid;
+  width: 34px;
+  height: 34px;
+  place-items: center;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  color: var(--teal);
+  background: var(--surface-2);
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.claim-heading {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: start;
+}
+
+.claim-heading h3 {
+  margin: 2px 0 0;
+  font-size: 19px;
+  line-height: 1.35;
+}
+
+.claim-heading .status-pill {
+  white-space: nowrap;
+}
+
+.claim-answer {
+  margin: 11px 0 0;
+}
+
+.claim-limit {
+  margin: 12px 0 0;
+  padding-left: 12px;
+  border-left: 3px solid var(--amber);
+  color: var(--muted);
+}
+
+.claim-sources {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px 14px;
+  align-items: baseline;
+  margin-top: 13px;
+  font-size: 13px;
+}
+
+.claim-source-label {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.claim-sources a {
+  font-weight: 800;
+  text-underline-offset: 3px;
 }
 
 .quiz-shell {
@@ -921,6 +995,15 @@ code {
   .formula-step,
   .study-step {
     min-height: 96px;
+  }
+
+  .claim-heading {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+
+  .claim-heading .status-pill {
+    justify-self: start;
   }
 
   .quiz-body {

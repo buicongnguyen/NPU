@@ -9,6 +9,21 @@
     vendor: 'Vendor claim'
   };
 
+  var claimStatus = {
+    answered: {
+      label: 'Answered in sources',
+      className: 'status-measured'
+    },
+    conditional: {
+      label: 'Study-dependent',
+      className: 'status-partial'
+    },
+    open: {
+      label: 'Evidence incomplete',
+      className: 'status-open'
+    }
+  };
+
   function element(tag, className, text) {
     var node = document.createElement(tag);
     if (className) node.className = className;
@@ -75,7 +90,30 @@
     var root = document.getElementById('claim-tests');
     if (!root) return;
     tests.forEach(function (test) {
-      root.appendChild(element('li', '', test));
+      var item = element('li', 'claim-item');
+      var heading = element('div', 'claim-heading');
+      var status = claimStatus[test.status] || claimStatus.conditional;
+      var title = element('h3', '', test.question);
+      var pill = element('span', 'status-pill ' + status.className, status.label);
+      var answer = element('p', 'claim-answer', test.answer);
+      var limit = element('p', 'claim-limit');
+      var sources = element('div', 'claim-sources');
+
+      limit.append(
+        element('strong', '', 'Remaining limit: '),
+        document.createTextNode(test.limit)
+      );
+
+      sources.appendChild(element('span', 'claim-source-label', 'Primary evidence'));
+      test.sources.forEach(function (source) {
+        var link = element('a', '', source.label);
+        link.href = source.url;
+        sources.appendChild(link);
+      });
+
+      heading.append(title, pill);
+      item.append(heading, answer, limit, sources);
+      root.appendChild(item);
     });
   }
 

@@ -283,15 +283,237 @@
     }
   ],
   "claimTests": [
-    "Was the result measured on fabricated silicon, derived from device traces, or simulated?",
-    "Did the complete validation dataset run through hardware, or only selected layers and samples?",
-    "Is the baseline FP32, a quantized software model, a software-equivalent threshold, or the authors' own retrained model?",
-    "Which work remained off-chip or in software: attention, activation, normalization, pooling, routing, or partial sums?",
-    "How much retraining, chip-in-loop tuning, calibration, redundancy, expansion, or refresh was required?",
-    "Are the reported energy and latency measured end to end, or only for a full and perfectly utilized array?",
-    "How does accuracy change across chips, temperature, voltage, process corners, defects, and time?",
-    "Does the mitigation preserve density and efficiency, or move the cost into more arrays, converters, digital work, or extra cycles?",
-    "Is the claim for inference, training, or both? Static inference weights avoid the update linearity and endurance burden of training.",
-    "Can the method scale to the target model's parameter count, tensor shapes, context length, and communication pattern?"
+    {
+      "question": "Was the result measured on fabricated silicon, derived from device traces, or simulated?",
+      "status": "conditional",
+      "answer": "All three evidence types appear in this literature and must not be merged. NeuRRAM reports fabricated-chip measurements for every benchmark result, and the HERMES and speech studies also measure fabricated 14-nm PCM chips. The 2018 training study is a mixed hardware-software experiment whose throughput and energy figures are calculated for the proposed implementation. The adaptive-ADC study characterizes devices but uses circuit and neural-network simulation for important system results, while the 2026 GPT-2 mapping study is a PCM-calibrated noise-model analysis with no target chip measurement.",
+      "limit": "A result can use real silicon and still leave operators, data movement, or system energy outside the measured boundary.",
+      "sources": [
+        {
+          "label": "NeuRRAM measured-chip methodology",
+          "url": "https://www.nature.com/articles/s41586-022-04992-8"
+        },
+        {
+          "label": "2018 mixed hardware-software training",
+          "url": "https://www.nature.com/articles/s41586-018-0180-5"
+        },
+        {
+          "label": "Adaptive ADC experiment and simulation",
+          "url": "https://www.nature.com/articles/s41467-025-65233-w"
+        },
+        {
+          "label": "Modeled GPT-2 mapping workflow",
+          "url": "https://arxiv.org/html/2606.02672"
+        }
+      ]
+    },
+    {
+      "question": "Did the complete validation dataset run through hardware, or only selected layers and samples?",
+      "status": "conditional",
+      "answer": "The answer is study-specific. NeuRRAM explicitly says all benchmark results came from hardware measurements on complete datasets. The five-chip RNNT experiment sent the full LibriSpeech validation set through chip 1 and then through the remaining chips, but intermediate outputs were saved on an x86 host while chips were swapped. In the ALBERT study, the complete validation sets were used for RTE, MRPC, CoLA, and SST-2; QNLI, MNLI, and QQP used randomized 1,000-sequence subsets selected so that their floating-point accuracy matched the full datasets.",
+      "limit": "A representative subset is useful evidence, but it is not the same claim as complete-dataset hardware validation and should be reported separately.",
+      "sources": [
+        {
+          "label": "NeuRRAM complete-dataset statement",
+          "url": "https://www.nature.com/articles/s41586-022-04992-8"
+        },
+        {
+          "label": "Five-chip RNNT validation method",
+          "url": "https://www.nature.com/articles/s41586-023-06337-5"
+        },
+        {
+          "label": "ALBERT full sets and selected subsets",
+          "url": "https://www.nature.com/articles/s41467-025-63794-4"
+        }
+      ]
+    },
+    {
+      "question": "Is the baseline FP32, a quantized software model, a software-equivalent threshold, or the authors' own retrained model?",
+      "status": "conditional",
+      "answer": "There is no common baseline. NeuRRAM's main comparison is a software model with 4-bit weights, not FP32. The RNNT paper reports a 7.452% word-error-rate software baseline, defines a looser 99%-software-equivalent threshold of 8.378%, and obtains 9.258% after weight expansion. ALBERT starts from a floating-point model, performs hardware-aware fine-tuning in software, and reports hardware accuracy relative to the floating-point reference. The mixed memristor-SRAM processor reports degradation relative to an FP16 software baseline. Therefore, the phrase 'near software accuracy' is not comparable across papers without the adjacent baseline definition.",
+      "limit": "Always record the baseline precision, training recipe, acceptance threshold, metric, and absolute result beside the hardware number.",
+      "sources": [
+        {
+          "label": "NeuRRAM 4-bit software comparison",
+          "url": "https://www.nature.com/articles/s41586-022-04992-8"
+        },
+        {
+          "label": "RNNT baseline and software-equivalent threshold",
+          "url": "https://www.nature.com/articles/s41586-023-06337-5"
+        },
+        {
+          "label": "ALBERT floating-point reference",
+          "url": "https://www.nature.com/articles/s41467-025-63794-4"
+        },
+        {
+          "label": "Mixed-CIM FP16 comparison",
+          "url": "https://www.nature.com/articles/s41586-025-08639-2"
+        }
+      ]
+    },
+    {
+      "question": "Which work remained off-chip or in software: attention, activation, normalization, pooling, routing, or partial sums?",
+      "status": "conditional",
+      "answer": "The boundaries are documented and differ sharply. NeuRRAM maps convolution, fully connected, and batch-normalization parameters to one chip, while an on-board FPGA performs partial-sum accumulation, average pooling, and LSTM element-wise operations. In the RNNT experiment, analog MACs run on the PCM chips, while vector-vector products, nonlinear activations, biases, the joint layer, and affine calibration run on an x86 host. ALBERT maps four fully connected layer blocks to analog hardware; attention matrices, GELU, softmax, tanh, pooling, and classification remain in software. HERMES is more integrated and implements weight-layer computation, activation functions, and on-chip communication.",
+      "limit": "Count preprocessing, unsupported operators, intermediate storage, host transfers, control, and partial sums before calling a demonstration end to end.",
+      "sources": [
+        {
+          "label": "NeuRRAM FPGA boundary",
+          "url": "https://www.nature.com/articles/s41586-022-04992-8"
+        },
+        {
+          "label": "RNNT off-chip operations",
+          "url": "https://www.nature.com/articles/s41586-023-06337-5"
+        },
+        {
+          "label": "ALBERT hardware-software partition",
+          "url": "https://www.nature.com/articles/s41467-025-63794-4"
+        },
+        {
+          "label": "HERMES integrated-chip scope",
+          "url": "https://www.nature.com/articles/s41928-023-01010-1"
+        }
+      ]
+    },
+    {
+      "question": "How much retraining, chip-in-loop tuning, calibration, redundancy, expansion, or refresh was required?",
+      "status": "answered",
+      "answer": "The mitigation is substantial and is part of the result. NeuRRAM combines per-layer model-driven calibration using training samples, measured-noise training, analog write programming, and progressive chip-in-loop fine-tuning. The RNNT work states that it did not retrain the network, but it uses affine tile calibration, differential mapping, two or four PCM devices per weight, and optional weight expansion. ALBERT uses closed-loop programming, four PCM devices per weight, hardware-aware fine-tuning that improves average hardware accuracy by 4.4%, per-use column scale and offset calibration, and later recalibration for drift. Gradient-descent programming adds repeated random-probe MVMs and digitally calculated gradients during deployment programming.",
+      "limit": "Training time, calibration data, programming cycles, extra devices, metadata, refresh cadence, and endurance consumption belong in the implementation cost.",
+      "sources": [
+        {
+          "label": "NeuRRAM co-optimization stack",
+          "url": "https://www.nature.com/articles/s41586-022-04992-8"
+        },
+        {
+          "label": "RNNT mapping and weight expansion",
+          "url": "https://www.nature.com/articles/s41586-023-06337-5"
+        },
+        {
+          "label": "ALBERT fine-tuning and calibration",
+          "url": "https://www.nature.com/articles/s41467-025-63794-4"
+        },
+        {
+          "label": "Gradient-descent array programming",
+          "url": "https://arxiv.org/abs/2305.16647"
+        }
+      ]
+    },
+    {
+      "question": "Are the reported energy and latency measured end to end, or only for a full and perfectly utilized array?",
+      "status": "conditional",
+      "answer": "Usually the boundary is narrower than wall-plug application energy. The 2018 training paper explicitly calculates its projected energy efficiency and throughput density. HERMES reports maximum full-chip MVM throughput and efficiency for high- and low-precision modes. The speech study measures each chip's power, but estimates the missing digital processing and simulates integrated-system execution time; communication, low tile utilization, and digital work reduce the analog-tile figure from 20.0 TOPS/W to a projected sustained 6.94 TOPS/W. ALBERT experimentally measures analog MAC time and power while simulating non-MAC digital units in 14-nm technology. The mixed memristor-SRAM processor reports measured processor efficiency, but that remains different from board or application wall-plug energy.",
+      "limit": "Report array, full-chip, board, and end-to-end application numbers separately, together with utilization, batch size, data movement, and modeled components.",
+      "sources": [
+        {
+          "label": "Calculated 2018 training efficiency",
+          "url": "https://www.nature.com/articles/s41586-018-0180-5"
+        },
+        {
+          "label": "HERMES precision-efficiency modes",
+          "url": "https://www.nature.com/articles/s41928-023-01010-1"
+        },
+        {
+          "label": "Speech chip measurement and system estimate",
+          "url": "https://www.nature.com/articles/s41586-023-06337-5"
+        },
+        {
+          "label": "ALBERT measured analog and simulated digital power",
+          "url": "https://www.nature.com/articles/s41467-025-63794-4"
+        }
+      ]
+    },
+    {
+      "question": "How does accuracy change across chips, temperature, voltage, process corners, defects, and time?",
+      "status": "open",
+      "answer": "Only fragments of this production question are answered. ALBERT measured one MRPC workload for 30 days at room temperature: accuracy fell by roughly 5% without recalibration and by less than 1% with recalibration. The paper says longer retention would require elevated-temperature testing. The 2020 memristor CNN includes a two-hour drift study and one million read pulses. The 2026 fault-free method tolerates a measured 39% static device-fault rate for a DFT matrix, but that does not cover dynamic read noise, voltage, process corners, or aging. The 2026 reviews still list variability, endurance, retention, and cross-layer non-idealities as deployment barriers.",
+      "limit": "The reviewed showcase papers do not provide a common multi-chip, wafer-level PVT, yield, and lifetime distribution for their headline neural-network result.",
+      "sources": [
+        {
+          "label": "ALBERT 30-day drift experiment",
+          "url": "https://www.nature.com/articles/s41467-025-63794-4"
+        },
+        {
+          "label": "Memristor CNN drift and read-disturb tests",
+          "url": "https://www.nature.com/articles/s41586-020-1942-4"
+        },
+        {
+          "label": "Fault-free static-defect experiment",
+          "url": "https://www.nature.com/articles/s41928-026-01638-9"
+        },
+        {
+          "label": "2026 non-ideality review",
+          "url": "https://www.nature.com/articles/s42254-026-00957-2"
+        }
+      ]
+    },
+    {
+      "question": "Does the mitigation preserve density and efficiency, or move the cost into more arrays, converters, digital work, or extra cycles?",
+      "status": "conditional",
+      "answer": "Most methods move at least part of the cost. ALBERT uses four PCM devices per logical weight plus calibration. RNNT mappings use two or four PCM devices per weight; weight expansion improves accuracy but changes the analog-to-digital operation ratio from 325:1 to 88:1. The mixed-CIM processor preserves accuracy by routing sensitive kernels to SRAM CIM or tiny digital units rather than curing the memristor path. Fault-free representation replaces one target matrix with two optimized factors, trading extra stages for fault tolerance, although it reports gains against differential-pair baselines. The adaptive ADC reduces modeled converter overhead, but an n-bit flash-like design requires 2^(n-1) quantization cells. The 2026 accuracy review concludes that many mitigations add hardware or energy overhead.",
+      "limit": "Compare usable weight density, converter area and energy, extra MVM phases, digital fallback, calibration traffic, and achieved utilization after mitigation.",
+      "sources": [
+        {
+          "label": "ALBERT multi-device weight mapping",
+          "url": "https://www.nature.com/articles/s41467-025-63794-4"
+        },
+        {
+          "label": "RNNT expansion and operation ratio",
+          "url": "https://www.nature.com/articles/s41586-023-06337-5"
+        },
+        {
+          "label": "Mixed-CIM heterogeneous execution",
+          "url": "https://www.nature.com/articles/s41586-025-08639-2"
+        },
+        {
+          "label": "2026 accuracy-cost review",
+          "url": "https://www.nature.com/articles/s41563-026-02600-y"
+        }
+      ]
+    },
+    {
+      "question": "Is the claim for inference, training, or both? Static inference weights avoid the update linearity and endurance burden of training.",
+      "status": "answered",
+      "answer": "The major recent chip demonstrations in this ledger are inference results. The 2018 Nature work is the principal training example, but it is a mixed hardware-software system using volatile capacitors for near-linear updates and PCM for long-term storage; its throughput and energy are projected for the proposed implementation. The 2020 CNN uses hybrid training to adapt programmed hardware. ALBERT explicitly targets inference and notes that training introduces programming-symmetry, update-linearity, and endurance requirements not evaluated there. Gradient-descent programming optimizes deployed array conductances before inference; it is not end-to-end neural-network training on the AIMC core.",
+      "limit": "Do not use an inference accuracy result as evidence that the same memory can sustain accurate, frequent in-situ training updates.",
+      "sources": [
+        {
+          "label": "2018 analogue-memory training",
+          "url": "https://www.nature.com/articles/s41586-018-0180-5"
+        },
+        {
+          "label": "2020 hybrid-trained memristor CNN",
+          "url": "https://www.nature.com/articles/s41586-020-1942-4"
+        },
+        {
+          "label": "ALBERT inference-versus-training boundary",
+          "url": "https://www.nature.com/articles/s41467-025-63794-4"
+        },
+        {
+          "label": "Deployment-time gradient programming",
+          "url": "https://arxiv.org/abs/2305.16647"
+        }
+      ]
+    },
+    {
+      "question": "Can the method scale to the target model's parameter count, tensor shapes, context length, and communication pattern?",
+      "status": "open",
+      "answer": "There is progress but no general large-LLM proof. The RNNT experiment places about 45 million weights across five chips and processes the full validation set, with host-assisted sequencing. ALBERT maps 7.1 million unique weights, shared across 12 layers, into 28.3 million programmed PCM devices on one chip; its GLUE sequences are at most 128 tokens, while longer sequences up to 1,000 appear only in power analysis. The 2026 mapping paper studies GPT-2-small with 124 million parameters, but converts one projection at a time under a modeled PCM error and completes only sensitivity stages, not joint mapping or silicon validation. It identifies KV-cache capacity, prefill/decode asymmetry, tiling, communication, joint layer error, and billion-parameter search as open problems.",
+      "limit": "No paper in this ledger demonstrates a billion-parameter autoregressive LLM, long-context KV-cache traffic, and end-to-end accuracy, latency, and energy on fabricated analog CIM hardware.",
+      "sources": [
+        {
+          "label": "Five-chip 45-million-weight RNNT",
+          "url": "https://www.nature.com/articles/s41586-023-06337-5"
+        },
+        {
+          "label": "Single-chip ALBERT scale and sequence length",
+          "url": "https://www.nature.com/articles/s41467-025-63794-4"
+        },
+        {
+          "label": "GPT-2 mapping scope and open challenges",
+          "url": "https://arxiv.org/html/2606.02672"
+        }
+      ]
+    }
   ]
 }
