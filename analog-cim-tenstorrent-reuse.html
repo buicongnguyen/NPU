@@ -1,15 +1,14 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="A decision and study guide for reusing Tenstorrent open-source software in an analog compute-in-memory NPU: architecture fit, compiler and runtime gaps, licensing, validation, proof-of-concept gates, and interview due diligence.">
-  <title>Tenstorrent Reuse for Analog CIM | NPU Study Guide</title>
+  <meta name="description" content="An applied study guide for learning Tenstorrent's open-source architecture patterns and translating them into an analog compute-in-memory NPU compiler, runtime, simulator, and device stack.">
+  <title>Tenstorrent Patterns for Analog CIM | NPU Study Guide</title>
   <link rel="stylesheet" href="analog-cim.css">
   <link rel="stylesheet" href="npu-engineering.css">
   <link rel="stylesheet" href="analog-cim-reuse.css">
   <script src="npu-engineering.js" defer></script>
-  <script src="analog-cim-reuse.js" defer></script>
 </head>
 <body>
   <header class="site-header">
@@ -25,6 +24,7 @@
       <a href="analog-cim-sdk-toolchain.html">SDK</a>
       <a href="analog-cim-board-bringup.html">Bring-up</a>
       <a href="analog-cim-tenstorrent-reuse.html" aria-current="page">Reuse</a>
+      <a href="accelerator-repository-blueprint.html">Repository</a>
       <a href="analog-cim-scaleout-llm.html">Scale/LLM</a>
       <a href="analog-cim-interview.html">Interview</a>
       <a href="analog-cim-quiz.html">MCQ Lab</a>
@@ -34,23 +34,24 @@
   <main>
     <section class="hero">
       <div class="hero-copy">
-        <p class="eyebrow">Architecture decision guide | research snapshot 2026-07-11</p>
-        <h1>Reusing Tenstorrent for an Analog CIM NPU</h1>
+        <p class="eyebrow">Applied architecture study | research snapshot 2026-07-11</p>
+        <h1>Learning Tenstorrent Patterns for an Analog CIM NPU</h1>
         <p class="lede">
-          A contract-first method for deciding what to learn, reuse, adapt, or replace. Tenstorrent is a valuable
-          open-source reference, but its lower stack encodes a digital Tensix machine. An analog compute-in-memory
-          product needs its own array mapping, numerical contract, calibration state, weight lifecycle, and device backend.
+          Trace a real open-source accelerator stack, extract the engineering ideas that survive a hardware change,
+          and rebuild one path for analog compute-in-memory. The goal is to understand model import, multi-level IR,
+          scheduling, artifacts, runtime, simulation, and device control well enough to implement them for a new machine.
         </p>
         <div class="hero-actions">
-          <a class="button" href="#reuse-matrix">Open the reuse matrix</a>
-          <a class="button secondary" href="#unknowns">Audit the hardware contract</a>
-          <a class="button secondary" href="#poc">Plan a proof of concept</a>
+          <a class="button" href="#transfer-map">Open the learning map</a>
+          <a class="button secondary" href="#architecture-choices">Compare architecture choices</a>
+          <a class="button secondary" href="#poc">Start the implementation labs</a>
+          <a class="button secondary" href="accelerator-repository-blueprint.html">Design the repository</a>
         </div>
-        <div class="summary-strip" aria-label="Reuse decision summary">
-          <div><strong>Learn</strong><span>Study architecture and engineering patterns</span></div>
-          <div><strong>Reuse</strong><span>Keep target-neutral code behind stable interfaces</span></div>
-          <div><strong>Adapt</strong><span>Change isolated components after fit and license review</span></div>
-          <div><strong>Replace</strong><span>Build the analog-specific target and device layers</span></div>
+        <div class="summary-strip" role="group" aria-label="Applied learning sequence">
+          <div><strong>Trace</strong><span>Follow one model through the complete Tenstorrent stack</span></div>
+          <div><strong>Extract</strong><span>Separate portable patterns from Tensix assumptions</span></div>
+          <div><strong>Translate</strong><span>Define the equivalent ACiM contracts and dataflow</span></div>
+          <div><strong>Build</strong><span>Implement and measure one end-to-end vertical slice</span></div>
         </div>
       </div>
     </section>
@@ -58,10 +59,11 @@
     <section class="section" id="scope">
       <div class="section-heading">
         <p class="eyebrow">Coverage boundary</p>
-        <h2>This page answers a decision that the existing lessons leave open</h2>
+        <h2>This page turns architecture comparison into work you can perform</h2>
         <p class="section-note">
           The site already explains Tenstorrent, NPU compiler foundations, SoC software, Analog CIM physics,
-          accuracy evidence, and interview preparation. This guide connects those studies into a concrete reuse decision.
+          accuracy evidence, and device bring-up. This guide connects those lessons through diagrams, implementation
+          choices, exercises, artifacts, and self-checks.
         </p>
       </div>
       <div class="scope-ledger">
@@ -81,74 +83,73 @@
           <a href="npu-soc-software-architecture.html">Review SoC software architecture</a>
         </article>
         <article class="scope-item new">
-          <strong>New: compatibility boundary</strong>
-          <span>Separate portable infrastructure from semantics tied to Tensix hardware.</span>
-          <a href="#mismatch">Compare the machines</a>
+          <strong>New: architecture translation</strong>
+          <span>Convert each Tenstorrent pattern into an explicit ACiM compiler, runtime, or device concept.</span>
+          <a href="#transfer-map">Open the translation map</a>
         </article>
         <article class="scope-item new">
-          <strong>New: reuse governance</strong>
-          <span>Make component, dependency, license, maintenance, and provenance decisions explicit.</span>
-          <a href="#compliance">Audit open-source obligations</a>
+          <strong>New: choice guide</strong>
+          <span>Compare framework, compiler, simulator, operator-placement, and device-interface paths.</span>
+          <a href="#architecture-choices">See the choices and recommendations</a>
         </article>
         <article class="scope-item new">
-          <strong>New: stop/go evidence</strong>
-          <span>Use simulator, runtime, and silicon correlation gates before committing to a fork.</span>
-          <a href="#poc">Follow the proof-of-concept ladder</a>
+          <strong>New: applied laboratories</strong>
+          <span>Produce an IR, target descriptor, lowering, artifact, fake-device runtime, and correlation report.</span>
+          <a href="#poc">Follow the six implementation labs</a>
         </article>
       </div>
     </section>
 
-    <section class="section" id="verdict">
+    <section class="section" id="learning-method">
       <div class="section-heading">
-        <p class="eyebrow">Executive verdict</p>
-        <h2>Reuse the boundary patterns first, not the hardware assumptions</h2>
+        <p class="eyebrow">Learning method</p>
+        <h2>Study a pattern, expose its assumptions, then rebuild it for ACiM</h2>
       </div>
       <div class="callout verdict">
-        <h3>The important correction</h3>
+        <h3>The question to ask at every layer</h3>
         <p>
-          "Reuse Tenstorrent" is not one decision. Directly importing a model corpus is different from adapting an
-          MLIR frontend, and both are very different from forking a runtime or kernel driver. Decide at component
-          boundaries, and require semantic fit, legal clarity, tests, and an exit strategy for every component.
+          Which concept is a general accelerator-software pattern, and which part exists only because Tenstorrent
+          executes digital dataflow kernels on Tensix cores? Write both answers before designing the ACiM equivalent.
         </p>
       </div>
-      <div class="reuse-mode-grid" style="margin-top:12px">
-        <article class="reuse-mode learn"><b>Mode 1</b><h3>Learn</h3><p>Read the code and documentation to understand compiler layering, explicit data movement, tests, tooling, and release practices. No code dependency is created.</p></article>
-        <article class="reuse-mode reuse"><b>Mode 2</b><h3>Reuse</h3><p>Adopt target-neutral code with a compatible license and a stable boundary. Keep upstream history, attribution, tests, and dependency records.</p></article>
-        <article class="reuse-mode adapt"><b>Mode 3</b><h3>Adapt</h3><p>Modify an isolated component whose concepts fit but whose target interface does not. Budget for rebasing, qualification, and divergence.</p></article>
-        <article class="reuse-mode replace"><b>Mode 4</b><h3>Replace</h3><p>Implement a new analog backend when the original code assumes Tensix cores, tiles, circular buffers, NoC transactions, or Tenstorrent device ABIs.</p></article>
+      <div class="translation-loop" role="group" aria-label="Architecture translation learning loop">
+        <article class="translation-node"><b>1. Trace</b><strong>Observe the working path</strong><span>Follow one tensor, IR operation, command, buffer, and trace ID.</span></article>
+        <article class="translation-node"><b>2. Explain</b><strong>Name the invariant</strong><span>State the general compiler or runtime responsibility in hardware-neutral language.</span></article>
+        <article class="translation-node"><b>3. Contrast</b><strong>Expose target assumptions</strong><span>Mark every Tensix core, tile, NoC, circular-buffer, and device-ABI dependency.</span></article>
+        <article class="translation-node"><b>4. Translate</b><strong>Define the ACiM contract</strong><span>Substitute arrays, converters, calibration, programming, digital fallback, and device state.</span></article>
+        <article class="translation-node"><b>5. Verify</b><strong>Build and correlate</strong><span>Run the same vectors through reference, simulator, runtime, and hardware levels.</span></article>
       </div>
-      <div class="callout" style="margin-top:12px">
+      <div class="callout space-top">
         <p>
-          <strong>2026 repository audit:</strong> the strongest additions are Tenstorrent's reusable SoC/cluster
-          descriptor boundary, MeshDevice virtual-device model, static cluster descriptors, <code>tt-emule</code>
-          alternate-backend pattern, TT-Fabric control-plane design, and report tooling. The
-          <a href="analog-cim-scaleout-llm.html">scale-out, fault-tolerance, and LLM design</a> turns those patterns into
-          concrete ACiM interfaces without importing Tensix execution semantics.
+          <strong>High-value code-reading targets:</strong> TT-MLIR's dialect boundaries, TT-UMD's SoC descriptor,
+          MeshDevice's virtual topology, <code>tt-emule</code>'s alternate backend, TT-Fabric's control/data planes,
+          and Tenstorrent's trace/report tooling. Each becomes a concrete exercise in the transfer map below.
         </p>
       </div>
     </section>
 
     <section class="section" id="unknowns" data-progress="acim-target-contract">
       <div class="section-heading">
-        <p class="eyebrow">Hardware disclosure gate</p>
-        <h2>No backend decision is credible until this contract is known</h2>
+        <p class="eyebrow">Step A | Target architecture worksheet</p>
+        <h2>Learn which hardware facts create software requirements</h2>
         <p class="section-note">
           IHW's public patent record reveals part of the numerical architecture: positional digit-sliced weights,
           adaptive converter range, grouped quantization, and signed-current cancellation. It does not show that every
           pending mechanism is implemented in a product, or disclose the complete array, command, calibration,
-          compiler, firmware, and runtime contract needed for a compatibility judgment. Treat the following as
-          interview and onboarding questions, not assumptions about its shipping design.
+          compiler, firmware, and runtime contract. Use the checklist to construct a target descriptor and to mark
+          each field as measured, specified, assumed for simulation, or still unknown. This section inventories the
+          inputs; the discovery workbook later converts them into implementation rules and tests.
         </p>
       </div>
-      <div class="callout" style="margin-bottom:12px">
+      <div class="callout space-bottom">
         <p>
-          <strong>New evidence:</strong> the <a href="analog-cim-ihw-patents.html">iHW patent deep read</a> separates
-          granted claims, pending applications, company-reported silicon, remaining accuracy errors, and the metadata
-          an ACiM compiler and runtime would need.
+          <strong>Why this comes first:</strong> every item below changes an IR type, legalization rule, mapping cost,
+          artifact field, runtime state, or validation test. The <a href="analog-cim-ihw-patents.html">iHW patent deep
+          read</a> is one example of extracting possible software-visible mechanisms from hardware evidence.
         </p>
       </div>
       <div class="progress-panel" aria-live="polite">
-        <div class="progress-track"><div class="progress-bar" data-progress-bar role="progressbar" aria-label="Hardware contract discovery progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"></div></div>
+        <div class="progress-track"><progress class="progress-bar" data-progress-bar aria-label="Target architecture worksheet progress" max="100" value="0">0%</progress></div>
         <span class="progress-value" data-progress-value>0 / 12 complete</span>
       </div>
       <div class="lab-list">
@@ -165,50 +166,48 @@
         <label class="lab-item"><input type="checkbox" data-step="artifact"><span><strong>Artifact and ABI</strong><span>Target identifiers, code, mappings, programmed weights, calibration data, debug maps, and compatibility fields.</span></span></label>
         <label class="lab-item"><input type="checkbox" data-step="product"><span><strong>Product acceptance</strong><span>First models, accuracy SLA, latency, energy, programming time, thermal corners, and field-update requirements.</span></span></label>
       </div>
-      <div class="callout caution" style="margin-top:12px">
-        <p><strong>Stop condition:</strong> do not select TT-Metalium, TT-MLIR target dialects, or a custom backend until the target contract and first product workload are available in a versioned form.</p>
+      <div class="callout caution space-top">
+        <p><strong>Learning output:</strong> a versioned target descriptor whose required fields are explicit. A simulator may carry clearly labeled assumptions; a production compiler should diagnose any unresolved field needed for correct lowering.</p>
       </div>
     </section>
 
-    <section class="section" id="reuse-matrix">
+    <section class="section" id="transfer-map">
       <div class="section-heading">
-        <p class="eyebrow">Component decision matrix</p>
-        <h2>Evaluate Tenstorrent one repository and layer at a time</h2>
+        <p class="eyebrow">Tenstorrent learning map</p>
+        <h2>Turn each code-reading target into an ACiM implementation exercise</h2>
         <p class="section-note">
-          These are initial study recommendations, not final legal or architecture decisions. "Reuse" still requires
-          a file-level license and dependency audit; "adapt" requires a measured proof of concept.
+          Read a narrow path, identify the architectural pattern, build its ACiM equivalent, and retain a concrete
+          artifact that proves what you learned. Filter by the layer you want to study next.
         </p>
       </div>
-      <div class="segmented" data-filter-group="reuse-matrix-body" aria-label="Filter reuse recommendations">
-        <button class="segment-button" type="button" data-filter="all" aria-pressed="true">All</button>
-        <button class="segment-button" type="button" data-filter="reuse" aria-pressed="false">Reuse candidate</button>
-        <button class="segment-button" type="button" data-filter="adapt" aria-pressed="false">Adapt</button>
-        <button class="segment-button" type="button" data-filter="study" aria-pressed="false">Study only</button>
-        <button class="segment-button" type="button" data-filter="replace" aria-pressed="false">Replace</button>
+      <div class="segmented" role="group" data-filter-group="transfer-map-body" aria-label="Filter learning exercises by software layer">
+        <button class="segment-button" type="button" data-filter="all" aria-pressed="true">All layers</button>
+        <button class="segment-button" type="button" data-filter="frontend" aria-pressed="false">Frontend</button>
+        <button class="segment-button" type="button" data-filter="compiler" aria-pressed="false">Compiler</button>
+        <button class="segment-button" type="button" data-filter="runtime" aria-pressed="false">Runtime</button>
+        <button class="segment-button" type="button" data-filter="device" aria-pressed="false">Device</button>
+        <button class="segment-button" type="button" data-filter="validation" aria-pressed="false">Validation</button>
       </div>
       <div class="table-wrap reuse-table">
         <table>
           <thead>
-            <tr><th scope="col">Component</th><th scope="col">Initial decision</th><th scope="col">Reason</th><th scope="col">Required proof</th></tr>
+            <tr><th scope="col">Tenstorrent reference</th><th scope="col">Pattern to learn</th><th scope="col">ACiM exercise</th><th scope="col">Evidence you produce</th></tr>
           </thead>
-          <tbody id="reuse-matrix-body">
-            <tr data-domain="adapt"><th scope="row">TT-XLA / PJRT integration</th><td><span class="status-pill decision-adapt">Adapt</span></td><td>The framework boundary and PJRT plugin pattern are portable; the device client and executable semantics are not.</td><td>Compile and execute one StableHLO MatMul through an ACiM device plugin.</td></tr>
-            <tr data-domain="adapt"><th scope="row">TT-Forge-ONNX frontend</th><td><span class="status-pill decision-adapt">Adapt</span></td><td>ONNX import and model diagnostics may help, but partitioning and lowering encode target capabilities.</td><td>Inventory target-independent modules and compare importer behavior against the model corpus.</td></tr>
-            <tr data-domain="adapt"><th scope="row">TT-MLIR infrastructure</th><td><span class="status-pill decision-adapt">Adapt</span></td><td>MLIR pass, interface, and tooling structure can transfer; TTNN, TTMetal, and TTKernel semantics model Tenstorrent execution.</td><td>Define an ACiM dialect boundary without importing Tensix-only types or operations.</td></tr>
-            <tr data-domain="study"><th scope="row">TTNN dialect and library</th><td><span class="status-pill decision-study">Study only</span></td><td>Its tensor operations, layouts, sharding, and runtime path closely model TT-NN and Tenstorrent grids.</td><td>Document which high-level operation semantics are genuinely target neutral.</td></tr>
-            <tr data-domain="study"><th scope="row">TT-Lang DSL</th><td><span class="status-pill decision-study">Study only</span></td><td>The DSL is useful as a kernel-authoring reference, but its abstractions target Tenstorrent kernels.</td><td>Compare its programming model with an array-program, calibration, and digital-fallback DSL.</td></tr>
-            <tr data-domain="replace"><th scope="row">TTKernel / TTMetal dialects</th><td><span class="status-pill decision-replace">Replace</span></td><td>They expose circular buffers, tiles, NoC transactions, synchronization, and a near 1:1 Metalium mapping.</td><td>Create ACiM operations for array programming, MVM, conversion, calibration, and digital work.</td></tr>
-            <tr data-domain="study"><th scope="row">TT-Metalium runtime and kernels</th><td><span class="status-pill decision-study">Study only</span></td><td>The host workflow and command-queue patterns are instructive, but execution assumes Tensix cores and dataflow kernels.</td><td>Reuse only a proven target-neutral utility behind an ACiM HAL.</td></tr>
-            <tr data-domain="adapt"><th scope="row">TT-UMD descriptor, coordinate, and harvesting layer</th><td><span class="status-pill decision-adapt">Adapt</span></td><td>Tenstorrent explicitly describes the SoC descriptor as reusable for other grid-like SoCs and uses it as a higher-stack contract.</td><td>Prototype ACiM arrays, row/column/ADC maps, tile harvesting, calibration classes, and logical/physical coordinates without importing transport.</td></tr>
-            <tr data-domain="replace"><th scope="row">TT-UMD transport and device implementation</th><td><span class="status-pill decision-replace">Replace</span></td><td>Discovery, PCIe access, memory mapping, TLB behavior, firmware messages, and telemetry implement Tenstorrent devices.</td><td>Specify the ACiM user-mode HAL and prove device, functional-simulator, and queued-fake backends.</td></tr>
-            <tr data-domain="adapt"><th scope="row">MeshDevice, MeshTensor, and tt-run patterns</th><td><span class="status-pill decision-adapt">Adapt</span></td><td>A logical mesh over physical chips, explicit sharding/replication, SPMD dispatch, and explicit collectives transfer well at the architecture boundary.</td><td>Run one row-parallel and one column-parallel ACiM linear layer with all-gather and reduce-scatter through an <code>AcimMesh</code> API.</td></tr>
-            <tr data-domain="adapt"><th scope="row">TT cluster descriptors and topology mappings</th><td><span class="status-pill decision-adapt">Adapt</span></td><td>Static descriptors, alternate subsets, and fallback mappings make multi-chip tests reproducible without requiring hardware discovery.</td><td>Describe nominal, harvested, link-failed, card, multi-host, and checkpoint-recovery ACiM topologies.</td></tr>
-            <tr data-domain="study"><th scope="row">TT-Fabric architecture</th><td><span class="status-pill decision-study">Study only</span></td><td>Persistent control/data planes, rerouting, mesh reform, checkpoint restart, serialization, and fault injection are valuable system patterns.</td><td>Specify ACiM route epochs and recovery semantics; replace TT router, protocol, firmware, and link implementations.</td></tr>
-            <tr data-domain="study"><th scope="row">tt-emule</th><td><span class="status-pill decision-study">Study only</span></td><td>Its same-host-API alternate backend is a strong validation pattern, while its simulated cores, L1, circular buffers, semaphores, and NoC are Tensix-specific.</td><td>Make the same ACiM artifact and HAL tests run against functional, queued, nonideality, and hardware backends.</td></tr>
-            <tr data-domain="replace"><th scope="row">TT-KMD</th><td><span class="status-pill decision-replace">Replace</span></td><td>The kernel driver is both hardware specific and GPL-2.0 licensed, which creates a distinct product and legal boundary.</td><td>Define the target DMA, isolation, interrupt, power, reset, and firmware ABI with legal review.</td></tr>
-            <tr data-domain="reuse"><th scope="row">TT-Forge model corpus</th><td><span class="status-pill decision-reuse">Reuse candidate</span></td><td>Model manifests, demos, and regression patterns can accelerate coverage if individual code and asset licenses permit.</td><td>Produce an SPDX inventory and run a representative model subset through capability analysis.</td></tr>
-            <tr data-domain="adapt"><th scope="row">TT-NN Visualizer, Model Explorer, and performance reports</th><td><span class="status-pill decision-adapt">Adapt</span></td><td>Graph, memory, tensor, operation, and trace-report UX is valuable, but the schemas and counters must describe ACiM state.</td><td>Display logical/physical placement, defect maps, ADC use, calibration version, drift state, collective bytes, and first divergent layer.</td></tr>
-            <tr data-domain="reuse"><th scope="row">CI and differential-test patterns</th><td><span class="status-pill decision-reuse">Reuse candidate</span></td><td>Golden models, model sweeps, artifact retention, and regression gates are broadly portable engineering practices.</td><td>Confirm script licenses and replace device-specific runners, expectations, and thresholds.</td></tr>
+          <tbody id="transfer-map-body">
+            <tr data-domain="frontend"><th scope="row">TT-Forge ONNX and TT-XLA</th><td>Framework import, model diagnostics, capability reporting, and framework/device plugin boundaries.</td><td>Import one ONNX MatMul and one StableHLO dot, normalize both to the same target-neutral operation, and report unsupported semantics.</td><td>Importer tests, normalized IR snapshots, shape/dtype diagnostics, and an operator capability report.</td></tr>
+            <tr data-domain="compiler"><th scope="row">TT-MLIR StableHLO to TTIR path</th><td>Progressive lowering, dialect ownership, conversion targets, rewrite patterns, and reproducible compiler pipelines.</td><td>Define <code>acim</code> operations and types, then legalize one high-level dot into an ACiM MVM plus explicit digital work.</td><td>ODS definitions, verifier tests, pass pipeline, before/after IR, and failure diagnostics.</td></tr>
+            <tr data-domain="compiler"><th scope="row">TTIR, TTNN, and D2M</th><td>Separation between tensor meaning, physical layouts, sharding, memory spaces, and explicit data movement.</td><td>Represent logical tensors separately from array slices, ADC groups, local SRAM, and partial-sum layouts.</td><td>Layout schema, conversion-cost report, memory plan, and tests that reject impossible mappings.</td></tr>
+            <tr data-domain="compiler"><th scope="row">TTKernel and TTMetal dialects</th><td>How a low-level IR mirrors the executable machine and exposes synchronization, memory, and engine actions.</td><td>Create low-level operations for program/verify weights, drive inputs, convert columns, accumulate slices, invoke DSP work, and signal completion.</td><td>Target command IR, binary encoding test vectors, and a graph-to-command debug map.</td></tr>
+            <tr data-domain="compiler"><th scope="row">TT-Lang DSL</th><td>Kernel-authoring abstractions, static checking, specialization, and lowering from a concise programming model.</td><td>Sketch a small DSL for array programs and digital epilogues; lower one program through the same ACiM IR used by imported models.</td><td>Language examples, parser/type rules, generated IR, and equivalence tests against direct IR construction.</td></tr>
+            <tr data-domain="runtime"><th scope="row">TT-Metalium host workflow</th><td>Program creation, buffer ownership, command queues, asynchronous events, tracing, and explicit synchronization.</td><td>Implement <code>load -&gt; bind -&gt; program -&gt; calibrate -&gt; submit -&gt; wait</code> behind an ACiM HAL.</td><td>C API, C++ wrapper, fake-device transcript, timeout test, and lifecycle sequence diagram.</td></tr>
+            <tr data-domain="device"><th scope="row">TT-UMD SoC descriptor</th><td>A machine-readable topology contract separating logical coordinates and usable resources from physical discovery.</td><td>Describe arrays, rows, columns, ADC groups, SRAM banks, digital engines, defects, and calibration classes.</td><td>Versioned target-descriptor schema, sample devices, validation tool, and logical-to-physical maps.</td></tr>
+            <tr data-domain="device"><th scope="row">TT-UMD transport boundary</th><td>Separation between device-neutral objects and hardware-specific discovery, MMIO, DMA, firmware messages, and telemetry.</td><td>Make simulator, queued fake device, VFIO lab backend, and production driver backend implement one narrow HAL.</td><td>Backend conformance suite and identical application traces across at least two backends.</td></tr>
+            <tr data-domain="device"><th scope="row">MeshDevice and cluster descriptors</th><td>Virtual topology, explicit distribution, static test topologies, collectives, and logical/physical remapping.</td><td>Model one card and one two-card ACiM mesh, then execute row-parallel and column-parallel linear layers.</td><td>Topology files, shard maps, collective byte counts, and deterministic degraded-topology tests.</td></tr>
+            <tr data-domain="device runtime"><th scope="row">TT-Fabric</th><td>Persistent control/data planes, route epochs, fault detection, rerouting, checkpoint restart, and fault injection.</td><td>Specify ACiM route ownership and recovery for a failed link, tile, array region, or chiplet.</td><td>State machine, recovery sequence, fault-injection test, and before/after route graph.</td></tr>
+            <tr data-domain="validation"><th scope="row"><code>tt-emule</code></th><td>A same-host-API alternate backend that allows software tests before target hardware is available.</td><td>Run one artifact through functional, nonideality, queued, and hardware backends without changing the application API.</td><td>Differential results, cycle/trace correlation, declared model fidelity, and backend-specific error bounds.</td></tr>
+            <tr data-domain="device"><th scope="row">TT-KMD lifecycle</th><td>PCIe probe/remove, DMA isolation, buffer mapping, interrupts, reset, firmware loading, power, and process cleanup.</td><td>Trace those responsibilities, then map each one to the actual ACiM BAR, queue, firmware, and fault contracts described in the bring-up guide.</td><td>Responsibility matrix, UAPI draft, reset state machine, and DMA/interrupt test plan.</td></tr>
+            <tr data-domain="validation"><th scope="row">TT-NN Visualizer and performance reports</th><td>How graph operations, buffers, memory, traces, and bottlenecks remain connected by stable identifiers.</td><td>Display graph-to-array placement, ADC use, defect remaps, calibration version, drift state, and first divergent layer.</td><td>Trace schema, one generated report, and a debug path from wrong output back to physical mapping.</td></tr>
+            <tr data-domain="validation frontend"><th scope="row">Model corpus and CI patterns</th><td>Golden models, operator sweeps, retained artifacts, differential tests, and regression triage.</td><td>Build a small suite containing MatMul, Conv, YOLO subgraphs, transformer linear layers, and unsupported-op fallbacks.</td><td>Repeatable test manifest, reference outputs, accuracy thresholds, performance baselines, and failure triage report.</td></tr>
           </tbody>
         </table>
       </div>
@@ -291,7 +290,7 @@
         <h2>Keep the portable graph stack above an explicit ACiM boundary</h2>
         <p class="section-note">Tenstorrent can remain a comparison target or reference implementation without becoming the core dependency of the analog backend.</p>
       </div>
-      <div class="reuse-flow" aria-label="Portable analog CIM compiler architecture">
+      <div class="reuse-flow" role="group" aria-label="Portable analog CIM compiler architecture">
         <article class="flow-step"><b>Import</b><strong>PyTorch / ONNX / StableHLO</strong><span>Preserve source semantics and shape constraints</span></article>
         <article class="flow-step"><b>Normalize</b><strong>Target-neutral graph IR</strong><span>Canonical ops, quantization intent, fallback policy</span></article>
         <article class="flow-step"><b>Decide</b><strong>Capability and partition</strong><span>Analog, digital companion, CPU, or rejection</span></article>
@@ -300,7 +299,7 @@
         <article class="flow-step"><b>Package</b><strong>Versioned artifact</strong><span>Code, weights, maps, calibration schema, debug data</span></article>
         <article class="flow-step"><b>Execute</b><strong>ACiM HAL and runtime</strong><span>Simulator and device backends behind one contract</span></article>
       </div>
-      <div class="callout" style="margin-top:12px">
+      <div class="callout space-top">
         <p><strong>Design rule:</strong> the target-neutral IR should describe model meaning, while ACiM IR should describe physical analog intent. Neither layer should pretend that a conductance array is a Tensix core.</p>
       </div>
     </section>
@@ -330,9 +329,9 @@
         <p class="eyebrow">Runtime lifecycle</p>
         <h2>Inference is only the steady-state middle</h2>
       </div>
-      <div class="engineering-flow six" aria-label="Analog CIM runtime lifecycle">
+      <div class="engineering-flow six" role="group" aria-label="Analog CIM runtime lifecycle">
         <article class="flow-step"><b>1</b><strong>Discover</strong><span>Identify revision, arrays, faults, firmware, features</span></article>
-        <article class="flow-step"><b>2</b><strong>Validate</strong><span>Check artifact, device binding, licenses, ABI, security</span></article>
+        <article class="flow-step"><b>2</b><strong>Validate</strong><span>Check artifact, target, ABI, calibration, shapes, and required features</span></article>
         <article class="flow-step"><b>3</b><strong>Program</strong><span>Write and verify weights under endurance policy</span></article>
         <article class="flow-step"><b>4</b><strong>Calibrate</strong><span>Load or measure coefficients and health state</span></article>
         <article class="flow-step"><b>5</b><strong>Execute</strong><span>Schedule mixed analog/digital work and trace it</span></article>
@@ -346,7 +345,7 @@
         <h2>Use a correlation ladder, not a single simulator result</h2>
         <p class="section-note">
           IBM AIHWKit and CrossSim are useful analog-behavior study tools. They are not substitutes for a target
-          specification, circuit model, RTL, or measured silicon. CrossSim should remain a study reference until an applicable reuse license is confirmed.
+          specification, circuit model, RTL, or measured silicon. Declare which effects and timing each model includes.
         </p>
       </div>
       <div class="validation-ladder">
@@ -358,7 +357,7 @@
         <article class="level-card"><b>Level 5</b><strong>RTL / mixed signal</strong><span>Protocol, timing, firmware, circuit corners, co-simulation</span></article>
         <article class="level-card"><b>Level 6</b><strong>Silicon population</strong><span>Task SLA across chips, temperature, age, and recalibration</span></article>
       </div>
-      <div class="table-wrap" style="margin-top:12px">
+      <div class="table-wrap space-top">
         <table>
           <thead><tr><th scope="col">Evidence family</th><th scope="col">Required measurements</th><th scope="col">Failure question</th></tr></thead>
           <tbody>
@@ -372,144 +371,163 @@
       </div>
     </section>
 
-    <section class="section" id="compliance">
+    <section class="section" id="architecture-choices">
       <div class="section-heading">
-        <p class="eyebrow">Open-source engineering</p>
-        <h2>A repository label is not a complete license decision</h2>
-        <p class="section-note">This is an engineering checklist, not legal advice. Employer legal counsel or the open-source program office should approve product use and distribution.</p>
+        <p class="eyebrow">Architecture choice flow</p>
+        <h2>See the available paths, when each fits, and what to learn first</h2>
+        <p class="section-note">
+          "Best" depends on the immediate learning question. The highlighted option is the recommended starting point
+          for this study; the other choices remain useful at a later integration stage or for a different product goal.
+        </p>
       </div>
-      <div class="card-grid two">
-        <article class="learning-card"><span class="card-label">Inventory</span><h3>Record provenance per component</h3><p>Capture repository, commit, file/module boundary, SPDX identifier, copyright, modifications, build options, generated code, models, datasets, and transitive dependencies.</p></article>
-        <article class="learning-card"><span class="card-label">Obligations</span><h3>Preserve notices and license texts</h3><p>Apache-2.0 code can carry NOTICE, attribution, patent, and trademark considerations. Dependencies may use different licenses even when the top-level project is Apache-2.0.</p></article>
-        <article class="learning-card"><span class="card-label">Boundary</span><h3>Review GPL components separately</h3><p>TT-KMD is GPL-2.0 while TT-Metal, TT-MLIR, and TT-UMD publish Apache-2.0 licenses. Architecture and distribution choices must not collapse those distinctions.</p></article>
-        <article class="learning-card"><span class="card-label">Maintenance</span><h3>Choose upstream, vendor, or fork deliberately</h3><p>Define patch ownership, security response, upgrade cadence, compatibility tests, contribution policy, and the cost of carrying target-specific divergence.</p></article>
+      <div class="engineering-flow five choice-overview" role="group" aria-label="Architecture decision order">
+        <article class="flow-step"><b>1</b><strong>Model entry</strong><span>ONNX, ORT plugin, or StableHLO/PJRT</span></article>
+        <article class="flow-step"><b>2</b><strong>Compiler base</strong><span>MLIR, TVM, or a minimal custom IR</span></article>
+        <article class="flow-step"><b>3</b><strong>Execution model</strong><span>Functional, queued/cycle, or real hardware</span></article>
+        <article class="flow-step"><b>4</b><strong>Operator home</strong><span>Analog array, DSP, or CPU</span></article>
+        <article class="flow-step"><b>5</b><strong>Device access</strong><span>Simulator HAL, VFIO, or UMD/KMD</span></article>
       </div>
-      <div class="table-wrap" style="margin-top:12px">
-        <table>
-          <thead><tr><th scope="col">Component</th><th scope="col">Published top-level license</th><th scope="col">Engineering action</th></tr></thead>
-          <tbody>
-            <tr><th scope="row">TT-Metal</th><td>Apache License 2.0; NOTICE identifies separately licensed material and dependencies.</td><td>Audit selected files, NOTICE content, build dependencies, distribution package, and modifications.</td></tr>
-            <tr><th scope="row">TT-MLIR</th><td>Apache License 2.0; license file lists LLVM, FlatBuffers, StableHLO, Shardy, and other third-party dependencies.</td><td>Inventory the exact dialect, tool, and dependency closure selected for reuse.</td></tr>
-            <tr><th scope="row">TT-UMD</th><td>Apache License 2.0.</td><td>Audit descriptor and coordinate modules separately from device transport; adapt only a narrow, tested boundary.</td></tr>
-            <tr><th scope="row">TT-KMD</th><td>GNU General Public License version 2.</td><td>Require explicit legal and architecture review before any product dependency or derivative work.</td></tr>
-            <tr><th scope="row">Models and examples</th><td>May include code, model weights, datasets, and third-party assets with separate terms.</td><td>Track each artifact rather than inheriting the repository's top-level label.</td></tr>
-          </tbody>
-        </table>
+
+      <div class="choice-map">
+        <article class="choice-path">
+          <header class="choice-heading"><span>Decision 1 | 3 choices</span><h3>Which model entry should you implement first?</h3><p>Choose the boundary that matches the models and framework behavior you need to observe.</p></header>
+          <div class="choice-options">
+            <article class="choice-option recommended"><b>Recommended first</b><strong>Direct ONNX importer</strong><span>Best for learning compiler semantics with YOLO and common deployment models. It keeps the first debug path small: model, importer, IR, lowering, simulator.</span></article>
+            <article class="choice-option"><b>Integration stage</b><strong>ONNX Runtime plugin EP</strong><span>Best when applications already use ORT and the compiler/runtime API is stable enough to support subgraph capability, compilation, caching, and CPU fallback.</span></article>
+            <article class="choice-option"><b>OpenXLA path</b><strong>StableHLO plus PJRT</strong><span>Best when JAX, XLA, or StableHLO portability is a product requirement. PJRT provides a uniform device API, not the ACiM lowering itself.</span></article>
+          </div>
+          <p class="choice-recommendation"><strong>Recommended sequence:</strong> direct ONNX import for the first runnable slice, then an ORT plugin EP; add StableHLO/PJRT when OpenXLA clients are an explicit requirement.</p>
+        </article>
+
+        <article class="choice-path">
+          <header class="choice-heading"><span>Decision 2 | 3 choices</span><h3>Which compiler foundation should carry ACiM semantics?</h3><p>Choose based on how many abstraction levels, custom types, and target legality rules the compiler must express.</p></header>
+          <div class="choice-options">
+            <article class="choice-option recommended"><b>Recommended product path</b><strong>MLIR dialect stack</strong><span>Best for a real ACiM backend with target-neutral tensors, analog-aware operations, physical mapping, command IR, verifiers, and progressive legalization.</span></article>
+            <article class="choice-option"><b>Exploration path</b><strong>TVM backend</strong><span>Useful for schedule search, tensor-expression experiments, and Python-centered prototyping when the analog state and artifact model remain modest.</span></article>
+            <article class="choice-option"><b>Smallest experiment</b><strong>Custom C++ or Python IR</strong><span>Useful for one operator and quick cost-model experiments. It becomes expensive when adding graph regions, diagnostics, serialization, rewrites, and multiple targets.</span></article>
+          </div>
+          <p class="choice-recommendation"><strong>Recommended for this architecture:</strong> MLIR, because ACiM needs several explicit levels: model meaning, analog intent, physical placement, and executable commands. Use a minimal Python model alongside it as the numerical oracle.</p>
+        </article>
+
+        <article class="choice-path">
+          <header class="choice-heading"><span>Decision 3 | 3 levels</span><h3>Which execution backend should you build now?</h3><p>These are successive fidelity levels rather than competitors; each reveals a different class of bug.</p></header>
+          <div class="choice-options">
+            <article class="choice-option recommended"><b>Start here</b><strong>Functional and nonideality model</strong><span>Tests operator semantics, mapping, quantization, converter range, variation, and layerwise accuracy without queue or timing complexity.</span></article>
+            <article class="choice-option"><b>Build second</b><strong>Queued or cycle-oriented fake device</strong><span>Tests artifacts, buffers, dependencies, command ordering, timing estimates, trace IDs, timeouts, and recovery while hardware is unavailable.</span></article>
+            <article class="choice-option"><b>Correlate third</b><strong>FPGA or silicon backend</strong><span>Tests actual transport, firmware, converters, calibration, PVT behavior, faults, performance, and energy.</span></article>
+          </div>
+          <p class="choice-recommendation"><strong>Recommended flow:</strong> implement all three behind one HAL in this order. Skipping the functional model mixes numerical bugs with runtime bugs; skipping the queued model makes hardware bring-up unnecessarily opaque.</p>
+        </article>
+
+        <article class="choice-path">
+          <header class="choice-heading"><span>Decision 4 | 4 choices</span><h3>Where should each graph operation execute?</h3><p>The compiler should choose per operation and shape; no single engine is best for the whole model.</p></header>
+          <div class="choice-options four">
+            <article class="choice-option recommended"><b>Recommended policy</b><strong>Hybrid cost-based partition</strong><span>Evaluate accuracy, conversion, transfer, memory, latency, and energy for every candidate placement, then keep every fallback visible in the artifact and report.</span></article>
+            <article class="choice-option"><b>Dense compute</b><strong>ACiM array</strong><span>Best for large, supported, weight-resident MVM or convolution regions whose mapping, converter range, and measured accuracy satisfy the target.</span></article>
+            <article class="choice-option"><b>Digital companion</b><strong>DSP or vector engine</strong><span>Best for activation, normalization, reduction, softmax, partial-sum repair, small tensors, and precision-sensitive work near the arrays.</span></article>
+            <article class="choice-option"><b>Host fallback</b><strong>CPU</strong><span>Best for rare unsupported operations, dynamic control, preprocessing, postprocessing, and early bring-up; transfer and synchronization costs must be visible.</span></article>
+          </div>
+          <p class="choice-recommendation"><strong>Recommended rule:</strong> place an operation on ACiM only when end-to-end cost includes conversions, partial sums, calibration, and error recovery. Otherwise choose the closest digital engine, with CPU as the explicit final fallback.</p>
+        </article>
+
+        <article class="choice-path">
+          <header class="choice-heading"><span>Decision 5 | 3 maturity stages</span><h3>How should host software reach the device?</h3><p>Match the access path to the hardware stage and isolation requirements.</p></header>
+          <div class="choice-options">
+            <article class="choice-option recommended"><b>Start here</b><strong>Simulator HAL</strong><span>No kernel driver is needed. The runtime calls an in-process or service backend implementing the same buffer, submit, wait, trace, and reset contracts.</span></article>
+            <article class="choice-option"><b>Trusted lab</b><strong>VFIO prototype</strong><span>Useful for a single-purpose PCIe lab path with IOMMU-protected userspace access while the production UAPI is still changing.</span></article>
+            <article class="choice-option"><b>Production device</b><strong>UMD plus KMD</strong><span>Best for multi-process isolation, DMA ownership, interrupts, reset, power, firmware, security, cleanup, and stable deployment. An integrated SoC uses equivalent platform-driver responsibilities.</span></article>
+          </div>
+          <p class="choice-recommendation"><strong>Recommended flow:</strong> stabilize the HAL with simulator backends, use VFIO only for controlled bring-up when appropriate, then implement the production UMD/KMD boundary from the measured device contract.</p>
+        </article>
       </div>
     </section>
 
-    <section class="section" id="scorecard">
+    <section class="section" id="poc" data-progress="acim-applied-labs-v2">
       <div class="section-heading">
-        <p class="eyebrow">Build-versus-reuse scorecard</p>
-        <h2>Turn enthusiasm into explicit evidence</h2>
-        <p class="section-note">Score one component at a time. A high result starts a proof of concept; it never overrides legal review, target correctness, or measured exit gates.</p>
+        <p class="eyebrow">Applied implementation labs</p>
+        <h2>Six connected builds that teach the complete software path</h2>
+        <p class="section-note">Each lab has a learning objective and a reviewable output. Complete them in order because every later lab consumes contracts and test vectors from the earlier ones.</p>
       </div>
-      <div class="scorecard" data-reuse-scorecard>
-        <div class="score-fields">
-          <label class="score-field" for="score-semantics"><span><strong>Semantic fit</strong><small>Does the component model the target without disguising hardware differences?</small></span><input id="score-semantics" type="range" min="1" max="5" value="2" step="1" data-score="semantics" data-weight="25"><output for="score-semantics">2</output></label>
-          <label class="score-field" for="score-isolation"><span><strong>Boundary isolation</strong><small>Can it sit behind a narrow, versioned interface?</small></span><input id="score-isolation" type="range" min="1" max="5" value="3" step="1" data-score="isolation" data-weight="15"><output for="score-isolation">3</output></label>
-          <label class="score-field" for="score-license"><span><strong>License clarity</strong><small>Are code, assets, dependencies, notices, and distribution obligations understood?</small></span><input id="score-license" type="range" min="1" max="5" value="3" step="1" data-score="license" data-weight="15"><output for="score-license">3</output></label>
-          <label class="score-field" for="score-tests"><span><strong>Test maturity</strong><small>Can target-neutral behavior be verified independently?</small></span><input id="score-tests" type="range" min="1" max="5" value="3" step="1" data-score="tests" data-weight="15"><output for="score-tests">3</output></label>
-          <label class="score-field" for="score-upstream"><span><strong>Maintenance path</strong><small>Can the team follow upstream without permanent patch debt?</small></span><input id="score-upstream" type="range" min="1" max="5" value="2" step="1" data-score="upstream" data-weight="15"><output for="score-upstream">2</output></label>
-          <label class="score-field" for="score-value"><span><strong>Engineering leverage</strong><small>Does reuse remove substantial validated work from the product schedule?</small></span><input id="score-value" type="range" min="1" max="5" value="3" step="1" data-score="value" data-weight="15"><output for="score-value">3</output></label>
-        </div>
-        <aside class="score-result" aria-live="polite">
-          <span class="score-kicker">Advisory result</span>
-          <strong data-score-total>2.6 / 5</strong>
-          <h3 data-score-label>Adapt only behind a boundary</h3>
-          <p data-score-guidance>Isolate the component and require a focused proof of concept before creating a product dependency.</p>
-          <button class="segment-button" type="button" data-score-reset>Reset scorecard</button>
-        </aside>
-      </div>
-    </section>
-
-    <section class="section" id="poc" data-progress="acim-reuse-poc">
-      <div class="section-heading">
-        <p class="eyebrow">Proof-of-concept plan</p>
-        <h2>Six phases with a reason to stop at each boundary</h2>
+      <div class="engineering-flow six lab-route" role="group" aria-label="Applied ACiM learning route">
+        <article class="flow-step"><b>Lab 1</b><strong>Trace</strong><span>Tenstorrent model-to-device path</span></article>
+        <article class="flow-step"><b>Lab 2</b><strong>Model</strong><span>Digital and analog numerical ladder</span></article>
+        <article class="flow-step"><b>Lab 3</b><strong>Specify</strong><span>Target descriptor and ACiM IR</span></article>
+        <article class="flow-step"><b>Lab 4</b><strong>Lower</strong><span>One operator to physical mapping</span></article>
+        <article class="flow-step"><b>Lab 5</b><strong>Execute</strong><span>Artifact, HAL, queues, and trace</span></article>
+        <article class="flow-step"><b>Lab 6</b><strong>Correlate</strong><span>Accuracy, latency, energy, and faults</span></article>
       </div>
       <div class="progress-panel" aria-live="polite">
-        <div class="progress-track"><div class="progress-bar" data-progress-bar role="progressbar" aria-label="Reuse proof-of-concept progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"></div></div>
+        <div class="progress-track"><progress class="progress-bar" data-progress-bar aria-label="Applied implementation lab progress" max="100" value="0">0%</progress></div>
         <span class="progress-value" data-progress-value>0 / 6 complete</span>
       </div>
       <div class="phase-grid">
-        <label class="phase-item"><input type="checkbox" data-step="p0"><span><b>Phase 0</b><strong>Contract and inventory</strong><span>Version the hardware/software contract, first workloads, source inventory, licenses, dependencies, owners, and success metrics.</span><em>Stop when target facts or legal provenance are unavailable.</em></span></label>
-        <label class="phase-item"><input type="checkbox" data-step="p1"><span><b>Phase 1</b><strong>Numerical reference</strong><span>Build FP32, quantized, ideal-array, and nonideality baselines in AIHWKit or an approved target model.</span><em>Stop when the accuracy SLA has no plausible operating region.</em></span></label>
-        <label class="phase-item"><input type="checkbox" data-step="p2"><span><b>Phase 2</b><strong>Portable importer</strong><span>Import representative ONNX or StableHLO, emit a capability report, and preserve reference semantics and diagnostics.</span><em>Stop when reused code is more coupled than replacement work.</em></span></label>
-        <label class="phase-item"><input type="checkbox" data-step="p3"><span><b>Phase 3</b><strong>One operator end to end</strong><span>Lower MatMul or Conv to ACiM IR, array mapping, converter plan, calibration schema, and simulator execution.</span><em>Stop when physical intent cannot be expressed without Tensix concepts.</em></span></label>
-        <label class="phase-item"><input type="checkbox" data-step="p4"><span><b>Phase 4</b><strong>Artifact and fake device</strong><span>Package the program and run it through one HAL using functional and queued fake-device backends with trace and recovery tests.</span><em>Stop when compiler/runtime ownership remains ambiguous.</em></span></label>
-        <label class="phase-item"><input type="checkbox" data-step="p5"><span><b>Phase 5</b><strong>Hardware correlation</strong><span>Bring up silicon, compare every ladder level, measure product metrics, faults, calibration, drift, and population behavior.</span><em>Adopt reuse only after exit gates and maintainers approve it.</em></span></label>
+        <label class="phase-item"><input type="checkbox" data-step="trace"><span><b>Lab 1</b><strong>Trace one Tenstorrent operation</strong><span>Follow MatMul from StableHLO or ONNX through TT-MLIR dialects, layout decisions, runtime calls, command queues, buffers, and device completion. Annotate every target-specific concept.</span><em>Output: stack diagram, IR snapshots, call trace, and a one-page explanation of each boundary.</em></span></label>
+        <label class="phase-item"><input type="checkbox" data-step="model"><span><b>Lab 2</b><strong>Build the numerical reference ladder</strong><span>Implement FP32, INT8/INT4, ideal-array, and nonideality models. Sweep ADC range, slices, programming error, noise, drift, and clipping with identical test vectors.</span><em>Output: reproducible notebook, layerwise error plots, and the first-divergence report.</em></span></label>
+        <label class="phase-item"><input type="checkbox" data-step="specify"><span><b>Lab 3</b><strong>Specify the ACiM machine</strong><span>Create a target descriptor and MLIR ODS definitions for arrays, conductance formats, converters, SRAM, digital engines, calibration classes, defects, and command capabilities.</span><em>Output: schemas, sample target, verifier tests, and an architecture-to-software field map.</em></span></label>
+        <label class="phase-item"><input type="checkbox" data-step="lower"><span><b>Lab 4</b><strong>Lower MatMul end to end</strong><span>Import MatMul, legalize it, tile rows and columns, select signed/bit-sliced mapping, assign ADCs, plan partial sums, insert digital epilogue work, and emit executable commands.</span><em>Output: pass pipeline, mapping report, command listing, debug map, and simulator result.</em></span></label>
+        <label class="phase-item"><input type="checkbox" data-step="execute"><span><b>Lab 5</b><strong>Run the artifact through a fake device</strong><span>Package commands, constants, layouts, and calibration requirements. Implement sessions, buffers, submit/wait, trace, timeout, reset, and functional plus queued backends behind one HAL.</span><em>Output: C API, artifact schema, backend conformance tests, trace viewer input, and recovery transcript.</em></span></label>
+        <label class="phase-item"><input type="checkbox" data-step="correlate"><span><b>Lab 6</b><strong>Correlate and optimize the full path</strong><span>Compare reference, nonideality, queued/cycle, RTL/FPGA, and silicon when available. Explain accuracy loss, converter stalls, memory traffic, programming time, energy, and fault behavior.</span><em>Output: correlation dashboard, bottleneck report, model-fidelity statement, and prioritized optimization list.</em></span></label>
+      </div>
+      <div class="callout space-top">
+        <p><strong>Capstone:</strong> a runnable repository in which one ONNX MatMul compiles into an ACiM artifact, executes unchanged on numerical and queued backends, emits a layer-to-command trace, and reproduces the reference comparison. Use the <a href="accelerator-repository-blueprint.html">accelerator repository blueprint</a> for directory ownership, GoogleTest/pytest placement, CI gates, performance tests, contribution rules, and debugging artifacts.</p>
       </div>
     </section>
 
-    <section class="section" id="interview">
+    <section class="section" id="discovery-workbook">
       <div class="section-heading">
-        <p class="eyebrow">Company due diligence</p>
-        <h2>Interview questions that reveal the real engineering environment</h2>
+        <p class="eyebrow">Step B | Architecture discovery workbook</p>
+        <h2>Convert every unknown hardware fact into a software task</h2>
+        <p class="section-note">This section consumes the Step A worksheet. For each answer, update a machine-readable contract, implement the affected rule, and add the test that proves the rule.</p>
       </div>
-      <div class="card-grid">
-        <article class="learning-card"><span class="card-label">Architecture</span><h3>What is already fixed?</h3><ul class="question-list"><li>What is the analog/digital execution boundary?</li><li>Which array, converter, programming, and calibration parameters are compiler visible?</li><li>Which first models and accuracy/latency/energy SLAs define success?</li><li>Is a versioned architecture specification available to software engineers?</li></ul></article>
-        <article class="learning-card"><span class="card-label">Software</span><h3>What exists today?</h3><ul class="question-list"><li>Is the stack based on MLIR, LLVM, TVM, StableHLO/PJRT, or in-house infrastructure?</li><li>How mature are the simulator, compiler, runtime, firmware, driver, profiler, and layer debugger?</li><li>Who owns programming, calibration, per-chip state, and field recovery?</li><li>How are model, simulator, RTL, and silicon results correlated?</li></ul></article>
-        <article class="learning-card"><span class="card-label">Team</span><h3>What would I own?</h3><ul class="question-list"><li>Is the expectation architecture, implementation, bring-up, or all three?</li><li>What should be working after the first 30, 60, and 90 days?</li><li>What is the open-source intake and upstream-contribution policy?</li><li>Which proprietary data may approved coding assistants access?</li></ul></article>
+      <div class="translation-loop discovery-flow" role="group" aria-label="Hardware fact to implementation flow">
+        <article class="translation-node"><b>1. Observe</b><strong>Hardware fact</strong><span>Specification, measured data, simulator behavior, or an explicitly labeled assumption.</span></article>
+        <article class="translation-node"><b>2. Record</b><strong>Target descriptor</strong><span>Typed field, units, range, version, source, confidence, and required/optional status.</span></article>
+        <article class="translation-node"><b>3. Compile</b><strong>IR and mapping rule</strong><span>Verifier, legality, cost, placement, precision, and fallback behavior.</span></article>
+        <article class="translation-node"><b>4. Execute</b><strong>Artifact and runtime state</strong><span>Commands, calibration binding, programming data, queues, telemetry, and recovery.</span></article>
+        <article class="translation-node"><b>5. Prove</b><strong>Correlation test</strong><span>Golden vectors, corners, trace IDs, expected errors, and acceptance threshold.</span></article>
       </div>
-      <div class="callout caution" style="margin-top:12px">
-        <h3>Signals that require a deeper conversation</h3>
-        <p>No versioned hardware contract; no golden numerical reference; accuracy claims without chip-population data; compiler passes compensating for undocumented hardware behavior; calibration owned by nobody; a proposed fork without maintainers; or "open source" treated as a substitute for license review.</p>
+      <div class="table-wrap workbook-table">
+        <table>
+          <thead><tr><th scope="col">Fact to learn</th><th scope="col">Evidence to inspect or measure</th><th scope="col">Software you can implement after learning it</th></tr></thead>
+          <tbody>
+            <tr><th scope="row">Compute primitive</th><td>Array dimensions, MVM direction, supported shapes, cell encoding, differential mapping, bit slices, and accumulation path.</td><td>ACiM op semantics, shape verifier, tiling rule, physical layout, utilization report, and partial-sum plan.</td></tr>
+            <tr><th scope="row">Converter path</th><td>Input encoding, DAC or bit-serial drive, ADC count/sharing, range modes, ENOB, sample rate, latency, and energy.</td><td>Range planner, converter allocator, saturation estimator, schedule resource, and performance/energy cost model.</td></tr>
+            <tr><th scope="row">Programming behavior</th><td>Pulse algorithm, write-verify, target tolerance, programming time, endurance, retention, update granularity, and verify readback.</td><td>Programming manifest, weight lifecycle state machine, cache policy, update/rollback flow, and endurance-aware placement.</td></tr>
+            <tr><th scope="row">Variation and defects</th><td>Cell/array distributions, unusable rows or columns, spare resources, remap rules, yield data, temperature, and aging.</td><td>Fault-map schema, logical/physical remapper, calibrated cost, spare allocation, degraded mode, and population tests.</td></tr>
+            <tr><th scope="row">Memory and interconnect</th><td>SRAM banks, external memory, NoC topology, multicast, DMA paths, bandwidth, alignment, coherency, and address spaces.</td><td>Buffer planner, tensor layouts, transfer operations, double buffering, route schedule, and bandwidth diagnostics.</td></tr>
+            <tr><th scope="row">Digital companion</th><td>DSP/vector/scalar ISA, supported nonlinear and reduction operators, local memory, synchronization, and conversion formats.</td><td>Capability partitioner, digital dialect, fusion rules, precision-repair path, and analog/digital boundary cost.</td></tr>
+            <tr><th scope="row">Command and device model</th><td>Descriptors or ISA, queues, dependencies, interrupts, preemption, timeout, reset, firmware ABI, and telemetry counters.</td><td>Command IR, artifact encoder, HAL, runtime queues/events, UMD/KMD contract, profiler, and recovery tests.</td></tr>
+            <tr><th scope="row">Calibration lifecycle</th><td>Factory, boot, thermal, periodic, per-model, and drift-triggered calibration; storage format and invalidation rules.</td><td>Calibration schema, compatibility check, runtime state owner, recalibration scheduler, stale-state error, and trace fields.</td></tr>
+            <tr><th scope="row">Existing software path</th><td>Current importer, simulator, compiler passes, runtime API, firmware, driver, profiler, debugger, tests, and example models.</td><td>Gap map showing what already runs, which contracts are implicit, and the smallest new vertical slice to implement.</td></tr>
+            <tr><th scope="row">First workload</th><td>Representative tensor shapes, operator mix, accuracy metric, batch, latency, throughput, power, and update requirements.</td><td>Benchmark manifest, compiler priorities, fallback policy, acceptance thresholds, and regression suite.</td></tr>
+          </tbody>
+        </table>
       </div>
-    </section>
-
-    <section class="section" id="assistant-guardrails">
-      <div class="section-heading">
-        <p class="eyebrow">Coding-assistant policy</p>
-        <h2>Use assistants for implementation without outsourcing architecture or trust</h2>
-      </div>
-      <div class="card-grid">
-        <article class="learning-card"><span class="card-label">Information</span><h3>Use only approved environments</h3><p>Do not submit proprietary RTL, process data, calibration records, customer models, security material, or unreleased specifications to an unapproved service.</p></article>
-        <article class="learning-card"><span class="card-label">Provenance</span><h3>Track generated and imported code</h3><p>Review origin, license, dependencies, generated-file headers, security findings, and repository history. Never accept an assistant's license claim without source verification.</p></article>
-        <article class="learning-card"><span class="card-label">Verification</span><h3>Require ordinary engineering evidence</h3><p>Generated code needs human ownership, unit and differential tests, static analysis, hardware-model correlation, performance measurement, and normal code review.</p></article>
-        <article class="learning-card"><span class="card-label">Judgment</span><h3>Keep decisions with the engineering team</h3><p>Assistants can explain code and draft implementations. Hardware contracts, numerical tolerances, safety policy, product tradeoffs, and sign-off remain accountable human decisions.</p></article>
-      </div>
-    </section>
-
-    <section class="section" id="study-plan">
-      <div class="section-heading">
-        <p class="eyebrow">Focused study sequence</p>
-        <h2>Build the missing evidence in dependency order</h2>
-      </div>
-      <div class="engineering-flow six" aria-label="Tenstorrent and analog CIM study sequence">
-        <article class="flow-step"><b>Week 1</b><strong>Map Tenstorrent</strong><span>Trace one model through TT-Forge, TT-MLIR, TT-NN, Metalium, UMD, and KMD</span></article>
-        <article class="flow-step"><b>Week 2</b><strong>Model analog error</strong><span>Reproduce quantization, converter, programming, noise, and drift sweeps</span></article>
-        <article class="flow-step"><b>Week 3</b><strong>Define ACiM IR</strong><span>Specify arrays, slices, mappings, calibration, and digital boundaries</span></article>
-        <article class="flow-step"><b>Week 4</b><strong>Build one lowering</strong><span>Compile MatMul to a physical mapping and executable manifest</span></article>
-        <article class="flow-step"><b>Week 5</b><strong>Exercise runtime</strong><span>Program, calibrate, execute, trace, inject faults, and recover in a fake device</span></article>
-        <article class="flow-step"><b>Week 6</b><strong>Defend the decision</strong><span>Present reuse matrix, measurements, license inventory, risks, and next gates</span></article>
-      </div>
-      <div class="callout" style="margin-top:12px">
-        <p><strong>Capstone:</strong> deliver a source-linked architecture decision record, a working one-operator compiler/runtime path, a simulator correlation report, an SPDX/SBOM inventory, and a ten-minute interview presentation explaining what was reused and why.</p>
+      <div class="callout space-top">
+        <p><strong>Study exercise:</strong> add <code>status</code> = <code>specified</code>, <code>measured</code>, <code>assumed</code>, or <code>unknown</code> to every target field. Attach its source and confidence, then make the compiler reject any unknown field required by the selected lowering.</p>
       </div>
     </section>
 
     <section class="section" id="sources">
       <div class="section-heading">
         <p class="eyebrow">Primary sources</p>
-        <h2>Architecture, software, simulation, and license ledger</h2>
-        <p class="section-note">Repository documentation establishes current public software boundaries. IHW links establish only public product positioning; undisclosed architecture remains unknown.</p>
+        <h2>Architecture, compiler, runtime, and simulation references</h2>
+        <p class="section-note">Use these sources to reproduce the learning exercises and distinguish documented software behavior from proposed ACiM translations.</p>
       </div>
       <div class="source-grid">
         <article class="source-card"><a href="https://github.com/tenstorrent/tt-forge">Tenstorrent TT-Forge</a><span>Current compiler-stack organization, TT-XLA, TT-Forge-ONNX, TT-MLIR, TT-Lang, and model corpus</span></article>
         <article class="source-card"><a href="https://docs.tenstorrent.com/tt-mlir/overview.html">TT-MLIR overview</a><span>TTNN, D2M, and TTKernel dialect responsibilities and their mapping to Tenstorrent execution</span></article>
         <article class="source-card"><a href="https://github.com/tenstorrent/tt-metal/blob/main/METALIUM_GUIDE.md">TT-Metalium programming guide</a><span>Tensix cores, RISC-V processors, SRAM, tiles, NoC, kernels, circular buffers, and host workflow</span></article>
         <article class="source-card"><a href="https://docs.tenstorrent.com/tt-metal/latest/ttnn/index.html">TT-NN documentation</a><span>Tenstorrent tensor library and device operation surface</span></article>
-        <article class="source-card"><a href="https://github.com/tenstorrent/tt-metal/blob/main/LICENSE">TT-Metal license</a><span>Apache License 2.0 top-level license</span></article>
-        <article class="source-card"><a href="https://github.com/tenstorrent/tt-metal/blob/main/NOTICE">TT-Metal NOTICE</a><span>Modified LLVM material and separately licensed dependencies and attributions</span></article>
-        <article class="source-card"><a href="https://github.com/tenstorrent/tt-mlir/blob/main/LICENSE">TT-MLIR license</a><span>Apache-2.0 and third-party dependency notices</span></article>
-        <article class="source-card"><a href="https://github.com/tenstorrent/tt-umd/blob/main/LICENSE">TT-UMD license</a><span>Apache License 2.0 for the Tenstorrent user-mode driver repository</span></article>
-        <article class="source-card"><a href="https://github.com/tenstorrent/tt-kmd/blob/main/LICENSE">TT-KMD license</a><span>GNU General Public License version 2 for the kernel-mode driver repository</span></article>
+        <article class="source-card"><a href="https://openxla.org/stablehlo/spec">StableHLO specification</a><span>High-level model operation semantics and the framework-to-compiler portability boundary</span></article>
+        <article class="source-card"><a href="https://mlir.llvm.org/docs/DialectConversion/">MLIR dialect conversion</a><span>Conversion targets, legality, rewrite patterns, type conversion, and partial/full analysis modes</span></article>
+        <article class="source-card"><a href="https://mlir.llvm.org/docs/DefiningDialects/Operations/">MLIR ODS</a><span>TableGen operation definitions, generated builders, verifiers, parsers, printers, and documentation</span></article>
+        <article class="source-card"><a href="https://onnxruntime.ai/docs/execution-providers/">ONNX Runtime Execution Providers</a><span>Subgraph capability, hardware-provider execution, common application API, and CPU fallback model</span></article>
+        <article class="source-card"><a href="https://onnxruntime.ai/docs/execution-providers/add-execution-provider.html">ONNX Runtime plugin EP guide</a><span>Current plugin-based path for adding a new accelerator Execution Provider</span></article>
+        <article class="source-card"><a href="https://openxla.org/xla/pjrt">OpenXLA PJRT</a><span>Uniform C device API and opaque device-specific plugin boundary for framework clients</span></article>
         <article class="source-card"><a href="https://github.com/IBM/aihwkit">IBM AIHWKit</a><span>PyTorch-integrated analog hardware simulation, nonidealities, calibrated device models, and hardware-aware training</span></article>
-        <article class="source-card"><a href="https://github.com/IBM/aihwkit/blob/master/LICENSE.txt">IBM AIHWKit license</a><span>MIT license for AIHWKit source</span></article>
         <article class="source-card"><a href="https://github.com/sandialabs/cross-sim">Sandia CrossSim</a><span>Analog inference simulation for programming error, drift, read noise, ADC precision, parasitics, slicing, and array size</span></article>
         <article class="source-card"><a href="https://tvm.apache.org/docs/arch/index.html">Apache TVM architecture</a><span>Target-extensible compiler and runtime architecture reference</span></article>
-        <article class="source-card"><a href="https://openxla.org/xla/pjrt/pjrt_integration">OpenXLA PJRT integration</a><span>Framework-to-device plugin boundary and client integration model</span></article>
         <article class="source-card"><a href="https://github.com/tenstorrent/tt-umd/blob/main/docs/CUSTOM_MODIFICATION_GUIDE.md">TT-UMD custom-SoC guide</a><span>Explicitly reusable SoC descriptor contract plus the boundary for custom device implementation</span></article>
         <article class="source-card"><a href="https://github.com/tenstorrent/tt-metal/blob/main/tech_reports/Programming_Mesh_of_Devices/Programming_Mesh_of_Devices_with_TT-NN.md">TT-NN MeshDevice report</a><span>Virtual mesh, explicit tensor distribution, SPMD dispatch, and collective communication</span></article>
         <article class="source-card"><a href="https://github.com/tenstorrent/tt-metal/blob/main/tech_reports/TT-Fabric/TT-Fabric-Architecture.md">TT-Fabric architecture</a><span>Data/control planes, rerouting, mesh repair, checkpoint recovery, modeling, and fault injection</span></article>
@@ -517,10 +535,10 @@
         <article class="source-card"><a href="https://github.com/tenstorrent/tt-cluster-descriptors">Tenstorrent cluster descriptors</a><span>Static single-host, multi-host, subset, and fallback topology descriptions</span></article>
         <article class="source-card"><a href="https://github.com/tenstorrent/ttnn-visualizer">TT-NN Visualizer</a><span>Graph, tensor, buffer, memory, operation, and performance-report tooling reference</span></article>
         <article class="source-card"><a href="https://github.com/tenstorrent/tt-perf-report">Tenstorrent performance report tool</a><span>Trace, signpost, operation-ID, throughput, and bottleneck-analysis patterns</span></article>
-        <article class="source-card"><a href="https://www.ihw-ai.com/">IHW company overview</a><span>Public analog APU positioning and product claims</span></article>
-        <article class="source-card"><a href="https://ihw-ai.com/sub03">IHW product roadmap</a><span>Public Infertron product categories, applications, and roadmap positioning</span></article>
-        <article class="source-card"><a href="https://spdx.dev/use/specifications/">SPDX specifications</a><span>Software bill of materials and license-expression standards</span></article>
         <article class="source-card"><a href="analog-cim-evidence.html#paper-ledger">Analog CIM accuracy evidence ledger</a><span>Measured-silicon papers, claimed mitigations, remaining issues, and evidence boundaries</span></article>
+        <article class="source-card"><a href="analog-cim-ihw-patents.html">iHW patent-to-software study</a><span>Claimed ACiM mechanisms translated into possible compiler metadata, runtime state, and validation questions</span></article>
+        <article class="source-card"><a href="analog-cim-sdk-toolchain.html">ACiM SDK and compiler guide</a><span>Concrete IR, compiler-pass, artifact, HAL, runtime, simulator, and first vertical-slice implementation</span></article>
+        <article class="source-card"><a href="accelerator-repository-blueprint.html">Accelerator repository blueprint</a><span>TT-Metal-inspired source boundaries, implementation chain, test ladder, CI routing, contribution workflow, and debug playbook</span></article>
         <article class="source-card"><a href="analog-cim-board-bringup.html">ACiM PCIe board bring-up</a><span>How to adapt the KMD/UMD separation into target-specific BAR, DMA, interrupt, firmware, queue, reset, and YOLO implementation contracts</span></article>
         <article class="source-card"><a href="analog-cim-scaleout-llm.html">ACiM scale-out and LLM design</a><span>Fault hierarchy, logical mesh, compiler/runtime contracts, hybrid LLM partition, and implementation plan</span></article>
       </div>
@@ -528,9 +546,9 @@
   </main>
 
   <footer class="site-footer">
-    <p>English-only architecture decision study. Public facts and engineering inferences are kept separate.</p>
+    <p>English-only applied architecture study. Documented behavior and proposed ACiM translations are kept separate.</p>
     <div class="footer-links">
-      <a href="analog-cim-interview.html">Next: interview study</a>
+      <a href="accelerator-repository-blueprint.html">Next: structure the implementation repository</a>
       <a href="https://github.com/buicongnguyen/NPU">Source</a>
     </div>
   </footer>

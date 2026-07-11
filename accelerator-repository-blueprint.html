@@ -1,0 +1,1394 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="A TT-Metal-inspired repository blueprint for building an accelerator or analog compute-in-memory compiler, runtime, SDK, firmware, driver, simulator, test system, CI pipeline, Tracy profiler, and debugging toolchain.">
+  <title>Accelerator Repository Blueprint | NPU Study Guide</title>
+  <link rel="stylesheet" href="analog-cim.css">
+  <link rel="stylesheet" href="npu-engineering.css">
+  <link rel="stylesheet" href="accelerator-repository-blueprint.css">
+  <script src="npu-engineering.js" defer></script>
+</head>
+<body class="repo-page">
+  <header class="site-header">
+    <a class="brand" href="index.html" aria-label="NPU Study Guide home">
+      <img src="https://avatars.githubusercontent.com/u/72680210?v=4" alt="Bui Cong Nguyen avatar">
+      <span>NPU Study Guide</span>
+    </a>
+    <nav class="site-nav" aria-label="Repository engineering learning path">
+      <a href="npu-soc-software-architecture.html">SoC stack</a>
+      <a href="analog-cim-sdk-toolchain.html">SDK</a>
+      <a href="analog-cim-board-bringup.html">Bring-up</a>
+      <a href="analog-cim-tenstorrent-reuse.html">Patterns</a>
+      <a href="accelerator-repository-blueprint.html" aria-current="page">Repository</a>
+      <a href="analog-cim-scaleout-llm.html">Scale/LLM</a>
+    </nav>
+  </header>
+
+  <main>
+    <section class="hero">
+      <div class="hero-copy">
+        <p class="eyebrow">TT-Metal repository study | snapshot 2026-07-11</p>
+        <h1>Accelerator Repository Blueprint</h1>
+        <p class="lede">
+          Build a repository that can grow from one simulated matrix operation into a maintained compiler, runtime,
+          SDK, firmware, driver, model library, and hardware qualification system. TT-Metal supplies the concrete
+          reference; this page extracts the boundaries and test discipline that also apply to an Analog CIM machine.
+        </p>
+        <div class="hero-actions">
+          <a class="button" href="#blueprint">Open the repository tree</a>
+          <a class="button secondary" href="#toolchain">Build the minimal example</a>
+          <a class="button secondary" href="#test-ladder">Follow the test ladder</a>
+          <a class="button secondary" href="#profiling">Profile host and device</a>
+          <a class="button secondary" href="#debugging">Open the debug playbook</a>
+        </div>
+        <div class="summary-strip" role="group" aria-label="Repository design principles">
+          <div><strong>Contracts first</strong><span>One source for ABI, command, target, and artifact schemas</span></div>
+          <div><strong>Host first</strong><span>Compiler and runtime behavior testable without scarce hardware</span></div>
+          <div><strong>Vertical slices</strong><span>Each milestone ends in an executable path and evidence</span></div>
+          <div><strong>Layered gates</strong><span>Fast PR feedback plus deeper hardware and nightly coverage</span></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="observed">
+      <div class="section-heading">
+        <p class="eyebrow">Observed in TT-Metal</p>
+        <h2>The repository is an engineering system, not a large source folder</h2>
+        <p class="section-note">
+          The current <a href="https://github.com/tenstorrent/tt-metal">TT-Metal repository</a> separates the Metalium
+          programming layer, TT-NN, models, tests, documentation, tools, scripts, build infrastructure, and GitHub
+          automation. The exact names and scale are Tenstorrent-specific; the separation of ownership is the useful pattern.
+        </p>
+      </div>
+      <div class="repo-snapshot">
+        <article><strong>Product code</strong><code>tt_metal/</code><span>Host API, hardware kernels, low-level runtime, device implementation, examples, tests, and architecture descriptors.</span></article>
+        <article><strong>Operator and Python layer</strong><code>ttnn/</code><span>C++ implementation, Python package, public API, examples, tutorials, and component tests.</span></article>
+        <article><strong>Workload evidence</strong><code>models/</code><span>Demos, reusable model utilities, reference paths, performance support, datasets, and model CI tiers.</span></article>
+        <article><strong>Cross-stack tests</strong><code>tests/</code><span>Metalium, TT-NN, end-to-end, sweeps, performance, nightly, stress, distributed, and shared test infrastructure.</span></article>
+        <article><strong>Debug and profiling</strong><code>tools/</code><span>Hardware debug, triage, tracing, profiling, power support, inspection, and test utilities.</span></article>
+        <article><strong>Automation</strong><code>scripts/</code><span>Build, test, API checks, profiling, CI helpers, code health, and generated-data maintenance.</span></article>
+        <article><strong>Build and configuration</strong><code>cmake/</code><span>Toolchains, dependencies, sanitizers, packaging, compiler checks, caching, and version construction.</span></article>
+        <article><strong>Project contract</strong><code>docs/ .github/ contributing/</code><span>Documentation, workflows, time budgets, ownership, pull-request rules, and engineering practices.</span></article>
+      </div>
+      <div class="callout top-gap">
+        <p>
+          <strong>The current test tree is purpose-oriented:</strong> <code>tests/tt_metal/</code> covers low-level
+          subsystems and microbenchmarks; <code>tests/ttnn/</code> includes unit, integration, performance, profiling,
+          statistical, stress, and nightly paths; <code>tests/end_to_end_tests/</code> crosses stack boundaries;
+          <code>tests/sweep_framework/</code> explores parameter spaces; and <code>tests/nightly/</code> groups deeper
+          hardware configurations. This is the model for the proposed test ladder later on this page.
+        </p>
+      </div>
+      <div class="callout verdict top-gap">
+        <p>
+          <strong>Copy the architecture of responsibility, not the repository size.</strong> A new ACiM stack should begin
+          with one contract path, one simulator backend, one runtime path, and one operator. Create a directory only when
+          it has a clear owner, dependency direction, test lane, and generated artifact.
+        </p>
+      </div>
+      <div class="table-wrap top-gap">
+        <table>
+          <thead><tr><th scope="col">TT-Metal pattern</th><th scope="col">General lesson</th><th scope="col">ACiM translation</th></tr></thead>
+          <tbody>
+            <tr><th scope="row">C++ core plus Python product layer</th><td>Keep performance-sensitive and ABI-sensitive code below a usable high-level API.</td><td>C++ compiler/runtime/HAL with Python bindings, model tools, calibration tools, and framework integration.</td></tr>
+            <tr><th scope="row">Tests at root and inside components</th><td>Local tests protect implementation details; root tests protect cross-component behavior.</td><td>Place private compiler/runtime tests beside their components and complete system lanes under <code>tests/</code>.</td></tr>
+            <tr><th scope="row">GoogleTest and pytest</th><td>Use each framework where its language, fixtures, and failure diagnostics are strongest.</td><td>GoogleTest for C++ contracts and state machines; pytest for Python APIs, parametrized operators, models, and lab scheduling.</td></tr>
+            <tr><th scope="row">Dedicated tools tree</th><td>Debugging and profiling are products with stable inputs and outputs.</td><td>Ship artifact inspection, IR dumps, command traces, calibration inspection, first-divergence analysis, triage bundles, and profilers.</td></tr>
+            <tr><th scope="row">Fast and deep CI lanes</th><td>A pull request cannot run every expensive accelerator test, so routing and post-commit coverage must be explicit.</td><td>Use host-only PR gates, selected hardware smoke, merge integration, nightly sweeps/performance, and release qualification.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="section" id="terminology">
+      <div class="section-heading">
+        <p class="eyebrow">Repository terminology</p>
+        <h2>Terms used throughout the blueprint</h2>
+      </div>
+      <div class="definition-grid">
+        <article class="definition-item"><strong>ABI: Application Binary Interface</strong><span>The binary-level contract for calling functions or exchanging structures across independently built components.</span></article>
+        <article class="definition-item"><strong>HAL: Hardware Abstraction Layer</strong><span>An internal device-neutral interface implemented by simulator, fake-device, and real-hardware backends.</span></article>
+        <article class="definition-item"><strong>SDK: Software Development Kit</strong><span>The supported APIs, libraries, tools, examples, documentation, packages, and diagnostics used by application developers.</span></article>
+        <article class="definition-item"><strong>UMD / KMD</strong><span>User-Mode Driver and Kernel-Mode Driver. UMD integrates the runtime; KMD owns privileged OS resources such as DMA, interrupts, isolation and reset.</span></article>
+        <article class="definition-item"><strong>CI: Continuous Integration</strong><span>Automated build, static analysis, test, packaging, and evidence collection triggered by code changes or schedules.</span></article>
+        <article class="definition-item"><strong>CTest</strong><span>CMake's test runner and test registry. It can launch GoogleTest executables and label or group native test targets.</span></article>
+        <article class="definition-item"><strong>Smoke test</strong><span>The shortest complete health path: discover, open, execute one known operation, compare, close, and leave the device usable.</span></article>
+        <article class="definition-item"><strong>Sweep test</strong><span>A parameterized exploration across shapes, dtypes, layouts, precision, faults, calibration, or other supported dimensions.</span></article>
+        <article class="definition-item"><strong>Soak test</strong><span>A long-running stress test intended to reveal leaks, state accumulation, thermal behavior, rare races, and recovery failures.</span></article>
+        <article class="definition-item"><strong>Golden test</strong><span>A deterministic comparison against an approved IR, artifact, command sequence, tensor, or report. Updates require an explained semantic change.</span></article>
+        <article class="definition-item"><strong>PVT: Process, Voltage, Temperature</strong><span>The manufacturing and operating corners used to characterize timing, power, numerical variation, and reliability.</span></article>
+        <article class="definition-item"><strong>ADR: Architecture Decision Record</strong><span>A short document preserving the context, alternatives, chosen design, consequences, migration, tests, and owner of a durable decision.</span></article>
+        <article class="definition-item"><strong>SKU: Stock Keeping Unit</strong><span>A specific product or board configuration that may differ in devices, memory, topology, clocks, power, firmware, or supported features.</span></article>
+        <article class="definition-item"><strong>Sanitizer</strong><span>Compiler instrumentation such as AddressSanitizer or UndefinedBehaviorSanitizer that detects classes of memory and language errors at runtime.</span></article>
+        <article class="definition-item"><strong>Tracy</strong><span>A real-time frame profiler used here for host C++ zones, frames, messages, plots, threads, locks, memory, and operating-system activity.</span></article>
+        <article class="definition-item"><strong>Zone</strong><span>A named interval with a begin and end timestamp. Nested zones divide a host request or device command into attributable phases.</span></article>
+        <article class="definition-item"><strong>Device cycle counter</strong><span>A monotonically increasing hardware timer read by firmware. Its clock domain and frequency must accompany the captured value.</span></article>
+        <article class="definition-item"><strong>Clock domain</strong><span>Logic driven by one clock source. Host, controller, array sequencer, converter, DSP, and multiple devices may not share a timestamp origin or rate.</span></article>
+        <article class="definition-item"><strong>Correlation ID</strong><span>A stable identifier carried through API call, queue command, firmware descriptor, device trace, interrupt, and result so records from different planes can be joined.</span></article>
+        <article class="definition-item"><strong>Probe effect</strong><span>The latency, memory, bandwidth, scheduling, or power change caused by observation itself. Profiled and official uninstrumented measurements must be compared.</span></article>
+      </div>
+    </section>
+
+    <section class="section" id="blueprint">
+      <div class="section-heading">
+        <p class="eyebrow">Recommended repository</p>
+        <h2>A smaller tree with production boundaries from the beginning</h2>
+        <p class="section-note">
+          The tree below is a proposed starting architecture for an accelerator stack named <code>acim-stack</code>.
+          Rename it for the product, but keep the ownership and dependency rules. Blue paths are executable contracts,
+          red paths are verification, and amber paths are developer tools.
+        </p>
+      </div>
+      <div class="repo-tree-layout">
+        <div class="code-panel repo-tree-panel">
+          <header><strong>Proposed repository tree</strong><span>Start narrow; expand each branch only with a working owner and test</span></header>
+          <pre><code><span class="tree-root">acim-stack/</span>
+|-- README.md
+|-- CONTRIBUTING.md
+|-- CODE_OF_CONDUCT.md
+|-- SECURITY.md
+|-- CHANGELOG.md
+|-- LICENSE
+|-- CMakeLists.txt
+|-- CMakePresets.json
+|-- pyproject.toml
+|-- pytest.ini
+|-- .clang-format
+|-- .clang-tidy
+|-- .pre-commit-config.yaml
+|-- .github/
+|   |-- CODEOWNERS
+|   |-- pull_request_template.md
+|   `-- workflows/
+|       |-- pr-fast.yml
+|       |-- pr-hardware-smoke.yml
+|       |-- post-commit.yml
+|       |-- nightly-sweeps.yml
+|       |-- nightly-performance.yml
+|       |-- release-qualification.yml
+|       `-- acim-minimal.yml
+|-- cmake/
+|   |-- dependencies.cmake
+|   |-- sanitizers.cmake
+|   |-- warnings.cmake
+|   |-- packaging.cmake
+|   `-- toolchains/
+|-- configs/
+|   |-- targets/
+|   |-- test-matrices/
+|   |-- performance-thresholds/
+|   |-- model-manifests/
+|   `-- schemas/
+|-- docs/
+|   |-- architecture/
+|   |-- adr/
+|   |-- api/
+|   |-- bringup/
+|   |-- debugging/
+|   |-- testing/
+|   |-- tutorials/
+|   `-- generated/
+|-- <span class="tree-contract">schemas/</span>
+|   |-- target.fbs
+|   |-- artifact.fbs
+|   |-- command.fbs
+|   |-- calibration.fbs
+|   `-- trace.fbs
+|-- <span class="tree-contract">generated/</span>
+|   |-- cpp/
+|   |-- python/
+|   `-- firmware/
+|-- include/acim/
+|   |-- c_api/
+|   |-- compiler/
+|   |-- runtime/
+|   `-- hal/
+|-- src/
+|   |-- compiler/
+|   |   |-- import/
+|   |   |-- ir/
+|   |   |-- passes/
+|   |   |-- mapping/
+|   |   |-- codegen/
+|   |   `-- artifact/
+|   |-- runtime/
+|   |-- hal/
+|   |   |-- simulator/
+|   |   |-- fake_device/
+|   |   `-- hardware/
+|   |-- driver/
+|   |-- firmware/
+|   |-- simulator/
+|   `-- common/
+|-- kernels/
+|   |-- analog/
+|   |-- digital/
+|   `-- common/
+|-- bindings/
+|   `-- python/
+|-- python/acim/
+|   |-- compiler/
+|   |-- runtime/
+|   |-- framework/
+|   |-- calibration/
+|   `-- tools/
+|-- models/
+|   |-- demos/
+|   |-- reference/
+|   |-- manifests/
+|   |-- accuracy/
+|   `-- performance/
+|-- examples/
+|   |-- acim-minimal/
+|   |-- cpp/
+|   |-- python/
+|   `-- notebooks/
+|-- <span class="tree-tool">tools/</span>
+|   |-- artifact-inspect/
+|   |-- ir-dump/
+|   |-- trace/
+|   |-- profiler/
+|   |-- triage/
+|   |-- calibration-inspect/
+|   `-- codegen/
+|-- <span class="tree-test">tests/</span>
+|   |-- cpp/unit/
+|   |-- cpp/integration/
+|   |-- python/unit/
+|   |-- python/integration/
+|   |-- smoke/
+|   |-- sweeps/
+|   |-- end_to_end/
+|   |-- performance/
+|   |-- stress/
+|   |-- hardware/
+|   |-- qualification/
+|   |-- data/golden/
+|   `-- common/
+|-- <span class="tree-tool">scripts/</span>
+|   |-- build/
+|   |-- ci/
+|   |-- test/
+|   |-- release/
+|   `-- trace/
+|-- docker/
+|-- third_party/
+`-- packaging/</code></pre>
+        </div>
+        <div class="repo-rule-list">
+          <article class="repo-rule"><b>Rule 1</b><strong>One contract source</strong><span><code>schemas/</code> generates C++, Python, and firmware readers. Never maintain three handwritten definitions of a command or artifact.</span></article>
+          <article class="repo-rule"><b>Rule 2</b><strong>Public API is narrow</strong><span><code>include/acim/</code> exposes supported interfaces. Private implementation headers remain below <code>src/</code>.</span></article>
+          <article class="repo-rule"><b>Rule 3</b><strong>Hardware is a backend</strong><span>The runtime targets a HAL implemented by functional simulation, queued fake device, and hardware. Compiler tests do not require a board.</span></article>
+          <article class="repo-rule"><b>Rule 4</b><strong>Tests state their scope</strong><span>A developer can tell whether a test needs no device, one device, a topology, calibration data, or a qualification lab from its path and markers.</span></article>
+          <article class="repo-rule"><b>Rule 5</b><strong>Models are consumers</strong><span>Model demos may use the public SDK; they must not reach into compiler internals, physical addresses, or private driver APIs.</span></article>
+          <article class="repo-rule"><b>Rule 6</b><strong>Tools consume stable evidence</strong><span>Inspectors and profilers read versioned artifacts and traces. They do not scrape human log text as their primary interface.</span></article>
+          <article class="repo-rule"><b>Rule 7</b><strong>Configuration is validated data</strong><span>Target, test-matrix, model, and threshold files have schemas, units, version fields, examples, and validation tests.</span></article>
+          <article class="repo-rule"><b>Rule 8</b><strong>Generated output is reproducible</strong><span>Generated files record generator version and source hash; CI fails when committed output differs from regeneration.</span></article>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="dependencies">
+      <div class="section-heading">
+        <p class="eyebrow">Dependency direction</p>
+        <h2>The directory tree matters only when dependencies follow it</h2>
+        <p class="section-note">
+          Keep stable data contracts at the bottom, device-neutral behavior in the middle, and user-facing integrations
+          at the top. Hardware implementations satisfy interfaces; they do not redefine them.
+        </p>
+      </div>
+      <div class="dependency-flow" role="group" aria-label="Accelerator repository dependency direction">
+        <article class="dependency-node"><b>Foundation</b><strong>Schemas and types</strong><span>Status codes, target, artifact, command, calibration, and trace contracts</span></article>
+        <article class="dependency-node"><b>Mechanism</b><strong>Compiler and HAL</strong><span>Lowering, mapping, code generation, buffers, queues, events, and device interface</span></article>
+        <article class="dependency-node"><b>Execution</b><strong>Runtime</strong><span>Compatibility, allocation, binding, submission, synchronization, recovery, telemetry</span></article>
+        <article class="dependency-node"><b>Language</b><strong>C API and bindings</strong><span>Stable ABI plus C++ and Python convenience layers</span></article>
+        <article class="dependency-node"><b>Integration</b><strong>Framework and SDK</strong><span>ONNX Runtime, PyTorch tools, CLI, packaging, examples</span></article>
+        <article class="dependency-node"><b>Product proof</b><strong>Models and applications</strong><span>Real preprocessing, fallback, execution, postprocessing, accuracy, and performance</span></article>
+      </div>
+      <div class="table-wrap top-gap">
+        <table>
+          <thead><tr><th scope="col">Boundary</th><th scope="col">May depend on</th><th scope="col">Must not depend on</th><th scope="col">Enforcement</th></tr></thead>
+          <tbody>
+            <tr><th scope="row"><code>schemas/</code></th><td>Schema compiler and primitive types</td><td>Runtime, framework, board, or model code</td><td>Standalone generation target and compatibility tests</td></tr>
+            <tr><th scope="row"><code>src/compiler/</code></th><td>IR, target descriptors, operation/cost models, artifact writer</td><td>Live device handles, kernel-driver calls, serial-specific state</td><td>Link boundaries plus host-only compiler tests</td></tr>
+            <tr><th scope="row"><code>src/runtime/</code></th><td>Public contracts, HAL, artifact reader, telemetry</td><td>Framework graph classes or compiler-private passes</td><td>Runtime target links only approved libraries</td></tr>
+            <tr><th scope="row"><code>src/hal/</code></th><td>Device-neutral interfaces and backend-specific implementation</td><td>Model semantics, graph partition policy, Python objects</td><td>Backend conformance suite</td></tr>
+            <tr><th scope="row"><code>python/acim/</code></th><td>Public C ABI or supported bindings</td><td>Private C++ symbols and raw MMIO</td><td>Wheel test against installed headers and libraries</td></tr>
+            <tr><th scope="row"><code>models/</code></th><td>Installed SDK, public framework plugin, test utilities</td><td>Source-tree implementation imports</td><td>Run selected demos from a packaged installation</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="section" id="toolchain">
+      <div class="section-heading">
+        <p class="eyebrow">Native build toolchain</p>
+        <h2>Turn one ACiM source file into a repeatable binary and test result</h2>
+        <p class="section-note">
+          A build stack is a chain of different tools. CMake describes targets and generates a build graph; Ninja or
+          Make executes that graph; GCC, Clang, or MSVC compiles C/C++; an archiver and linker create libraries and
+          executables; CTest runs the native tests. Treating all of this as "the compiler" makes failures difficult to locate.
+        </p>
+      </div>
+      <div class="engineering-flow six" role="group" aria-label="Native ACiM build from preset to test evidence">
+        <article class="flow-step"><b>1. Select</b><strong>Preset and toolchain</strong><span>Host OS, compiler, build type, features, target/sysroot</span></article>
+        <article class="flow-step"><b>2. Configure</b><strong>CMake</strong><span>Detect capabilities, resolve packages, create explicit targets</span></article>
+        <article class="flow-step"><b>3. Generate</b><strong>Ninja build graph</strong><span>Commands, dependencies, generated files and output paths</span></article>
+        <article class="flow-step"><b>4. Compile</b><strong>GCC / Clang / MSVC</strong><span>Preprocess, parse, optimize, generate objects and diagnostics</span></article>
+        <article class="flow-step"><b>5. Link</b><strong>Archiver and linker</strong><span>Static/shared libraries, executables, symbols, ABI and runtime paths</span></article>
+        <article class="flow-step"><b>6. Prove</b><strong>CTest and install</strong><span>Unit, smoke, labels, package layout and saved build manifest</span></article>
+      </div>
+
+      <div class="section-heading top-gap">
+        <h3>Know which tool owns each failure</h3>
+      </div>
+      <div class="table-wrap routing-table">
+        <table>
+          <thead><tr><th scope="col">Tool</th><th scope="col">Responsibility</th><th scope="col">Recommended ACiM use</th><th scope="col">Typical failure or evidence</th></tr></thead>
+          <tbody>
+            <tr><th scope="row">CMake</th><td>Meta-build system: declares targets, requirements, generated files, installation, tests and package discovery.</td><td>One target per compiler/runtime/HAL boundary; checked-in presets; target-scoped options instead of global flags.</td><td>Configure log, compiler ID/version, cache, target graph, package resolution, generated Ninja files.</td></tr>
+            <tr><th scope="row">Ninja</th><td>Executes the generated dependency graph with fast incremental and parallel builds.</td><td>Default local and CI generator. Let CMake generate <code>build.ninja</code>; do not hand-author it.</td><td>Exact failed command, missing generated dependency, stale output, unexpected rebuild or parallel race.</td></tr>
+            <tr><th scope="row">GNU Make</th><td>Alternative build executor and the basis of Linux Kbuild.</td><td>Accept as a CMake generator when needed; use the kernel's Make/Kbuild flow for the Linux KMD.</td><td>Make target, dependency/rule expansion, kernel build output.</td></tr>
+            <tr><th scope="row">GCC / G++</th><td>GNU C/C++ compiler driver, frontend, optimizer and code generator; invokes assembler and linker.</td><td>Linux baseline for host compiler, runtime, simulator and SDK release builds with <code>libstdc++</code>.</td><td>Standards/warning diagnostics, generated objects, optimization report, GNU ABI and runtime dependencies.</td></tr>
+            <tr><th scope="row">Clang / Clang++</th><td>LLVM C/C++ compiler driver with independent diagnostics and sanitizer integration.</td><td>Second compiler in CI, developer diagnostics, AddressSanitizer/UndefinedBehaviorSanitizer and future LLVM/MLIR integration.</td><td>Independent compile result, sanitizer trace, optimization remarks, LLVM IR when explicitly requested.</td></tr>
+            <tr><th scope="row">MSVC / clang-cl</th><td>Windows-native C/C++ toolchains using the Microsoft command-line and ABI conventions.</td><td>Host-only Windows simulator/SDK confidence. Keep the production Linux PCIe/KMD lane separate.</td><td>MSVC ABI, CRT selection, PDB debug symbols, DLL import/export and Windows packaging behavior.</td></tr>
+            <tr><th scope="row">Assembler</th><td>Turns compiler-generated assembly into architecture-specific object files.</td><td>Normally driven by the compiler; direct use appears in firmware startup, interrupt stubs and ISA kernels.</td><td>Object sections, relocation records, instruction encoding and target ISA mismatch.</td></tr>
+            <tr><th scope="row">Archiver</th><td>Packages object files into static libraries such as <code>.a</code> or <code>.lib</code>.</td><td>Create narrow compiler, artifact, runtime and simulator libraries; inspect symbol ownership when links fail.</td><td>Archive member list, duplicate/missing symbols and unexpected private implementation exposure.</td></tr>
+            <tr><th scope="row">GNU ld / LLD / link.exe</th><td>Resolves symbols and relocations into shared libraries and executables.</td><td>Start with the compiler's default linker; add LLD only as a measured build-time optimization or target requirement.</td><td>Link map, unresolved/duplicate symbol, section size, RPATH, SONAME, import library and ABI mismatch.</td></tr>
+            <tr><th scope="row">CTest</th><td>CMake's native test registry and runner with labels, fixtures, timeouts and presets.</td><td>Common entry point for dependency-free unit tests, GoogleTest discovery, smoke tests and install checks.</td><td>Test name, label, command, timeout, exit code, output and per-lane summary.</td></tr>
+            <tr><th scope="row">GoogleTest</th><td>C++ test framework with typed assertions, fixtures, parameterized tests and CMake discovery.</td><td>Use for compiler passes, schemas, allocators, runtime state machines and backend contracts after the minimal offline tests work.</td><td>Focused assertion, parameter, fixture lifecycle and <code>--gtest_filter</code> reproducer.</td></tr>
+            <tr><th scope="row">clang-format / clang-tidy</th><td>Mechanical formatting plus AST-based diagnostics and refactoring checks.</td><td>Format automatically; run selected analyzer, bug-prone, performance and portability checks on owned targets.</td><td>Formatting diff or source-located diagnostic. Do not apply project warnings to third-party code.</td></tr>
+            <tr><th scope="row">Sanitizers</th><td>Compiler instrumentation for memory errors, undefined behavior, races or uninitialized reads.</td><td>Clang ASan+UBSan PR lane; separate TSan lane for queue/runtime concurrency; never use sanitizer timing as performance data.</td><td>Symbolized stack, allocation/free history, undefined operation or race report.</td></tr>
+            <tr><th scope="row">gcov / llvm-cov</th><td>Compiler instrumentation and reporting for function, line, region and branch coverage.</td><td>Measure owned host code after tests are stable; keep GCC and Clang coverage artifacts in separate lanes.</td><td>Instrumented binary, raw/indexed profile, source report and uncovered branch list. Coverage percentage is not correctness.</td></tr>
+            <tr><th scope="row">ccache / sccache</th><td>Caches compiler outputs keyed by source, compiler and command inputs.</td><td>Add after the uncached build is correct; report hit rate and include compiler/config hashes in CI cache keys.</td><td>Hit/miss statistics, cache-key mismatch and stale/non-reproducible input diagnosis.</td></tr>
+            <tr><th scope="row">Package/dependency tools</th><td><code>find_package</code>, package managers, dependency providers, <code>pkg-config</code> and optional <code>FetchContent</code>.</td><td>Prefer installed/pinned packages for release builds. Keep network fetching opt-in and hash-pinned.</td><td>Resolved package version, include/library path, dependency lock and provenance manifest.</td></tr>
+            <tr><th scope="row">Schema/code generators</th><td>Tools such as <code>flatc</code>, <code>protoc</code> or TableGen turn one contract source into language-specific code.</td><td>Generate C++, Python and firmware readers into the build tree; verify committed generated output only when distribution requires it.</td><td>Generator version, schema hash, generated diff, compatibility test and dependency edge in Ninja.</td></tr>
+            <tr><th scope="row">Python wheel and bindings</th><td><code>pyproject.toml</code> build backend plus pybind11/nanobind or a C ABI wrapper creates an installable Python extension.</td><td>Add after the C++ install tree is stable; build wheels against the supported Python/OS/architecture matrix.</td><td>Wheel contents, extension ABI, imported shared-library paths, Python tag and installed-package smoke test.</td></tr>
+            <tr><th scope="row">Doxygen / Sphinx</th><td>Generates C/C++ API documentation and narrative SDK documentation as explicit build targets.</td><td>Run warnings-as-errors for public API comments, examples and cross-links without putting docs in the default native compile target.</td><td>Generated HTML, missing-symbol/comment warnings, broken links and versioned API reference.</td></tr>
+            <tr><th scope="row">Cross compiler and sysroot</th><td>Builds host runtime or firmware for a target ISA/OS using target headers, libraries and ABI.</td><td>CMake toolchain file for AArch64 host runtime; separate freestanding project for the ACiM controller firmware.</td><td>Target triple, sysroot hash, compiler runtime, linker script, ELF attributes and emulation/hardware smoke result.</td></tr>
+            <tr><th scope="row">Kbuild</th><td>Linux kernel's supported build system for external and in-tree modules.</td><td>Build the kernel-mode driver with Kbuild. Top-level CMake may invoke and package it, but should not replace its rules.</td><td>Kernel version/config, module symbols, modpost output, signing and load/unload test.</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="section-heading top-gap">
+        <h3>Recommended choices for the first repository</h3>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th scope="col">Decision</th><th scope="col">Start with</th><th scope="col">Add when needed</th><th scope="col">Avoid in the first loop</th></tr></thead>
+          <tbody>
+            <tr><th scope="row">Language</th><td>ISO C++20 through <code>target_compile_features</code>; C ABI only at the supported SDK boundary</td><td>C17 for firmware/KMD boundaries and target-specific assembly where the ABI requires it</td><td>Compiler-specific language extensions in public headers</td></tr>
+            <tr><th scope="row">Linux compiler</th><td>GCC baseline plus Clang as an independent CI compiler</td><td>Versioned release matrix and target cross-compilers</td><td>Supporting many old compilers before a product/toolchain requirement exists</td></tr>
+            <tr><th scope="row">Windows compiler</th><td>MSVC for host simulator and SDK portability</td><td><code>clang-cl</code> if Windows LLVM diagnostics or compatibility is valuable</td><td>Claiming Windows device support from a host-only simulator build</td></tr>
+            <tr><th scope="row">Generator</th><td>CMake plus Ninja</td><td>Unix Makefiles or IDE generators as secondary paths</td><td>Handwritten per-platform build scripts that duplicate the target graph</td></tr>
+            <tr><th scope="row">Linker</th><td>Compiler default</td><td>LLD after measuring link time, memory or cross-target requirements</td><td>Mixing C++ standard libraries or CRT modes inside one ABI without an explicit boundary</td></tr>
+            <tr><th scope="row">Dependencies</th><td>No dependency for the first smoke/unit path; <code>find_package</code> for installed packages</td><td>Pinned provider/package manager; hash-pinned <code>FetchContent</code> for developer convenience</td><td>Downloading LLVM, MLIR or GoogleTest on every default configure</td></tr>
+            <tr><th scope="row">LLVM / MLIR</th><td>Disabled in the minimal build</td><td>Prebuilt, version-pinned package behind <code>ACIM_ENABLE_MLIR</code></td><td>Making a full LLVM source build a prerequisite for the first MVM smoke test</td></tr>
+            <tr><th scope="row">Device firmware</th><td>Host model of descriptors and state machines</td><td>Separate cross-toolchain, linker script, startup and hardware/RTL tests after ISA/ABI freeze</td><td>Linking host C++ runtime libraries into freestanding firmware by accident</td></tr>
+            <tr><th scope="row">Linux driver</th><td>Fake HAL and userspace tests</td><td>Kbuild module, kernel-version matrix and PCIe lab after UAPI/resource ownership is defined</td><td>Hiding driver commands inside general CMake targets or unit tests</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="section-heading top-gap">
+        <h3>Compiler and target matrix</h3>
+      </div>
+      <div class="table-wrap routing-table">
+        <table>
+          <thead><tr><th scope="col">Lane</th><th scope="col">Builds</th><th scope="col">Runs</th><th scope="col">Primary question</th><th scope="col">Suggested trigger</th></tr></thead>
+          <tbody>
+            <tr><th scope="row">GCC Debug</th><td>All host libraries, tools and dependency-free tests</td><td>Unit, smoke, simulator integration</td><td>Does the Linux baseline compile and behave correctly?</td><td>Every PR</td></tr>
+            <tr><th scope="row">Clang Debug</th><td>Same public targets with independent diagnostics</td><td>Unit and smoke</td><td>Did GCC accept a non-portable or suspicious construct?</td><td>Every PR</td></tr>
+            <tr><th scope="row">Clang ASan+UBSan</th><td>Owned host code with instrumentation</td><td>Unit and simulator integration</td><td>Are memory lifetime and language operations valid?</td><td>Every PR or post-commit</td></tr>
+            <tr><th scope="row">Clang TSan</th><td>Runtime/queue subset with race instrumentation</td><td>Deterministic concurrency tests</td><td>Are session, queue, event and callback accesses synchronized?</td><td>Post-commit/nightly</td></tr>
+            <tr><th scope="row">GCC Release</th><td>Install tree, shared/static policy, CLI and package</td><td>Packaged smoke plus controlled benchmarks</td><td>Does the shipped optimization/ABI configuration work?</td><td>Post-commit/release</td></tr>
+            <tr><th scope="row">MSVC Debug</th><td>Host simulator, public headers and SDK utilities</td><td>Unit and smoke</td><td>Are public C++ and data contracts portable to Windows?</td><td>Post-commit when Windows is supported</td></tr>
+            <tr><th scope="row">AArch64 Linux cross</th><td>Runtime, HAL interfaces and CLI against target sysroot</td><td>QEMU/package check, then target smoke</td><td>Are target dependencies, ABI and package paths correct?</td><td>Post-commit/release</td></tr>
+            <tr><th scope="row">Controller firmware</th><td>Freestanding image, map and size report</td><td>Host model, ISA simulator, RTL/FPGA, silicon in stages</td><td>Does firmware fit and implement the command ABI safely?</td><td>Every firmware PR plus hardware lanes</td></tr>
+            <tr><th scope="row">Linux KMD</th><td>Module through Kbuild for supported kernels</td><td>Static checks, load/unload, DMA/interrupt/reset smoke</td><td>Does privileged resource ownership work for this kernel/device?</td><td>Driver PR, nightly matrix, release</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="callout verdict top-gap">
+        <h3>A working minimal build is included</h3>
+        <p>
+          <a href="examples/acim-minimal/README.md"><code>examples/acim-minimal/</code></a> contains a dependency-free
+          C++20 functional MVM simulator, ADC clamp, CMake target policy, Ninja presets for GCC/Clang/MSVC, CTest unit
+          and smoke lanes, optional GoogleTest discovery, clang-format/clang-tidy configuration, installation rules,
+          and an AArch64 Linux toolchain example. It is a software reference model, not an analog circuit model.
+        </p>
+      </div>
+      <div class="code-panel top-gap">
+        <header><strong>First configure, build and test</strong><span>Run inside <code>examples/acim-minimal</code></span></header>
+        <pre><code># Linux baseline
+cmake --preset gcc
+cmake --build --preset gcc
+ctest --preset gcc
+
+# Independent compiler and sanitizer lane
+cmake --preset clang
+cmake --build --preset clang
+ctest --preset clang
+cmake --preset asan-clang
+cmake --build --preset asan-clang
+ctest --preset asan-clang
+
+# Windows host path from a Visual Studio Developer PowerShell
+cmake --preset msvc
+cmake --build --preset msvc
+ctest --preset msvc</code></pre>
+      </div>
+      <div class="callout caution top-gap">
+        <p>
+          <strong>ABI rule:</strong> record compiler ID/version, target triple, C++ standard library, build type,
+          sanitizer mode and public ABI version. Do not pass C++ standard-library objects across a plugin boundary
+          compiled with incompatible <code>libstdc++</code>, <code>libc++</code> or MSVC CRT/ABI settings; keep the stable
+          external boundary in C handles, fixed-width fields and explicitly versioned structures.
+        </p>
+      </div>
+    </section>
+
+    <section class="section" id="build-config">
+      <div class="section-heading">
+        <p class="eyebrow">Build graph and configuration</p>
+        <h2>CMake owns native targets; pyproject owns the Python product</h2>
+        <p class="section-note">
+          Keep target relationships explicit in CMake, package and tool entry points explicit in <code>pyproject.toml</code>,
+          and runtime/test choices in validated configuration files. Environment variables may override a declared
+          option, but the resolved value must appear in the run manifest.
+        </p>
+      </div>
+      <div class="dependency-flow" role="group" aria-label="Accelerator repository build target graph">
+        <article class="dependency-node"><b>Generate</b><strong>Contract code</strong><span><code>acim_schema_codegen</code> emits C++, Python and firmware definitions</span></article>
+        <article class="dependency-node"><b>Foundation</b><strong>Artifact and common</strong><span>Versioning, hashing, status, logging, target and executable readers</span></article>
+        <article class="dependency-node"><b>Core</b><strong>Compiler and HAL API</strong><span>Host-only compiler plus backend-neutral device interfaces</span></article>
+        <article class="dependency-node"><b>Execute</b><strong>Runtime and backends</strong><span>Functional, queued simulation and hardware implementations</span></article>
+        <article class="dependency-node"><b>Expose</b><strong>C API and Python</strong><span>Installed ABI, bindings, wheel, CLI and framework adapters</span></article>
+        <article class="dependency-node"><b>Verify</b><strong>Tests and packages</strong><span>Link public targets, install tree and selected private test helpers</span></article>
+      </div>
+      <div class="code-panel top-gap">
+        <header><strong>Recommended native target graph</strong><span>One target per ownership boundary; private dependencies stay private</span></header>
+        <pre><code>acim_schema_codegen
+  -> acim_common
+  -> acim_artifact
+  -> acim_compiler
+  -> acim_hal
+       -> acim_hal_functional
+       -> acim_hal_queued_sim
+       -> acim_hal_hardware
+  -> acim_runtime
+  -> acim_c_api
+  -> acim_python_binding
+  -> acim_tools
+
+acim_gtest_contracts        # schema, artifact and ABI layout
+acim_gtest_compiler         # IR, passes, mapping and encoding
+acim_gtest_runtime          # lifecycle, queues, memory and recovery
+acim_gtest_hal_conformance  # same cases for every backend
+acim_gtest_firmware_model   # descriptor validation and state machines</code></pre>
+      </div>
+      <div class="table-wrap top-gap">
+        <table>
+          <thead><tr><th scope="col">Configuration</th><th scope="col">Owns</th><th scope="col">Required fields or profiles</th><th scope="col">Validation rule</th></tr></thead>
+          <tbody>
+            <tr><th scope="row"><code>CMakePresets.json</code></th><td>Repeatable native configure/build/test modes</td><td><code>dev</code>, <code>release</code>, <code>asan</code>, <code>ubsan</code>, <code>coverage</code>, cross-compile presets</td><td>CI invokes the same presets documented for developers.</td></tr>
+            <tr><th scope="row"><code>pyproject.toml</code></th><td>Python package, build backend, dependencies, optional groups and CLI entry points</td><td>Supported Python versions, core/runtime extras, test/docs tools, wheel contents</td><td>Build and test a wheel in a clean environment; model tests use the installed package.</td></tr>
+            <tr><th scope="row"><code>pytest.ini</code></th><td>Test discovery, markers and default diagnostics</td><td><code>unit</code>, <code>integration</code>, <code>hardware</code>, <code>smoke</code>, <code>nightly</code>, <code>performance</code>, model tiers</td><td>Unknown markers fail; hardware tests cannot enter the default host-only lane.</td></tr>
+            <tr><th scope="row"><code>configs/targets/*.yaml</code></th><td>Target class and capabilities</td><td>Schema/ABI version, revision, arrays, converters, memory, engines, commands, limits and units</td><td>Schema validation plus compiler/runtime compatibility tests; every compile records the target hash.</td></tr>
+            <tr><th scope="row"><code>configs/test-matrices/*.yaml</code></th><td>Where each test lane runs</td><td>SKU, topology, marker, runner label, timeout, exclusivity, firmware, cleanup and retry policy</td><td>CI validates that each required lane has a compatible runner and bounded timeout.</td></tr>
+            <tr><th scope="row"><code>configs/performance-thresholds/*.yaml</code></th><td>Versioned regression policy</td><td>Workload ID, metric, baseline, absolute limit, allowed change, owner and review date</td><td>A threshold change is reviewed separately from the implementation it would excuse.</td></tr>
+            <tr><th scope="row"><code>configs/model-manifests/*.yaml</code></th><td>Reproducible model workload</td><td>Model/input hashes, preprocessing, shapes, precision, backend, accuracy metric, fallback, performance scenario</td><td>E2E jobs reject implicit downloads, mutable model names and missing reference thresholds.</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="callout top-gap">
+        <p>
+          <strong>Configuration rule:</strong> defaults belong beside their schema; overrides are typed, bounded and
+          logged; units are part of the field name or type; deprecated fields have migration tests; and the fully
+          resolved configuration hash is attached to every artifact, benchmark and failure bundle.
+        </p>
+      </div>
+    </section>
+
+    <section class="section" id="implementation-chain">
+      <div class="section-heading">
+        <p class="eyebrow">Implementation chain</p>
+        <h2>Build one executable path before expanding the surface area</h2>
+        <p class="section-note">
+          Each milestone adds exactly one new responsibility and must leave a testable artifact behind. This sequence
+          prevents the model zoo, framework plugin, and hardware backend from hiding an unstable compiler/runtime contract.
+        </p>
+      </div>
+      <div class="engineering-flow six" role="group" aria-label="First accelerator repository implementation sequence">
+        <article class="flow-step"><b>1. Bootstrap</b><strong>Build and lint</strong><span>CMake presets, Python package, warnings, format, sanitizers</span></article>
+        <article class="flow-step"><b>2. Contract</b><strong>Schema and ABI</strong><span>Target, artifact, command, status, trace, compatibility</span></article>
+        <article class="flow-step"><b>3. Reference</b><strong>Functional model</strong><span>One MVM, digital epilogue, deterministic golden vectors</span></article>
+        <article class="flow-step"><b>4. Compile</b><strong>One vertical slice</strong><span>Import, legalize, map, emit artifact, inspect</span></article>
+        <article class="flow-step"><b>5. Execute</b><strong>Runtime and fake HAL</strong><span>Load, allocate, bind, submit, wait, trace, reset</span></article>
+        <article class="flow-step"><b>6. Correlate</b><strong>Hardware and model</strong><span>Bring-up backend, framework path, accuracy, performance</span></article>
+      </div>
+      <div class="table-wrap top-gap">
+        <table>
+          <thead><tr><th scope="col">Milestone</th><th scope="col">Code added</th><th scope="col">Required proof</th><th scope="col">Do not add yet</th></tr></thead>
+          <tbody>
+            <tr><th scope="row">M0: reproducible checkout</th><td>Build presets, dependency lock, package metadata, pre-commit, minimal docs</td><td>Clean machine configures, builds, installs, imports Python, and runs an empty CTest/pytest lane</td><td>Board support, model integrations, optimization</td></tr>
+            <tr><th scope="row">M1: machine contract</th><td>Target schema, artifact envelope, commands, status codes, generated readers</td><td>Round-trip, malformed-input, old/new schema, and cross-language compatibility tests</td><td>Compiler policy hidden in ad hoc YAML</td></tr>
+            <tr><th scope="row">M2: numerical reference</th><td>FP32, quantized, ideal-array, and configurable nonideality implementations</td><td>Golden MVM vectors and property tests across shapes, signs, saturation, and rounding</td><td>Cycle claims or silicon accuracy claims</td></tr>
+            <tr><th scope="row">M3: one-op compiler</th><td>MatMul import, validation, mapping, command emission, artifact inspector</td><td>Golden IR, illegal-target diagnostics, deterministic artifact hash, reference equivalence</td><td>General fusion and broad operator coverage</td></tr>
+            <tr><th scope="row">M4: executable runtime</th><td>C API, sessions, buffers, queues, events, fake/functional HALs, trace</td><td>Backend conformance, timeout/reset, resource cleanup, multithreaded lifecycle tests</td><td>Framework-specific state in the runtime</td></tr>
+            <tr><th scope="row">M5: first hardware path</th><td>KMD/UMD or platform driver, firmware transport, DMA, interrupt, health, recovery</td><td>Discovery, loopback, one-command smoke, reset after fault, simulator/hardware trace correlation</td><td>Performance optimization before correctness and recovery</td></tr>
+            <tr><th scope="row">M6: first model path</th><td>Framework partition, package, one representative model, preprocessing/postprocessing</td><td>End-to-end accuracy, fallback accounting, reproducible latency and power manifest</td><td>Large model catalog with duplicate utilities</td></tr>
+            <tr><th scope="row">M7: optimization and release</th><td>Cost model, scheduling, fusion, caching, profiler, package and compatibility policy</td><td>Measured regression thresholds, stress, multi-device if required, qualification report</td><td>Optimization accepted without an attributed measurement</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="section" id="test-ladder">
+      <div class="section-heading">
+        <p class="eyebrow">Verification architecture</p>
+        <h2>The test chain grows in cost, realism, and diagnostic distance</h2>
+        <p class="section-note">
+          Lower levels answer narrow questions quickly. Higher levels validate integration and product behavior, but
+          they should never be the first place a compiler rule, allocator invariant, or command encoding is tested.
+        </p>
+      </div>
+      <div class="test-ladder" role="group" aria-label="Accelerator software test ladder from qualification to static checks">
+        <article class="test-rung" data-scope="qualification"><b>Qualification</b><span>Chip populations, PVT, aging, drift, defects, power and thermal limits</span><span class="rung-gate">Release or silicon gate</span></article>
+        <article class="test-rung" data-scope="stress"><b>Stress and soak</b><span>Long duration, concurrency, repeated reset, memory pressure, fault injection</span><span class="rung-gate">Nightly or weekly</span></article>
+        <article class="test-rung" data-scope="e2e"><b>End to end</b><span>Framework through preprocessing, compile, runtime, device, fallback, postprocessing</span><span class="rung-gate">Merge and nightly tiers</span></article>
+        <article class="test-rung" data-scope="perf"><b>Performance</b><span>Kernel, operator and model latency, throughput, bytes, utilization, energy</span><span class="rung-gate">Controlled runners</span></article>
+        <article class="test-rung" data-scope="sweep"><b>Sweep and differential</b><span>Shapes, dtypes, layouts, precision, faults and calibration against a reference</span><span class="rung-gate">Post-commit and nightly</span></article>
+        <article class="test-rung" data-scope="integration"><b>Integration</b><span>Compiler-artifact-runtime-simulator contracts and selected real-device paths</span><span class="rung-gate">PR routes and merge</span></article>
+        <article class="test-rung" data-scope="smoke"><b>Smoke</b><span>Discover, open, allocate, execute one operation, compare, close and reset</span><span class="rung-gate">Fast hardware confidence</span></article>
+        <article class="test-rung"><b>Unit</b><span>One class, pass, encoding, state transition or Python API with deterministic inputs</span><span class="rung-gate">Every relevant PR</span></article>
+        <article class="test-rung"><b>Static checks</b><span>Format, lint, schema, docs, dependency rules, generated files and compilation</span><span class="rung-gate">Local and every PR</span></article>
+      </div>
+
+      <div class="section-heading top-gap">
+        <h3>Give every test lane one precise contract</h3>
+      </div>
+      <div class="table-wrap test-table">
+        <table>
+          <thead><tr><th scope="col">Lane</th><th scope="col">Question answered</th><th scope="col">Environment</th><th scope="col">Typical trigger</th><th scope="col">Acceptance and saved evidence</th></tr></thead>
+          <tbody>
+            <tr><th scope="row">Static</th><td>Is the change structurally valid and reproducible?</td><td>No hardware; clean source checkout</td><td>Pre-commit and every PR</td><td>Formatting, warnings-as-errors, lint, schema validation, docs links, dependency checks, generated-diff check all pass.</td></tr>
+            <tr><th scope="row">C++ unit</th><td>Does one low-level contract or state machine behave correctly?</td><td>Host process with fakes; ASan/UBSan variants</td><td>Every relevant PR</td><td>GoogleTest assertions identify the exact invariant; no board, network, sleeps, or shared mutable lab state.</td></tr>
+            <tr><th scope="row">Python unit</th><td>Does one public Python API, importer rule, or analysis function behave correctly?</td><td>Installed wheel or source package with mocks</td><td>Every relevant PR</td><td>pytest result, stable exception/status, parametrized shapes and dtypes, no hidden hardware requirement.</td></tr>
+            <tr><th scope="row">Smoke</th><td>Can the minimum supported execution path complete now?</td><td>One simulator or reserved device</td><td>Selected PRs, deployment, lab health</td><td>Discover, open, allocate, execute one known vector, compare, close; save serial, firmware, artifact hash, trace, and reset result.</td></tr>
+            <tr><th scope="row">Integration</th><td>Do two or more owned components honor the same contract?</td><td>Functional/queued simulator; selected hardware</td><td>Changed-path PR route and post-commit</td><td>Artifact loads across public C API; compiler/runtime/backend traces correlate; fault and cleanup paths are checked.</td></tr>
+            <tr><th scope="row">Sweep</th><td>Where does behavior fail across the supported state space?</td><td>Parallel host simulation, then sampled hardware</td><td>Post-commit and nightly</td><td>Vector source, parameter set, random seed, expected result, actual result, first divergence, and minimized reproducer are stored.</td></tr>
+            <tr><th scope="row">Performance</th><td>Did a measured metric regress under a controlled configuration?</td><td>Dedicated, thermally stable runner</td><td>Kernel/model changes, nightly, release</td><td>Warmups, sample distribution, p50/p95, cycles, bytes, energy, clocks, temperature, artifact and calibration IDs; compare with versioned threshold.</td></tr>
+            <tr><th scope="row">End to end</th><td>Does a real user workflow meet correctness and service-level goals?</td><td>Packaged SDK and representative hardware</td><td>Model tier policy, merge, nightly</td><td>Real preprocessing/postprocessing, accuracy metric, fallback share, compile/load/execute timing, peak memory, throughput and power.</td></tr>
+            <tr><th scope="row">Stress</th><td>Does the system remain correct under time, load and recovery pressure?</td><td>Isolated lab allocation</td><td>Nightly, weekly, pre-release</td><td>Soak duration, concurrency, memory pressure, injected faults, reset count, leak trend, temperature and terminal device state.</td></tr>
+            <tr><th scope="row">Qualification</th><td>Is the product robust across the deployed device population and operating envelope?</td><td>Characterization and production labs</td><td>Silicon, firmware, calibration or release change</td><td>Device sample plan, PVT corners, defect classes, drift/retention, guard bands, confidence intervals and signed release report.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="section" id="test-layout">
+      <div class="section-heading">
+        <p class="eyebrow">GoogleTest, pytest, and test data</p>
+        <h2>Choose the framework by the contract being protected</h2>
+      </div>
+      <div class="repo-tree-layout test-framework-layout">
+        <div class="code-panel">
+          <header><strong>Recommended test subtree</strong><span>Names describe scope, not just language</span></header>
+          <pre><code>tests/
+|-- cpp/
+|   |-- unit/
+|   |   |-- compiler/
+|   |   |-- artifact/
+|   |   |-- runtime/
+|   |   |-- hal/
+|   |   `-- firmware_model/
+|   `-- integration/
+|       |-- compiler_runtime/
+|       `-- runtime_backend/
+|-- python/
+|   |-- unit/
+|   |-- integration/
+|   `-- package/
+|-- smoke/
+|   |-- simulator/
+|   `-- hardware/
+|-- sweeps/
+|   |-- operators/
+|   |-- numerical/
+|   |-- faults/
+|   `-- manifests/
+|-- end_to_end/
+|   |-- vision/
+|   |-- transformer/
+|   `-- application/
+|-- performance/
+|   |-- microbenchmarks/
+|   |-- operators/
+|   `-- models/
+|-- stress/
+|-- qualification/
+|-- common/
+|   |-- fixtures/
+|   |-- device_pool/
+|   |-- artifact_capture/
+|   `-- comparisons/
+`-- data/
+    |-- golden/
+    |-- models/
+    |-- calibration/
+    `-- target_descriptors/</code></pre>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th scope="col">Use</th><th scope="col">GoogleTest</th><th scope="col">pytest</th></tr></thead>
+            <tbody>
+              <tr><th scope="row">Best fit</th><td>C++ IR utilities, encoders, allocators, queue/event state, HAL contracts, firmware host models</td><td>Python API, framework import, parameter sweeps, model execution, lab fixtures, report validation</td></tr>
+              <tr><th scope="row">Fixture scope</th><td>Process-local fake objects and deterministic temporary files</td><td>Function fixture by default; session fixture only for expensive immutable setup or reserved device lifecycle</td></tr>
+              <tr><th scope="row">Selection</th><td>Small executables or labels plus <code>--gtest_filter</code></td><td>Markers such as <code>unit</code>, <code>hardware</code>, <code>smoke</code>, <code>nightly</code>, <code>performance</code></td></tr>
+              <tr><th scope="row">Do not duplicate</th><td colspan="2">Test a C++ invariant once in GoogleTest; add a Python test only for binding behavior or an end-user contract, not the same private branch.</td></tr>
+              <tr><th scope="row">Failure output</th><td>Expected/actual typed values, state transition, command bytes, seed and target descriptor</td><td>Node ID, parameters, backend, device identity, artifact hash, seed, trace path and minimized reproducer</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <div class="callout top-gap">
+        <p>
+          <strong>TT-Metal precedent:</strong> its root test CMake enables CTest and GoogleTest, while focused C++
+          executables and extensive pytest directories cover different layers. The model CI tier document further
+          separates end-to-end, module, sweep, device-performance, PR-gate, and stress coverage rather than treating
+          all model tests as equivalent.
+        </p>
+      </div>
+    </section>
+
+    <section class="section" id="performance-tests">
+      <div class="section-heading">
+        <p class="eyebrow">Performance discipline</p>
+        <h2>A performance test is a controlled experiment, not a timed unit test</h2>
+      </div>
+      <div class="definition-grid">
+        <article class="definition-item"><strong>Pin the workload</strong><span>Model/operator hash, shape, batch, sequence length, precision, layout, compiler options and fallback policy.</span></article>
+        <article class="definition-item"><strong>Pin the machine</strong><span>Board SKU, device serial, firmware, clocks, power mode, temperature window, target descriptor, calibration and defect-map IDs.</span></article>
+        <article class="definition-item"><strong>Separate phases</strong><span>Report compile, weight program, load, warmup and steady-state execution separately; do not hide setup in token or frame throughput.</span></article>
+        <article class="definition-item"><strong>Use distributions</strong><span>Record sample count, warmup count, p50, p95, variability and outliers. One best run is not a regression baseline.</span></article>
+        <article class="definition-item"><strong>Count causes</strong><span>Cycles, bytes, queue wait, DMA, array active time, ADC occupancy, digital fallback, stalls, saturation and retries explain the headline metric.</span></article>
+        <article class="definition-item"><strong>Version thresholds</strong><span>Store absolute limits and allowed regression percentages with owner, reason, baseline commit and expiry/review date.</span></article>
+        <article class="definition-item"><strong>Prove correctness first</strong><span>A faster incorrect result fails. Associate accuracy output and numerical-policy identity with every accepted performance record.</span></article>
+        <article class="definition-item"><strong>Control instrumentation</strong><span>Use detailed traces to diagnose, then measure the official result with the declared low-overhead counter set.</span></article>
+      </div>
+      <div class="callout caution top-gap">
+        <p>
+          <strong>ACiM-specific rule:</strong> report cold programming, warm resident-weight inference, recalibration, and
+          degraded/remapped execution as different scenarios. A resident-weight MVM number cannot stand in for the
+          latency or energy of deployment, model switching, digital fallback, or recovery.
+        </p>
+      </div>
+    </section>
+
+    <section class="section" id="profiling">
+      <div class="section-heading">
+        <p class="eyebrow">Tracy and device profiling</p>
+        <h2>Use Tracy directly on the host and preserve device time at the source</h2>
+        <p class="section-note">
+          Tenstorrent is a useful reference because its tooling exposes both host work and device-side RISC-V work.
+          The reusable architecture is a split design: normal Tracy instrumentation for code running on the host,
+          plus bounded cycle-stamped records for bare-metal firmware and accelerator engines. A clock-correlation and
+          export layer brings the evidence together without changing when the device work appears to have happened.
+        </p>
+      </div>
+      <div class="callout verdict">
+        <p>
+          <strong>Recommended ACiM design:</strong> use upstream Tracy for host C++ and Python-visible runtime phases;
+          use one fixed-record trace buffer per device producer; drain through the UMD/KMD path; fit each device clock
+          to the host monotonic clock; then export an accurate device trace. Put device intervals into the Tracy UI only
+          through a maintained bridge that accepts their original timestamps.
+        </p>
+      </div>
+
+      <div class="section-heading top-gap">
+        <h3>What the Tenstorrent implementation teaches</h3>
+        <p class="section-note">
+          The current <a href="https://docs.tenstorrent.com/tt-metal/latest/tt-metalium/tools/tracy_profiler.html">TT-Metalium
+          Tracy guide</a> covers host C++, Python, and device views. The more detailed
+          <a href="https://docs.tenstorrent.com/tt-metal/v0.69.0/tt-metalium/tools/device_program_profiler.html">device
+          program profiler guide</a> shows the device mechanism: kernels emit bounded records, and the host runtime
+          drains them for analysis. These are related views, but not the same instrumentation path.
+        </p>
+      </div>
+      <div class="table-wrap routing-table">
+        <table>
+          <thead><tr><th scope="col">TT path</th><th scope="col">Observed interface</th><th scope="col">Reusable lesson for ACiM</th></tr></thead>
+          <tbody>
+            <tr><th scope="row">Host C++</th><td>Normal Tracy <code>ZoneScoped</code> or named zones execute in the host process.</td><td>Instrument compiler, SDK, UMD, queue, DMA request, wait, fallback and postprocess directly.</td></tr>
+            <tr><th scope="row">Device kernel</th><td><code>DeviceZoneScopedN</code> writes device-side scope records through TT's kernel profiler support.</td><td>Use a device-native emit primitive around dispatch, data movement, MVM, converter and epilogue phases.</td></tr>
+            <tr><th scope="row">Runtime enable</th><td><code>TT_METAL_DEVICE_PROFILER=1</code> enables collection; device close drains automatically, or <code>ReadDeviceProfilerResults(device)</code> drains explicitly.</td><td>Make profile mode and drain points explicit runtime policy, not unconditional firmware behavior.</td></tr>
+            <tr><th scope="row">Evidence</th><td>The documented device output includes <code>profile_log_device.csv</code> and can be inspected in device timeline lanes.</td><td>Keep a machine-readable raw trace even when a richer profiler UI is available.</td></tr>
+            <tr><th scope="row">Limits</th><td>The guide warns about annotation cost, finite L1 records, inter-core skew, unsynchronized devices, and conflicts with DPRINT/Watcher.</td><td>Publish buffer, clock, overhead and tool-exclusion contracts for every ACiM profiling mode.</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="repo-tree-layout top-gap">
+        <div class="code-panel">
+          <header><strong>TT host pattern</strong><span>Runs where the host work occurs</span></header>
+          <pre><code>#include &lt;tracy/Tracy.hpp&gt;
+
+void submit_program() {
+  ZoneScopedN("submit_program");
+  // Pack, enqueue, submit, and wait phases.
+}</code></pre>
+        </div>
+        <div class="code-panel">
+          <header><strong>TT device-profiler pattern</strong><span>Reference pattern, not an ACiM header</span></header>
+          <pre><code>#include &lt;tools/profiler/kernel_profiler.hpp&gt;
+
+void kernel_main() {
+  DeviceZoneScopedN("device_kernel");
+  // Device RISC-V work.
+}</code></pre>
+        </div>
+      </div>
+
+      <div class="section-heading top-gap">
+        <h3>Choose the path from the execution context</h3>
+      </div>
+      <div class="engineering-flow six" role="group" aria-label="Decision flow for host and device profiling">
+        <article class="flow-step"><b>1. Locate</b><strong>Where did it run?</strong><span>Host process, firmware controller, analog engine, converter, DSP, DMA, or fabric</span></article>
+        <article class="flow-step"><b>2. Host?</b><strong>Use Tracy zones</strong><span>Instrument the C++ call where it executes; preserve thread, nesting, frame, and lock context</span></article>
+        <article class="flow-step"><b>3. Device?</b><strong>Read device cycles</strong><span>Firmware records the local cycle immediately before and after the operation</span></article>
+        <article class="flow-step"><b>4. Transport</b><strong>Drain bounded records</strong><span>Per-producer SRAM buffer, sequence, drop count, capture ID, ABI, and clock metadata</span></article>
+        <article class="flow-step"><b>5. Align</b><strong>Correlate clocks</strong><span>Multiple ping samples fit device cycles to the host monotonic timeline</span></article>
+        <article class="flow-step"><b>6. Inspect</b><strong>Join by command ID</strong><span>Host Tracy capture plus accurate device trace, counters, numerical result, and machine state</span></article>
+      </div>
+
+      <div class="section-heading top-gap">
+        <h3>Two data paths, one correlated investigation</h3>
+      </div>
+      <p class="section-note"><strong>Host path:</strong> timestamps are created by Tracy in the process that performs the work.</p>
+      <div class="engineering-flow six" role="group" aria-label="Host Tracy profiling data flow">
+        <article class="flow-step"><b>Application</b><strong>Request and frame</strong><span>Preprocess, compile/load policy, inference request, postprocess</span></article>
+        <article class="flow-step"><b>SDK / UMD</b><strong>Scoped host zones</strong><span>Session, buffer, queue, submit, wait, callbacks, locks, DMA requests</span></article>
+        <article class="flow-step"><b>Client</b><strong>TracyClient</strong><span>On-demand event collection in each instrumented process</span></article>
+        <article class="flow-step"><b>Transport</b><strong>Local socket</strong><span>Live event stream from the host process to the profiler</span></article>
+        <article class="flow-step"><b>Capture</b><strong>Tracy profiler</strong><span>Threads, zones, frames, plots, messages, memory and OS context</span></article>
+        <article class="flow-step"><b>Result</b><strong>Host attribution</strong><span>Compile, queue, DMA request, wait, callback, fallback, and CPU overhead</span></article>
+      </div>
+      <p class="section-note top-gap"><strong>Device path:</strong> timestamps are created on the controller or engine and survive the later drain.</p>
+      <div class="engineering-flow six" role="group" aria-label="ACiM device profiling data flow">
+        <article class="flow-step"><b>Controller</b><strong>Read cycle CSR</strong><span>Command dispatch, validation, programming, calibration, sequencer work</span></article>
+        <article class="flow-step"><b>Engines</b><strong>Emit IDs and counters</strong><span>DAC/input drive, array MVM, settle, ADC, accumulation, DMA, retries</span></article>
+        <article class="flow-step"><b>Device SRAM</b><strong>Fixed trace records</strong><span>One bounded single-producer buffer per source; no strings or allocation</span></article>
+        <article class="flow-step"><b>KMD / UMD</b><strong>Drain and validate</strong><span>DMA or MMIO, ABI sizes, sequence, drop count, capture and command IDs</span></article>
+        <article class="flow-step"><b>Runtime</b><strong>Fit clock and decode</strong><span>Per clock domain affine map plus generated event dictionary</span></article>
+        <article class="flow-step"><b>Exporter</b><strong>Preserve history</strong><span>CSV/JSON, Perfetto, or explicit-timestamp Tracy bridge</span></article>
+      </div>
+      <div class="callout caution top-gap">
+        <p>
+          <strong>Do not create ordinary host zones while draining records and label them as device work.</strong> Those
+          zones describe the drain time. Upstream Tracy's normal scoped-zone API is excellent for host execution, but
+          it is not a generic public API for injecting an arbitrary accelerator interval that finished earlier. Keep the
+          raw correlated device timeline authoritative unless the profiler bridge explicitly supports external timestamps.
+        </p>
+      </div>
+
+      <div class="section-heading top-gap">
+        <h3>Use each output for the question it can answer</h3>
+      </div>
+      <div class="table-wrap routing-table">
+        <table>
+          <thead><tr><th scope="col">Question</th><th scope="col">Recommended mechanism</th><th scope="col">What it preserves</th><th scope="col">Important limit</th></tr></thead>
+          <tbody>
+            <tr><th scope="row">Why is the host request slow?</th><td>Upstream Tracy zones, frames, plots, locks, messages, allocation and OS scheduling</td><td>Original host timestamps, thread nesting and live context</td><td>It cannot infer what happened inside an opaque accelerator command.</td></tr>
+            <tr><th scope="row">Which device phase consumed cycles?</th><td>Firmware/device records with begin/end cycles and fixed event IDs</td><td>Original device time, source/core identity, sequence, counters and dropped records</td><td>Instrumentation consumes device SRAM and cycles; a finite buffer can overflow.</td></tr>
+            <tr><th scope="row">How do host and device overlap?</th><td>Clock-correlated device export joined to host command/capture IDs</td><td>Queue, DMA, command, MVM, ADC, DSP and completion ordering</td><td>Every independent or variable-frequency clock domain needs its own fit.</td></tr>
+            <tr><th scope="row">Must everything appear in Tracy?</th><td>Maintained profiler fork or bridge with explicit timestamp/context support</td><td>A unified interactive view when the integration is tested and versioned</td><td>This is profiler integration code, not ordinary application-zone instrumentation.</td></tr>
+            <tr><th scope="row">Is a regression real?</th><td>Uninstrumented benchmark plus low-overhead hardware counters</td><td>Official latency, throughput, energy, accuracy and machine configuration</td><td>A rich diagnostic capture may perturb the result and cannot be the only baseline.</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="section-heading top-gap">
+        <h3>End-to-end capture sequence and ownership</h3>
+      </div>
+      <div class="table-wrap routing-table">
+        <table>
+          <thead><tr><th scope="col">Step</th><th scope="col">Application / SDK</th><th scope="col">UMD / KMD</th><th scope="col">Firmware / ACiM device</th><th scope="col">Collector</th></tr></thead>
+          <tbody>
+            <tr><th scope="row">1. Configure</th><td>Select profiling mode, capture ID, command ID and event mask.</td><td>Reserve DMA-visible trace storage and enforce ownership/isolation.</td><td>Reset selected per-producer buffers and dropped counters.</td><td>Open host Tracy capture and the raw device-trace output.</td></tr>
+            <tr><th scope="row">2. Synchronize</th><td>Record host send and receive monotonic timestamps around several clock pings.</td><td>Transport the ping without interpreting profiler semantics.</td><td>Return local device cycle and clock-domain ID with the host cookie.</td><td>Reject malformed samples; retain round-trip uncertainty.</td></tr>
+            <tr><th scope="row">3. Submit</th><td>Open host zones for pack, enqueue, submit and wait; attach the command ID.</td><td>Map buffers, ring doorbell, account bytes, and record interrupt path.</td><td>Record dispatch receive and descriptor validation cycles.</td><td>Keep host and device records under one capture manifest.</td></tr>
+            <tr><th scope="row">4. Execute</th><td>Remain asynchronous where possible; do not hide blocking in a broad request zone.</td><td>Expose queue and DMA progress counters.</td><td>Record programming/calibration, input drive, settle/MVM, ADC, accumulation, fallback and output DMA.</td><td>Detect sequence gaps, mismatched begin/end, and nearing capacity.</td></tr>
+            <tr><th scope="row">5. Complete</th><td>Record wait completion, callback, D2H visibility and postprocess.</td><td>Acknowledge interrupt/fence and make trace bytes visible safely.</td><td>Close zones, publish record count, drop count, clock rate and terminal status.</td><td>Associate terminal status, output hash and numerical counters.</td></tr>
+            <tr><th scope="row">6. Drain</th><td>Request a drain after completion or at an explicit live-trace watermark.</td><td>DMA records; KMD owns privileged transport, not event-name policy.</td><td>Hand off a completed buffer; switch to the other buffer for live collection.</td><td>Validate ABI before decoding any record.</td></tr>
+            <tr><th scope="row">7. Correlate</th><td>Provide the host monotonic time base and command intervals.</td><td>Provide transport counters and reset/DVFS epochs.</td><td>Provide device cycles, source ID, clock domain and frequency metadata.</td><td>Fit each domain, calculate residual/error bounds, and map cycles to host time.</td></tr>
+            <tr><th scope="row">8. Publish</th><td>Save the Tracy capture reference and run manifest.</td><td>Save driver counters and faults.</td><td>Preserve raw records and firmware/event-dictionary versions.</td><td>Write an accurate device trace, summary, and optional unified-view capture.</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="section-heading top-gap">
+        <h3>Add Tracy to host code without making it a hard dependency</h3>
+        <p class="section-note">
+          The working example under <code>examples/acim-minimal/</code> implements this pattern. Profiling macros compile
+          to no-ops by default; the opt-in preset fetches Tracy 0.13.1 at an exact commit, enables on-demand collection,
+          and limits the client to localhost.
+        </p>
+      </div>
+      <div class="repo-tree-layout">
+        <div class="code-panel">
+          <header><strong>CMake integration</strong><span>Target-scoped and opt-in</span></header>
+          <pre><code>option(ACIM_ENABLE_TRACY "Instrument host targets" OFF)
+option(ACIM_FETCH_TRACY "Fetch pinned Tracy" OFF)
+
+if(ACIM_ENABLE_TRACY)
+  if(ACIM_FETCH_TRACY)
+    include(FetchContent)
+    set(TRACY_ENABLE ON CACHE BOOL "" FORCE)
+    set(TRACY_ON_DEMAND ON CACHE BOOL "" FORCE)
+    set(TRACY_ONLY_LOCALHOST ON CACHE BOOL "" FORCE)
+    set(TRACY_NO_BROADCAST ON CACHE BOOL "" FORCE)
+    FetchContent_Declare(tracy
+      URL https://github.com/wolfpld/tracy/archive/05cceee0df3b8d7c6fa87e9638af311dbabc63cb.zip)
+    FetchContent_MakeAvailable(tracy)
+  else()
+    find_package(Tracy CONFIG REQUIRED)
+  endif()
+
+  target_compile_definitions(acim_profiling
+    INTERFACE ACIM_TRACY_ENABLED=1)
+  target_link_libraries(acim_profiling
+    INTERFACE Tracy::TracyClient)
+endif()</code></pre>
+        </div>
+        <div class="code-panel">
+          <header><strong>Host instrumentation</strong><span>Zones match owned phases</span></header>
+          <pre><code>#include "acim/profiling.hpp"
+
+Result Runtime::submit(const Request&amp; request) {
+  ACIM_PROFILE_ZONE("Runtime::submit");
+
+  {
+    ACIM_PROFILE_ZONE("validate_and_pack");
+    validate(request);
+    pack_descriptors(request);
+  }
+  {
+    ACIM_PROFILE_ZONE("queue_and_doorbell");
+    queue_.submit(request.command_id());
+  }
+  {
+    ACIM_PROFILE_ZONE("wait_for_completion");
+    completion_.wait(request.command_id());
+  }
+
+  ACIM_PROFILE_PLOT("ACiM queue depth", queue_.depth());
+  ACIM_PROFILE_FRAME("ACiM inference");
+  return collect_result(request);
+}</code></pre>
+        </div>
+      </div>
+      <div class="definition-grid top-gap">
+        <article class="definition-item"><strong>Zone the phase, not every loop iteration</strong><span>Start with request, compile, artifact load, H2D, submit, queue wait, D2H, fallback, and postprocess. Add inner zones only after evidence identifies a broad phase.</span></article>
+        <article class="definition-item"><strong>Carry IDs as messages or structured metadata</strong><span>Command, graph, artifact, device, queue, capture, calibration, and defect-map IDs make host zones joinable to runtime logs and device records.</span></article>
+        <article class="definition-item"><strong>Use frames deliberately</strong><span>A frame can mean one image inference, one decode token, or one service iteration. Do not mix meanings in one capture.</span></article>
+        <article class="definition-item"><strong>Use plots for low-rate state</strong><span>Queue depth, outstanding DMA, temperature, power, fallback count, and device utilization are useful; per-element plots create noise and overhead.</span></article>
+      </div>
+      <div class="code-panel top-gap">
+        <header><strong>Build and run the included host integration</strong><span>Run inside <code>examples/acim-minimal/</code></span></header>
+        <pre><code>cmake --preset tracy
+cmake --build --preset tracy
+ctest --preset tracy
+
+# Start the Tracy profiler, connect locally, then run:
+./build/tracy/acim_smoke             # Linux
+build\tracy\acim_smoke.exe           # Windows</code></pre>
+      </div>
+      <p class="command-note">The fetched CMake target builds and links <code>TracyClient</code>; obtain or build the desktop Profiler from the same Tracy version separately. With on-demand collection and broadcast disabled, connect to <code>127.0.0.1</code> before starting the workload.</p>
+
+      <div class="section-heading top-gap">
+        <h3>Add a firmware-safe device trace</h3>
+      </div>
+      <div class="repo-tree-layout">
+        <div class="code-panel">
+          <header><strong>Controller or engine instrumentation</strong><span>No strings, allocation, socket, or host timestamp</span></header>
+          <pre><code>#include "acim/device_events.h"
+#include "acim/device_trace.h"
+
+void run_tile(Command* command, AcimTraceBuffer* trace) {
+  const uint16_t source = command-&gt;tile_id;
+  acim_trace_set_command_id(trace, command-&gt;id);
+
+  acim_trace_zone_begin(trace, read_device_cycles(),
+                        ACIM_EVENT_INPUT_DRIVE_DAC, source);
+  drive_inputs(command);
+  acim_trace_zone_end(trace, read_device_cycles(),
+                      ACIM_EVENT_INPUT_DRIVE_DAC, source);
+
+  acim_trace_zone_begin(trace, read_device_cycles(),
+                        ACIM_EVENT_ARRAY_SETTLE_MVM, source);
+  start_array_mvm(command);
+  wait_array_done();
+  acim_trace_zone_end(trace, read_device_cycles(),
+                      ACIM_EVENT_ARRAY_SETTLE_MVM, source);
+
+  acim_trace_counter(trace, read_device_cycles(),
+                     ACIM_EVENT_ADC_SATURATION_COUNT,
+                     source, read_adc_saturation_count());
+}</code></pre>
+        </div>
+        <div class="code-panel">
+          <header><strong>Runtime drain and correlation</strong><span>Pseudocode for the real UMD path</span></header>
+          <pre><code>samples = []
+for cookie in range(sync_sample_count):
+    host_send_ns = monotonic_ns()
+    device_cycle = firmware.clock_ping(cookie)
+    host_receive_ns = monotonic_ns()
+    samples.append((host_send_ns,
+                    device_cycle,
+                    host_receive_ns))
+
+correlation = fit_clock_correlation(samples)
+batch = device.dma_read_trace(capture_id)
+
+validate(batch.abi_version,
+         batch.header_size,
+         batch.record_size,
+         batch.record_count,
+         batch.dropped_records)
+
+for record in batch.records:
+    host_ns = correlation.map(record.cycle)
+    exporter.write(host_ns, record.source_id,
+                   event_name(record.event_id),
+                   record.kind, record.value)
+</code></pre>
+        </div>
+      </div>
+
+      <div class="section-heading top-gap">
+        <h3>The trace ABI is a hardware/software contract</h3>
+      </div>
+      <div class="table-wrap routing-table">
+        <table>
+          <thead><tr><th scope="col">Field</th><th scope="col">Why it exists</th><th scope="col">Validation rule</th><th scope="col">Typical failure it exposes</th></tr></thead>
+          <tbody>
+            <tr><th scope="row"><code>abi_version</code>, header/record size</th><td>Allows firmware and runtime to reject incompatible layouts before parsing.</td><td>Exact supported version and sizes; little-endian encoding declared by the platform ABI.</td><td>Old UMD with new firmware, wrong packing, stale generated reader.</td></tr>
+            <tr><th scope="row"><code>capture_id</code>, command ID</th><td>Joins a batch to the host capture and every record to its queued command, including interleaved commands.</td><td>The header capture ID identifies the epoch; every record carries a command ID that is unique within that capture.</td><td>Trace from a previous capture or another queued command attached to the current result.</td></tr>
+            <tr><th scope="row"><code>cycle</code>, clock rate/domain</th><td>Preserves when work happened in the source clock.</td><td>Monotonic inside a source and epoch; re-synchronize after reset, wrap, rate change, or power transition.</td><td>Negative duration, cross-domain ordering error, DVFS-induced drift.</td></tr>
+            <tr><th scope="row"><code>sequence</code></th><td>Distinguishes record order when timestamps tie and detects missing records.</td><td>Monotonic modulo declared wrap behavior for each producer.</td><td>Partial DMA, overwrite, malformed live-buffer ownership.</td></tr>
+            <tr><th scope="row"><code>event_id</code>, kind</th><td>Represents begin, end, counter or sync without device-side strings.</td><td>ID dictionary is generated/versioned; every begin has a legal matching end for the same source.</td><td>Unknown firmware event, unbalanced zone, decoder mismatch.</td></tr>
+            <tr><th scope="row"><code>source_id</code></th><td>Names controller, tile, array, converter, DSP, DMA engine or virtual lane.</td><td>Must be legal for the target descriptor and capture mode.</td><td>Wrong routing, unexpected engine, overlapping use of one resource.</td></tr>
+            <tr><th scope="row"><code>value</code>, flags</th><td>Carries signed counters, host sync cookie, error state or event attributes.</td><td>Meaning is fixed by event dictionary and unit metadata.</td><td>Saturation, retry, remap, timeout, converter contention, fallback.</td></tr>
+            <tr><th scope="row"><code>record_count</code>, dropped count</th><td>Makes a truncated profile visibly incomplete.</td><td>Count cannot exceed capacity; a nonzero drop count marks the timeline incomplete.</td><td>Trace mask too broad, buffer too small, drain too late.</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="callout top-gap">
+        <p>
+          <strong>Concurrency rule:</strong> make each device buffer single-producer so the hot emit path needs no
+          shared atomic reservation. For live profiling, use two buffers with explicit <em>device-owned</em>,
+          <em>ready-for-host</em>, <em>host-owned</em>, and <em>free</em> states. The device never writes a host-owned
+          buffer; the host never decodes a device-owned buffer.
+        </p>
+      </div>
+
+      <div class="section-heading top-gap">
+        <h3>Correlate clocks instead of assuming they are synchronized</h3>
+      </div>
+      <div class="callout verdict">
+        <p>
+          For sync sample <code>i</code>, record host send <code>t0[i]</code>, device cycle <code>c[i]</code>, and host
+          receive <code>t1[i]</code>. Approximate the host time of the device read as
+          <code>m[i] = t0[i] + (t1[i] - t0[i]) / 2</code>, then fit
+          <code>host_ns = reference_host_ns + ns_per_cycle * (cycle - reference_cycle)</code>. Save maximum fit residual
+          and round-trip time; they are evidence about alignment quality, not decoration.
+        </p>
+      </div>
+      <div class="definition-grid top-gap">
+        <article class="definition-item"><strong>Use several samples</strong><span>Two points define a line but cannot reveal jitter. Collect samples before and after the workload, reject malformed/outlier exchanges by an explicit policy, and retain the raw samples.</span></article>
+        <article class="definition-item"><strong>Fit each domain independently</strong><span>Controller, array sequencer, converter, DSP, and a second chip may have different clocks. Never order unrelated raw cycle values directly.</span></article>
+        <article class="definition-item"><strong>Start a new epoch</strong><span>Reset, clock gating, DVFS, wrap, suspend/resume, firmware restart, or device replacement invalidates the old map unless the hardware contract proves continuity.</span></article>
+        <article class="definition-item"><strong>Expose uncertainty</strong><span>Round-trip asymmetry and fit residual bound confidence in cross-domain ordering. Events closer than the uncertainty may be concurrent; do not invent a precise order.</span></article>
+      </div>
+
+      <div class="section-heading top-gap">
+        <h3>Record the phases that distinguish ACiM from a digital NPU</h3>
+      </div>
+      <div class="table-wrap routing-table">
+        <table>
+          <thead><tr><th scope="col">Layer</th><th scope="col">Zones</th><th scope="col">Counters and state</th><th scope="col">Likely diagnosis</th></tr></thead>
+          <tbody>
+            <tr><th scope="row">Host/compiler</th><td>Import, partition, quantize, map arrays, schedule, allocate, package, cache lookup</td><td>Graph ops, fallback ops, compile cache hit, artifact bytes, mapped arrays, padding/expansion</td><td>Compile overhead, unsupported op, poor utilization, excess digital fallback.</td></tr>
+            <tr><th scope="row">Runtime/transport</th><td>Open, program artifact, H2D, enqueue, doorbell, wait, interrupt, D2H, postprocess</td><td>Queue depth, DMA bytes, descriptors, interrupts, retries, IOMMU faults</td><td>Host serialization, PCIe/DMA limit, command starvation, completion delay.</td></tr>
+            <tr><th scope="row">Weight lifecycle</th><td>Erase/program, verify, calibration, defect scan, remap, refresh</td><td>Pulses, verify failures, bad rows/columns, spare use, calibration age, drift estimate</td><td>Cold-start/model-switch cost, endurance pressure, degraded capacity.</td></tr>
+            <tr><th scope="row">Analog datapath</th><td>Input encode/DAC, word-line drive, array settle/MVM, sense, ADC conversion</td><td>Active arrays, input slices, output slices, converter occupancy, saturation, clipping, retries</td><td>ADC/DAC bottleneck, settle-time increase, limited parallel converters, range mismatch.</td></tr>
+            <tr><th scope="row">Digital epilogue</th><td>Bit-slice reconstruction, partial-sum reduction, bias, activation, normalization, unsupported DSP op</td><td>DSP/vector cycles, SRAM bytes, NoC bytes, reduction steps, fallback percentage</td><td>Analog core is fast but digital accumulation or data movement sets end-to-end latency.</td></tr>
+            <tr><th scope="row">Reliability/power</th><td>Thermal throttle, recalibration, recovery, reset, power-state transition</td><td>Temperature, voltage, clock, power, ECC, fault, retry, remap, reset reason</td><td>Performance drift across time/PVT, intermittent stalls, instrumentation-induced power change.</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="section-heading top-gap">
+        <h3>Read the combined timeline as a causality graph</h3>
+      </div>
+      <div class="debug-grid">
+        <article class="debug-card"><b>Host gap</b><strong>Request to submit is long</strong><span>Inspect preprocessing, compile/cache miss, artifact packing, allocation, locks and queue policy.</span><code>Evidence: host Tracy zones and lock timeline</code></article>
+        <article class="debug-card"><b>Dispatch gap</b><strong>Doorbell to device begin is long</strong><span>Inspect queue backlog, PCIe/MMIO, descriptor DMA, firmware dispatch, power wake and command validation.</span><code>Evidence: command ID across host and device</code></article>
+        <article class="debug-card"><b>Input starve</b><strong>Array waits for input</strong><span>Inspect H2D, on-chip DMA, SRAM banking, input slicing, DAC/input-driver availability and scheduling.</span><code>Evidence: bytes, DMA zone, array idle cycles</code></article>
+        <article class="debug-card"><b>Converter bound</b><strong>MVM is short; ADC is long</strong><span>Inspect ADC sharing, resolution/cycles, output slicing, saturation, range selection and converter scheduling.</span><code>Evidence: ADC occupancy and conversion cycles</code></article>
+        <article class="debug-card"><b>Digital tail</b><strong>Analog work ends early</strong><span>Inspect partial-sum reduction, dequantization, activation, normalization, routing and unsupported-operator DSP fallback.</span><code>Evidence: DSP cycles, SRAM/NoC bytes, fallback</code></article>
+        <article class="debug-card"><b>Accuracy tax</b><strong>Retries or calibration dominate</strong><span>Inspect program/verify, drift, remap, redundant reads, high-resolution re-read and layer precision policy.</span><code>Evidence: retries, saturation, remap, profile ID</code></article>
+      </div>
+
+      <div class="section-heading top-gap">
+        <h3>Make profiling depth an explicit runtime mode</h3>
+      </div>
+      <div class="table-wrap routing-table">
+        <table>
+          <thead><tr><th scope="col">Mode</th><th scope="col">Enabled evidence</th><th scope="col">Use</th><th scope="col">Acceptance rule</th></tr></thead>
+          <tbody>
+            <tr><th scope="row"><code>off</code></th><td>No Tracy client activity; minimal architectural counters only if always-on by design</td><td>Official latency, throughput, energy and accuracy benchmark</td><td>Configuration is recorded and reproducible.</td></tr>
+            <tr><th scope="row"><code>host</code></th><td>Host Tracy zones, frames, plots, messages, locks and allocation</td><td>Compiler, runtime, queue, callback and CPU diagnosis</td><td>A/B overhead versus <code>off</code> is measured.</td></tr>
+            <tr><th scope="row"><code>device-summary</code></th><td>Command begin/end plus aggregate DMA, array, ADC, DSP, retry and saturation counters</td><td>Low-overhead continuous regression explanation</td><td>Counter read cost and wrap behavior are characterized.</td></tr>
+            <tr><th scope="row"><code>device-scoped</code></th><td>Selected phase begin/end records per source plus counters</td><td>One operator/model bottleneck investigation</td><td>Zero drops for accepted capture; buffer and clock-fit quality reported.</td></tr>
+            <tr><th scope="row"><code>deep-debug</code></th><td>Fine engine/NoC/converter records, waypoints, selected data snapshots</td><td>Short controlled reproduction only</td><td>Resource conflicts and probe effect are documented; never used as headline performance.</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="callout caution top-gap">
+        <p>
+          <strong>Budget device instrumentation before enabling it.</strong> Tenstorrent's device-profiler documentation
+          describes finite per-core L1 storage, small inter-core clock skew, generally unsynchronized clocks across
+          devices, annotation overhead, and resource conflicts with DPRINT and Watcher. An ACiM implementation should
+          publish its own bytes/record, records/source, emit cycles, drain bandwidth, exclusions, and overflow behavior.
+        </p>
+      </div>
+
+      <div class="section-heading top-gap">
+        <h3>Measurement protocol and exit gates</h3>
+      </div>
+      <div class="engineering-flow six" role="group" aria-label="Performance profiling measurement protocol">
+        <article class="flow-step"><b>1. Freeze</b><strong>Workload and machine</strong><span>Artifact, input, precision, firmware, clocks, power, temperature, calibration</span></article>
+        <article class="flow-step"><b>2. Warm</b><strong>Separate setup</strong><span>Compile, program weights, calibration, allocator and cache warmup reported apart</span></article>
+        <article class="flow-step"><b>3. Capture</b><strong>Diagnostic profile</strong><span>Selected host zones, device events, counters, correctness and IDs</span></article>
+        <article class="flow-step"><b>4. Validate</b><strong>Trace quality</strong><span>ABI, sequence, balanced zones, zero unexpected drops, clock residual, no faults</span></article>
+        <article class="flow-step"><b>5. Compare</b><strong>Measure probe effect</strong><span>Same run with profile off, summary, and selected scoped mode</span></article>
+        <article class="flow-step"><b>6. Report</b><strong>Official evidence</strong><span>Uninstrumented distribution plus diagnostic explanation and archived manifests</span></article>
+      </div>
+      <div class="definition-grid top-gap">
+        <article class="definition-item"><strong>Trace completeness</strong><span>Every accepted command has submit, device begin/end, terminal status and output correlation; all device zones balance; record drop count is zero unless the report is explicitly marked incomplete.</span></article>
+        <article class="definition-item"><strong>Clock quality</strong><span>Sync sample count, maximum round trip, fit residual, frequency/epoch, and cross-domain ambiguity are reported against a project-defined budget. Compare <code>1e9 / ns_per_cycle</code> with the header clock rate to catch a wrong domain or unreported rate change.</span></article>
+        <article class="definition-item"><strong>Numerical validity</strong><span>The profiled output still passes the same accuracy policy; saturation, retries, remap, fallback and calibration identity accompany the performance trace.</span></article>
+        <article class="definition-item"><strong>Performance validity</strong><span>Warmup, sample count, p50/p95, temperature/power state and profile mode are fixed. Rich capture explains the result; the uninstrumented run supplies the claim.</span></article>
+      </div>
+
+      <div class="callout top-gap">
+        <p>
+          <strong>Working code:</strong> the included example provides opt-in host zones, the pinned Tracy CMake target,
+          a C-compatible 32-byte device record, event IDs, overflow accounting, clock-sync samples, affine correlation,
+          and unit tests. It intentionally stops before pretending to be a real PCIe drain or a custom Tracy protocol
+          extension; those require the actual device memory map, timer domains, firmware ownership protocol, and profiler API.
+        </p>
+      </div>
+    </section>
+
+    <section class="section" id="ci">
+      <div class="section-heading">
+        <p class="eyebrow">Continuous integration</p>
+        <h2>Route cheap certainty early and expensive evidence deliberately</h2>
+        <p class="section-note">
+          TT-Metal explicitly describes its pull-request gate as a fast minimum bar and relies on broader post-commit
+          coverage. Use the same principle with declared time budgets and changed-path routing.
+        </p>
+      </div>
+      <div class="ci-flow" role="group" aria-label="Accelerator repository continuous integration flow">
+        <article class="ci-node"><b>Developer</b><strong>Local loop</strong><span>Format, focused unit, functional simulator; target under 2 minutes</span></article>
+        <article class="ci-node"><b>Pull request</b><strong>Fast host gate</strong><span>Static, build, sanitizers, affected unit and golden tests; target under 8 minutes</span></article>
+        <article class="ci-node"><b>Selected PR</b><strong>Hardware smoke</strong><span>Changed-path route on reserved SKU; one known operation and cleanup</span></article>
+        <article class="ci-node"><b>Post-commit</b><strong>Integration</strong><span>All host tests, packaged SDK, simulator E2E, broader device matrix</span></article>
+        <article class="ci-node"><b>Nightly</b><strong>Depth</strong><span>Sweeps, models, performance, stress, sanitizer variants, multiple SKUs</span></article>
+        <article class="ci-node"><b>Release</b><strong>Qualification</strong><span>Compatibility, population/PVT, recovery, packages, reproducibility, reports</span></article>
+      </div>
+      <div class="table-wrap routing-table top-gap">
+        <table>
+          <thead><tr><th scope="col">Changed path</th><th scope="col">Always run</th><th scope="col">Selected hardware</th><th scope="col">Deferred depth</th></tr></thead>
+          <tbody>
+            <tr><th scope="row"><code>docs/ examples/</code></th><td>Format, spelling/link, code-snippet compile or execution</td><td>Only when an example declares hardware</td><td>Documentation build and packaged tutorial run</td></tr>
+            <tr><th scope="row"><code>schemas/ generated/</code></th><td>Regeneration diff, old/new compatibility, C++/Python/firmware round-trip</td><td>Artifact-load smoke if command or ABI semantics changed</td><td>Full consumer matrix and upgrade tests</td></tr>
+            <tr><th scope="row"><code>src/compiler/</code></th><td>Compiler unit, verifier, golden IR, deterministic artifact, functional reference</td><td>One affected operator if lowering or command output changed</td><td>Operator sweeps, model tier, compile-time and artifact-size trends</td></tr>
+            <tr><th scope="row"><code>src/runtime/ src/hal/</code></th><td>GoogleTest lifecycle, fake backend conformance, ASan/UBSan, multithread tests</td><td>Open/load/submit/wait/timeout/reset smoke</td><td>Concurrency, stress, recovery and multi-device tests</td></tr>
+            <tr><th scope="row"><code>src/driver/ src/firmware/</code></th><td>Build, static analysis, ABI/layout checks, firmware host model</td><td>Boot, DMA/interrupt, bad descriptor, timeout and reset</td><td>Soak, fault injection, power transitions and upgrade/rollback</td></tr>
+            <tr><th scope="row"><code>kernels/</code></th><td>Compile, static checks, numerical golden, simulator comparison</td><td>Affected kernel correctness and health monitor</td><td>Shape/precision sweep, device profiler and regression benchmark</td></tr>
+            <tr><th scope="row"><code>python/ bindings/</code></th><td>Wheel build, import, pytest unit, API and exception behavior</td><td>Minimal public Python execution path</td><td>Supported Python/platform matrix and framework integration</td></tr>
+            <tr><th scope="row"><code>models/</code></th><td>Manifest validation, reference/module tests, preprocessing checks</td><td>Critical model tier selected by manifest</td><td>Full accuracy, E2E performance, stress and fallback accounting</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="code-panel top-gap">
+        <header><strong>Workflow ownership</strong><span>Keep routing visible instead of hiding every lane in one CI file</span></header>
+        <pre><code>.github/workflows/pr-fast.yml                  # CPU-only minimum bar
+.github/workflows/pr-hardware-smoke.yml        # changed-path device route
+.github/workflows/post-commit.yml              # broad integration
+.github/workflows/nightly-sweeps.yml           # parameter and model depth
+.github/workflows/nightly-performance.yml      # controlled runner baselines
+.github/workflows/release-qualification.yml    # compatibility and product evidence
+
+configs/test-matrices/*.yaml                   # SKU, topology, marker, timeout
+configs/performance-thresholds/*.yaml          # metric, limit, baseline, owner
+scripts/ci/changed_path_router.py               # path -> required lane mapping
+scripts/ci/collect_failure_bundle.py            # standard artifacts on failure</code></pre>
+      </div>
+      <div class="callout top-gap">
+        <p>
+          <strong>Executable example:</strong> <code>.github/workflows/acim-minimal.yml</code> applies this pattern to
+          the included simulator. It defines GCC Debug, Clang Debug, Clang ASan+UBSan, staged-install smoke, and pinned
+          GoogleTest and Tracy integration jobs, plus clang-format and clang-tidy checks, whenever the example or its
+          workflow changes.
+        </p>
+      </div>
+    </section>
+
+    <section class="section" id="conduct">
+      <div class="section-heading">
+        <p class="eyebrow">Contribution and code conduct</p>
+        <h2>Make the engineering agreement executable and easy to find</h2>
+        <p class="section-note">
+          <code>CODE_OF_CONDUCT.md</code> defines respectful project behavior. <code>CONTRIBUTING.md</code> defines how
+          technical changes are proposed, built, tested, measured, reviewed, and merged. They solve different problems.
+        </p>
+      </div>
+      <div class="engineering-flow six" role="group" aria-label="Repository contribution flow">
+        <article class="flow-step"><b>1. Frame</b><strong>Problem and evidence</strong><span>Reproducer, requirement, trace or measured bottleneck</span></article>
+        <article class="flow-step"><b>2. Design</b><strong>Contract impact</strong><span>ADR for ABI, architecture, schema or ownership changes</span></article>
+        <article class="flow-step"><b>3. Test</b><strong>Failure and gate</strong><span>Smallest deterministic test plus required deeper lanes</span></article>
+        <article class="flow-step"><b>4. Implement</b><strong>Focused commits</strong><span>Each commit builds and preserves relevant behavior</span></article>
+        <article class="flow-step"><b>5. Prove</b><strong>Correctness and metrics</strong><span>Reports, traces, compatibility and performance evidence</span></article>
+        <article class="flow-step"><b>6. Review</b><strong>Owners and follow-through</strong><span>CODEOWNERS, docs, release note and monitored merge</span></article>
+      </div>
+      <div class="table-wrap top-gap">
+        <table>
+          <thead><tr><th scope="col">Repository file</th><th scope="col">What it should answer</th><th scope="col">Practical content</th></tr></thead>
+          <tbody>
+            <tr><th scope="row"><code>README.md</code></th><td>What runs, for whom, and what is the shortest successful path?</td><td>Supported targets, architecture map, build/install, first simulator example, first hardware example, test commands, documentation links.</td></tr>
+            <tr><th scope="row"><code>CONTRIBUTING.md</code></th><td>How does a change become trusted code?</td><td>Environment, style, commit rules, test selection, PR categories, design/ADR threshold, review, performance evidence, debugging bundle.</td></tr>
+            <tr><th scope="row"><code>CODE_OF_CONDUCT.md</code></th><td>How do contributors work together?</td><td>Expected behavior, unacceptable behavior, reporting path, enforcement responsibility and scope.</td></tr>
+            <tr><th scope="row"><code>.github/CODEOWNERS</code></th><td>Who understands and approves each contract?</td><td>Named owners for schema/ABI, compiler, runtime, driver, firmware, kernels, models, CI, performance and qualification.</td></tr>
+            <tr><th scope="row"><code>docs/adr/</code></th><td>Why does a durable architecture decision exist?</td><td>Context, options, decision, consequences, compatibility, migration, tests, owners and review date.</td></tr>
+            <tr><th scope="row">PR template</th><td>What changed and what proves it?</td><td>Category, affected boundaries, test commands/results, hardware/SKU, accuracy, performance, docs, compatibility and rollback.</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="definition-grid top-gap">
+        <article class="definition-item"><strong>Code style</strong><span>Format automatically; compile with strong warnings; use static analysis; keep public headers minimal; prefer typed units, enums and spans over unstructured integers and pointers.</span></article>
+        <article class="definition-item"><strong>Error behavior</strong><span>Stable status category, subsystem, operation/graph ID, device ID, cause, recovery hint and machine-readable fields. Do not make users decode a generic timeout.</span></article>
+        <article class="definition-item"><strong>Logging</strong><span>Structured events with severity and correlation IDs. Avoid hot-loop logging and sensitive/raw tensor dumps by default.</span></article>
+        <article class="definition-item"><strong>Commit quality</strong><span>Descriptive subject, one coherent purpose, builds independently, relevant tests pass, generated output and docs remain synchronized.</span></article>
+        <article class="definition-item"><strong>Review depth</strong><span>Architecture/schema changes need contract owners; kernel performance changes need correctness and profiler evidence; model claims need reproducible manifests.</span></article>
+        <article class="definition-item"><strong>Definition of done</strong><span>Implementation, focused regression test, required lanes, observable failure path, documentation, compatibility decision, and measured acceptance evidence.</span></article>
+      </div>
+    </section>
+
+    <section class="section" id="debugging">
+      <div class="section-heading">
+        <p class="eyebrow">Debugging playbook</p>
+        <h2>Find the first layer that diverges, then instrument only that layer</h2>
+        <p class="section-note">
+          TT-Metal treats debug print, Watcher, Inspector, Tracy, device profiling, assertions, triage and NoC dumps as
+          explicit tools. An ACiM repository needs equivalent host, compiler, runtime, device, numerical and performance views.
+        </p>
+      </div>
+      <div class="engineering-flow six" role="group" aria-label="Accelerator debugging sequence">
+        <article class="flow-step"><b>1. Reproduce</b><strong>Freeze the run</strong><span>Commit, target, artifact, calibration, seed, inputs, backend</span></article>
+        <article class="flow-step"><b>2. Classify</b><strong>Name the symptom</strong><span>Build, compile, load, hang, wrong result, intermittent, performance</span></article>
+        <article class="flow-step"><b>3. Compare</b><strong>Find first divergence</strong><span>Reference, ideal array, nonideal model, queued sim, RTL, silicon</span></article>
+        <article class="flow-step"><b>4. Inspect</b><strong>Narrow the layer</strong><span>IR, artifact, buffers, queue, firmware, array, digital epilogue</span></article>
+        <article class="flow-step"><b>5. Prove</b><strong>Minimize and fix</strong><span>Small vector, deterministic failure, explicit invariant</span></article>
+        <article class="flow-step"><b>6. Preserve</b><strong>Add regression</strong><span>Focused test, failure bundle, docs and applicable deeper lane</span></article>
+      </div>
+      <div class="debug-grid top-gap">
+        <article class="debug-card"><b>Host C++</b><strong>Memory, lifetime, threads</strong><span>Debug symbols, GDB/LLDB, ASan, UBSan, TSan, core dumps, queue/event state and ownership logs.</span><code>Start: failing GoogleTest under sanitizer</code></article>
+        <article class="debug-card"><b>Python and bindings</b><strong>API, conversion, exceptions</strong><span><code>pytest -x -vv</code>, one node ID, <code>faulthandler</code>, typed boundary logs, native debugger for binding crashes.</span><code>Start: installed package, one parametrization</code></article>
+        <article class="debug-card"><b>Compiler</b><strong>Semantics and lowering</strong><span>Verify after every pass, dump canonical IR, pass bisect, target legality report, mapping explanation, deterministic artifact diff.</span><code>Start: first different IR operation</code></article>
+        <article class="debug-card"><b>Artifact and runtime</b><strong>Compatibility and execution</strong><span>Artifact inspector, schema/ABI versions, buffer ownership, command list, correlation IDs, queue timeline, timeout reason and cleanup trace.</span><code>Start: load transcript and command ID</code></article>
+        <article class="debug-card"><b>Firmware and device</b><strong>Hang, fault, bad command</strong><span>Watcher-style health monitor, waypoints, device print, bounded asserts, command validation, register snapshot, interrupt history, safe reset and triage bundle.</span><code>Start: last completed waypoint</code></article>
+        <article class="debug-card"><b>Analog numerical path</b><strong>Accuracy and variability</strong><span>Layerwise reference, ideal-array, characterized nonideality and silicon outputs; converter saturation, slice sums, calibration, remap and defect-map identity.</span><code>Start: first tensor exceeding tolerance</code></article>
+        <article class="debug-card"><b>Performance</b><strong>Latency and utilization</strong><span>Same artifact and machine state, warmup, host/device timeline, DMA bytes, queue waits, array active time, ADC/DSP occupancy, stalls and thermal history.</span><code>Start: phase with changed cycles or bytes</code></article>
+        <article class="debug-card"><b>Intermittent failures</b><strong>Race, thermal, state leak</strong><span>Repeat with fixed seed, record preceding tests, serialize device use, vary reset depth, track temperature, allocator state, calibration age and firmware logs.</span><code>Start: smallest repetition count that fails</code></article>
+        <article class="debug-card"><b>Scale-out</b><strong>Route and collective failure</strong><span>Topology epoch, logical/physical map, route table, per-link counters, collective step, timeout ownership and before/after recovery trace.</span><code>Start: first node missing progress</code></article>
+      </div>
+
+      <div class="section-heading top-gap">
+        <h3>Every failure should produce one portable evidence bundle</h3>
+      </div>
+      <div class="code-panel">
+        <header><strong>Proposed triage bundle</strong><span>Machine-readable files plus a short human summary</span></header>
+        <pre><code>failure-20260711T143100Z/
+|-- summary.md                    # symptom, first divergence, next action
+|-- run-manifest.json             # commit, command, seed, environment
+|-- model-manifest.json           # model, inputs, preprocessing, accuracy policy
+|-- target-descriptor.json        # SKU, revision, topology and capabilities
+|-- device-state.json             # serial, firmware, clocks, temperature, health
+|-- calibration-manifest.json     # calibration and defect/remap identity
+|-- executable.acx                # exact artifact when data policy permits
+|-- artifact-report.json          # sections, versions, hashes, requirements
+|-- compiler/
+|   |-- pipeline.txt
+|   |-- first-before.mlir
+|   |-- first-after.mlir
+|   `-- mapping-report.json
+|-- runtime/
+|   |-- commands.jsonl
+|   |-- buffers.json
+|   `-- queue-timeline.json
+|-- device/
+|   |-- firmware.log
+|   |-- waypoints.json
+|   |-- fault-snapshot.json
+|   `-- reset-transcript.json
+|-- numerical/
+|   |-- comparison.json
+|   `-- first-divergent-tensor.bin
+`-- performance/
+    |-- counters.json
+    `-- trace.atrace</code></pre>
+      </div>
+      <div class="callout caution top-gap">
+        <p>
+          <strong>Do not enable every device tool at once.</strong> Instrumentation consumes memory, bandwidth, timing
+          margin, or device resources and can change a race or performance result. TT-Metal documentation explicitly
+          notes conflicts among some device debug/profiling modes; document equivalent exclusions in the new stack.
+        </p>
+      </div>
+    </section>
+
+    <section class="section" id="commands">
+      <div class="section-heading">
+        <p class="eyebrow">Developer loop</p>
+        <h2>Give contributors short, memorable commands for every test depth</h2>
+        <p class="section-note">These are proposed command names for the blueprint, not commands currently supplied by TT-Metal.</p>
+      </div>
+      <div class="code-panel">
+        <header><strong>Local build and focused verification</strong><span>Illustrative interface to implement in scripts and presets</span></header>
+        <pre><code># Configure, build and install a host-only development tree
+cmake --preset dev
+cmake --build --preset dev --parallel
+cmake --install build/dev --prefix build/install
+
+# Fast checks before a pull request
+pre-commit run --all-files
+ctest --preset host-unit --output-on-failure
+python -m pytest tests/python/unit -m "unit and not hardware"
+
+# One complete simulator path
+python -m pytest tests/smoke/simulator -m smoke
+acim-compile models/manifests/matmul.yaml -o build/matmul.acx
+acim-run build/matmul.acx --backend functional --trace build/matmul.atrace
+
+# Reserved hardware path
+python -m pytest tests/smoke/hardware -m "hardware and smoke" --device auto
+
+# Broader correctness and performance lanes
+python -m pytest tests/sweeps -m nightly --maxfail=20
+python -m pytest tests/end_to_end -m "model_tier_1"
+python -m pytest tests/performance -m performance --benchmark-manifest configs/performance.yaml
+
+# Diagnostic host/device profile; compare against profile-off benchmark
+cmake --preset tracy
+cmake --build --preset tracy
+ctest --preset tracy
+
+# Reproduce a failure bundle
+acim-triage collect --run-id RUN_ID --output build/triage/RUN_ID
+acim-triage compare --left functional --right hardware --first-divergence</code></pre>
+      </div>
+      <p class="command-note">A real implementation should wrap lab reservation, timeout, artifact capture and reset in fixtures or runner services so individual tests cannot leave a shared device unusable.</p>
+    </section>
+
+    <section class="section" id="checklist" data-progress="accelerator-repository-blueprint-v1">
+      <div class="section-heading">
+        <p class="eyebrow">Repository readiness workbook</p>
+        <h2>Eleven checks before broad operator or model development</h2>
+        <p class="section-note">Complete these in order. Every checked item should point to code, a command, and saved evidence in the repository.</p>
+      </div>
+      <div class="progress-panel" aria-live="polite">
+        <div class="progress-track"><progress class="progress-bar" data-progress-bar aria-label="Accelerator repository readiness progress" max="100" value="0">0%</progress></div>
+        <span class="progress-value" data-progress-value>0 / 10 complete</span>
+      </div>
+      <div class="lab-list">
+        <label class="lab-item"><input type="checkbox" data-step="bootstrap"><span><strong>Reproducible bootstrap</strong><span>A clean checkout configures, builds, installs, imports and runs host-only tests with documented commands.</span></span></label>
+        <label class="lab-item"><input type="checkbox" data-step="ownership"><span><strong>Ownership map</strong><span>Every top-level component has a responsibility, allowed dependencies, CODEOWNER and test lane.</span></span></label>
+        <label class="lab-item"><input type="checkbox" data-step="contracts"><span><strong>Generated contracts</strong><span>Target, artifact, command, calibration and trace schemas generate all language readers and pass compatibility tests.</span></span></label>
+        <label class="lab-item"><input type="checkbox" data-step="reference"><span><strong>Numerical reference</strong><span>One MVM has FP32, quantized, ideal-array and nonideality paths with deterministic golden vectors.</span></span></label>
+        <label class="lab-item"><input type="checkbox" data-step="compiler"><span><strong>One-op compiler</strong><span>MatMul imports, validates, maps, emits a deterministic artifact and explains unsupported targets.</span></span></label>
+        <label class="lab-item"><input type="checkbox" data-step="runtime"><span><strong>Backend-neutral runtime</strong><span>The public C API runs the same artifact through functional and queued fake backends with trace and recovery.</span></span></label>
+        <label class="lab-item"><input type="checkbox" data-step="tests"><span><strong>Test ladder</strong><span>Static, unit, smoke, integration, sweep, performance, E2E, stress and qualification lanes have distinct contracts.</span></span></label>
+        <label class="lab-item"><input type="checkbox" data-step="ci"><span><strong>CI routing</strong><span>Changed paths select fast gates and required hardware; nightly/release lanes own deferred depth and artifacts.</span></span></label>
+        <label class="lab-item"><input type="checkbox" data-step="debug"><span><strong>Debug evidence</strong><span>Compiler, runtime, firmware, numerical and performance failures create the standard triage bundle.</span></span></label>
+        <label class="lab-item"><input type="checkbox" data-step="profiling"><span><strong>Correlated profiler</strong><span>Host zones, device cycle records, overflow accounting, clock fit, command IDs, probe-effect measurement, and an accurate export path are tested.</span></span></label>
+        <label class="lab-item"><input type="checkbox" data-step="hardware"><span><strong>Hardware correlation</strong><span>One known operation discovers, executes, compares, closes and resets while preserving simulator-to-silicon evidence.</span></span></label>
+      </div>
+    </section>
+
+    <section class="section" id="sources">
+      <div class="section-heading">
+        <p class="eyebrow">Primary references</p>
+        <h2>Repository, build, tests, CI, profiling, contribution and debug sources</h2>
+        <p class="section-note">TT-Metal observations and build-tool behavior link to primary project documentation. The ACiM tree, commands, sample architecture and CI budgets on this page are proposed engineering guidance.</p>
+      </div>
+      <div class="source-grid">
+        <article class="source-card"><a href="https://github.com/tenstorrent/tt-metal">Tenstorrent TT-Metal repository</a><span>Current top-level source, model, test, documentation, build, tooling and automation organization.</span></article>
+        <article class="source-card"><a href="https://github.com/tenstorrent/tt-metal/blob/main/CONTRIBUTING.md">TT-Metal contribution guide</a><span>Build/test expectations, GoogleTest use, Python testing, debugging, formatting, commits, pull requests, review and architecture plans.</span></article>
+        <article class="source-card"><a href="https://github.com/tenstorrent/tt-metal/blob/main/tests/README.md">TT-Metal tests README</a><span>Sweep framework, vector generation, result handling, dry runs, validation statuses and test-runner concepts.</span></article>
+        <article class="source-card"><a href="https://github.com/tenstorrent/tt-metal/blob/main/tests/tt_metal/tt_metal/README.md">Metalium test organization</a><span>Subsystem-oriented test placement, naming, fixtures and file organization.</span></article>
+        <article class="source-card"><a href="https://github.com/tenstorrent/tt-metal/blob/main/models/model_ci_tiers.md">TT-Metal model CI tiers</a><span>Tiered end-to-end, module, sweep, device-performance, PR-gate and stress coverage.</span></article>
+        <article class="source-card"><a href="https://raw.githubusercontent.com/tenstorrent/tt-metal/main/tests/CMakeLists.txt">TT-Metal root test CMake</a><span>CTest, GoogleTest, common test libraries and component test inclusion.</span></article>
+        <article class="source-card"><a href="https://raw.githubusercontent.com/tenstorrent/tt-metal/main/tests/ttnn/unit_tests/gtests/CMakeLists.txt">TT-NN GoogleTest targets</a><span>Focused object libraries and smoke/basic/unit executable composition.</span></article>
+        <article class="source-card"><a href="https://raw.githubusercontent.com/tenstorrent/tt-metal/main/tests/tt_metal/tt_metal/CMakeLists.txt">Metalium GoogleTest targets</a><span>Subsystem test executables for API, data movement, debug tools, device, dispatch, integration, NoC and performance.</span></article>
+        <article class="source-card"><a href="https://raw.githubusercontent.com/tenstorrent/tt-metal/main/.github/workflows/pr-gate.yaml">TT-Metal pull-request gate</a><span>Fast minimum-bar philosophy, changed-file routing, build/sanitizer, smoke, documentation and analysis jobs.</span></article>
+        <article class="source-card"><a href="https://raw.githubusercontent.com/tenstorrent/tt-metal/main/.github/workflows/smoke.yaml">TT-Metal smoke workflow</a><span>Configuration-driven hardware matrices, SKU routing, time budgets, sanitizer modes and focused executables.</span></article>
+        <article class="source-card"><a href="https://docs.tenstorrent.com/tt-metal/latest/tt-metalium/tools/index.html">TT-Metalium debugging tools</a><span>Debug checkpoints, device print, Watcher, Tracy, device profiler, asserts, Inspector, triage, NoC dump and TT-SMI.</span></article>
+        <article class="source-card"><a href="https://docs.tenstorrent.com/tt-metal/latest/tt-metalium/tools/tracy_profiler.html">TT-Metalium Tracy profiler</a><span>Host C++, Python and device-side profiling and trace capture.</span></article>
+        <article class="source-card"><a href="https://docs.tenstorrent.com/tt-metal/v0.69.0/tt-metalium/tools/device_program_profiler.html">TT-Metalium device program profiler</a><span>Device scoped annotations, runtime drain, CSV output, finite L1 buffers, timing caveats, overhead and debug-tool conflicts.</span></article>
+        <article class="source-card"><a href="https://docs.tenstorrent.com/tt-lang/reference/performance-tools.html">TT performance tools</a><span>Device timelines, operation summaries, cycle analysis, DRAM/NoC traffic, barriers and per-RISC execution evidence.</span></article>
+        <article class="source-card"><a href="https://github.com/tenstorrent/tracy">Tenstorrent Tracy fork</a><span>The maintained TT-Metalium profiler fork, showing that unified accelerator visualization is a deliberate integration component.</span></article>
+        <article class="source-card"><a href="https://github.com/wolfpld/tracy">Upstream Tracy</a><span>Profiler source, C/C++ instrumentation APIs, client library, server applications, documentation and supported platform integrations.</span></article>
+        <article class="source-card"><a href="https://github.com/wolfpld/tracy/releases/tag/v0.13.1">Tracy 0.13.1 release</a><span>The exact upstream release pinned by the minimal example at commit <code>05cceee0df3b8d7c6fa87e9638af311dbabc63cb</code>.</span></article>
+        <article class="source-card"><a href="https://perfetto.dev/docs/instrumentation/trace-sdk">Perfetto Trace SDK</a><span>Primary documentation for writing timestamped trace events when an accurate portable device timeline is preferable to a custom Tracy bridge.</span></article>
+        <article class="source-card"><a href="https://docs.tenstorrent.com/tt-metal/latest/tt-metalium/get_started/get_started.html">TT-Metalium getting started</a><span>Current high-level component, example, documentation and contributor entry points.</span></article>
+        <article class="source-card"><a href="https://github.com/tenstorrent/tt-metal/blob/main/METALIUM_GUIDE.md">TT-Metalium architecture guide</a><span>Programming model, hardware concepts, host workflow and low-level execution context.</span></article>
+        <article class="source-card"><a href="https://cmake.org/cmake/help/latest/guide/tutorial/index.html">CMake tutorial</a><span>Official target-oriented configure, build, library, testing, installation and packaging progression.</span></article>
+        <article class="source-card"><a href="https://cmake.org/cmake/help/latest/manual/cmake-presets.7.html">CMake presets</a><span>Checked-in project presets, local user presets, configure/build/test workflows and toolchain selection.</span></article>
+        <article class="source-card"><a href="https://cmake.org/cmake/help/latest/manual/cmake-toolchains.7.html">CMake toolchains</a><span>Compiler detection, capability checks, sysroots and GCC/Clang cross-compilation contracts.</span></article>
+        <article class="source-card"><a href="https://cmake.org/cmake/help/latest/module/CTest.html">CTest module</a><span>Native test enablement, <code>BUILD_TESTING</code>, labels, dashboard integration and common runner behavior.</span></article>
+        <article class="source-card"><a href="https://cmake.org/cmake/help/latest/module/FetchContent.html">CMake FetchContent</a><span>Configure-time dependencies, package integration and the recommendation to pin remote content by commit hash.</span></article>
+        <article class="source-card"><a href="https://ninja-build.org/manual.html">Ninja manual</a><span>Generated dependency graph execution, incremental builds, command tracking and parallel scheduling.</span></article>
+        <article class="source-card"><a href="https://gcc.gnu.org/onlinedocs/gcc/C_002b_002b-Dialect-Options.html">GCC C++ options</a><span>Language-standard, diagnostics and GNU compiler behavior used by the Linux baseline lane.</span></article>
+        <article class="source-card"><a href="https://clang.llvm.org/docs/UsersManual.html">Clang user manual</a><span>Compiler driver, target and sanitizer options used by the independent Clang lane.</span></article>
+        <article class="source-card"><a href="https://clang.llvm.org/docs/AddressSanitizer.html">Clang AddressSanitizer</a><span>Memory-error instrumentation, symbolization, runtime behavior and limitations.</span></article>
+        <article class="source-card"><a href="https://clang.llvm.org/extra/clang-tidy/">clang-tidy</a><span>AST-based diagnostics and check configuration for bug-prone, performance and portability analysis.</span></article>
+        <article class="source-card"><a href="https://clang.llvm.org/docs/SourceBasedCodeCoverage.html">Clang source-based coverage</a><span>Coverage instrumentation, profile collection, <code>llvm-profdata</code>, <code>llvm-cov</code> reports and format limitations.</span></article>
+        <article class="source-card"><a href="https://google.github.io/googletest/quickstart-cmake.html">GoogleTest CMake quickstart</a><span>CMake target setup, CTest discovery, assertions and dependency options.</span></article>
+        <article class="source-card"><a href="https://pybind11.readthedocs.io/en/stable/compiling.html">pybind11 build systems</a><span>CMake helpers and build-system integration for a C++ Python extension.</span></article>
+        <article class="source-card"><a href="https://scikit-build-core.readthedocs.io/en/latest/">scikit-build-core</a><span><code>pyproject.toml</code>-based CMake wheel and editable-install integration.</span></article>
+        <article class="source-card"><a href="https://cmake.org/cmake/help/latest/module/FindDoxygen.html">CMake FindDoxygen</a><span>Imported Doxygen/Graphviz tools and explicit API-documentation build targets.</span></article>
+        <article class="source-card"><a href="https://docs.kernel.org/kbuild/index.html">Linux Kbuild</a><span>Official kernel build system used for an ACiM Linux kernel-mode driver.</span></article>
+        <article class="source-card"><a href="examples/acim-minimal/README.md">Minimal ACiM build example</a><span>Working C++20 simulator, CMake/Ninja presets, CTest, optional GoogleTest and Tracy, device trace ABI, clock correlation, installation and cross-build notes.</span></article>
+        <article class="source-card"><a href="analog-cim-sdk-toolchain.html">ACiM SDK and compiler implementation</a><span>Target, IR, artifact, HAL, runtime, calibration, simulator and vertical-slice contracts used by this repository blueprint.</span></article>
+        <article class="source-card"><a href="analog-cim-board-bringup.html">ACiM board bring-up guide</a><span>KMD, UMD, PCIe, DMA, interrupts, firmware, reset, analog lifecycle and YOLO bring-up requirements.</span></article>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <p>Repository engineering guide. TT-Metal observations and proposed ACiM implementation choices are labeled separately.</p>
+    <div class="footer-links">
+      <a href="analog-cim-tenstorrent-reuse.html">Back to Tenstorrent pattern study</a>
+      <a href="https://github.com/buicongnguyen/NPU">Source</a>
+    </div>
+  </footer>
+</body>
+</html>

@@ -17,7 +17,10 @@ The Analog CIM learning path adds a source-critical Mythic case study:
 - SDK and compiler implementation guide: https://buicongnguyen.github.io/NPU/analog-cim-sdk-toolchain.html
 - PCIe board, UMD/KMD, firmware, and YOLO bring-up: https://buicongnguyen.github.io/NPU/analog-cim-board-bringup.html
 - Mythic and Videantis acquisition case study: https://buicongnguyen.github.io/NPU/analog-cim-mythic-videantis.html
-- Tenstorrent reuse decision guide: https://buicongnguyen.github.io/NPU/analog-cim-tenstorrent-reuse.html
+- Tenstorrent architecture pattern study: https://buicongnguyen.github.io/NPU/analog-cim-tenstorrent-reuse.html
+- TT-Metal-inspired accelerator repository, test, build, and Tracy profiling blueprint: https://buicongnguyen.github.io/NPU/accelerator-repository-blueprint.html
+- Host Tracy and cycle-correlated ACiM device profiling: https://buicongnguyen.github.io/NPU/accelerator-repository-blueprint.html#profiling
+- Minimal CMake/GCC/Clang/MSVC ACiM example: https://github.com/buicongnguyen/NPU/tree/main/examples/acim-minimal
 - Scale-out, fault tolerance, and LLM inference: https://buicongnguyen.github.io/NPU/analog-cim-scaleout-llm.html
 - Interview study: https://buicongnguyen.github.io/NPU/analog-cim-interview.html
 - Interactive MCQ lab: https://buicongnguyen.github.io/NPU/analog-cim-quiz.html

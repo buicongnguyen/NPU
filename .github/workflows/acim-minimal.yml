@@ -1,0 +1,190 @@
+name: ACiM Minimal Native Build
+
+on:
+  pull_request:
+    paths:
+      - examples/acim-minimal/**
+      - .github/workflows/acim-minimal.yml
+  push:
+    branches:
+      - main
+    paths:
+      - examples/acim-minimal/**
+      - .github/workflows/acim-minimal.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  linux-toolchains:
+    name: ${{ matrix.name }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: GCC Debug
+            cc: gcc
+            cxx: g++
+            sanitizers: OFF
+          - name: Clang Debug
+            cc: clang
+            cxx: clang++
+            sanitizers: OFF
+          - name: Clang ASan and UBSan
+            cc: clang
+            cxx: clang++
+            sanitizers: ON
+    defaults:
+      run:
+        working-directory: examples/acim-minimal
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Install native toolchains
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes --no-install-recommends ninja-build gcc g++ clang
+
+      - name: Record toolchain
+        run: |
+          cmake --version
+          ninja --version
+          ${{ matrix.cxx }} --version
+
+      - name: Configure
+        env:
+          CC: ${{ matrix.cc }}
+          CXX: ${{ matrix.cxx }}
+        run: >-
+          cmake -S . -B build/ci-${{ matrix.cc }}-${{ matrix.sanitizers }} -G Ninja
+          -DCMAKE_BUILD_TYPE=Debug
+          -DBUILD_TESTING=ON
+          -DACIM_WARNINGS_AS_ERRORS=ON
+          -DACIM_ENABLE_SANITIZERS=${{ matrix.sanitizers }}
+
+      - name: Build
+        run: cmake --build build/ci-${{ matrix.cc }}-${{ matrix.sanitizers }} --parallel
+
+      - name: Test
+        run: >-
+          ctest --test-dir build/ci-${{ matrix.cc }}-${{ matrix.sanitizers }}
+          --output-on-failure
+
+      - name: Install and run staged smoke
+        run: |
+          cmake --install build/ci-${{ matrix.cc }}-${{ matrix.sanitizers }} --prefix build/stage-${{ matrix.cc }}-${{ matrix.sanitizers }}
+          ./build/stage-${{ matrix.cc }}-${{ matrix.sanitizers }}/bin/acim_smoke
+
+  google-test:
+    name: GoogleTest discovery
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: examples/acim-minimal
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Install native build tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes --no-install-recommends ninja-build
+
+      - name: Configure with pinned GoogleTest
+        run: >-
+          cmake -S . -B build/ci-gtest -G Ninja
+          -DCMAKE_BUILD_TYPE=Debug
+          -DBUILD_TESTING=ON
+          -DACIM_WARNINGS_AS_ERRORS=ON
+          -DACIM_ENABLE_GTEST=ON
+          -DACIM_FETCH_GTEST=ON
+
+      - name: Build
+        run: cmake --build build/ci-gtest --parallel
+
+      - name: Test discovered cases
+        run: ctest --test-dir build/ci-gtest --output-on-failure
+
+  tracy-integration:
+    name: Pinned Tracy integration
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: examples/acim-minimal
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Install native build tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes --no-install-recommends ninja-build
+
+      - name: Configure with pinned Tracy
+        run: >-
+          cmake -S . -B build/ci-tracy -G Ninja
+          -DCMAKE_BUILD_TYPE=Debug
+          -DBUILD_TESTING=ON
+          -DACIM_WARNINGS_AS_ERRORS=ON
+          -DACIM_ENABLE_TRACY=ON
+          -DACIM_FETCH_TRACY=ON
+
+      - name: Build instrumented binaries
+        run: cmake --build build/ci-tracy --parallel
+
+      - name: Test instrumented binaries
+        run: ctest --test-dir build/ci-tracy --output-on-failure
+
+  static-analysis:
+    name: clang-format and clang-tidy
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: examples/acim-minimal
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Install Clang tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes --no-install-recommends ninja-build clang clang-format clang-tidy
+
+      - name: Check C++ formatting
+        run: >-
+          clang-format --dry-run --Werror
+          firmware/include/acim/device_events.h
+          firmware/include/acim/device_trace.h
+          include/acim/profiling.hpp
+          include/acim/simulator.hpp
+          include/acim/trace_correlation.hpp
+          src/simulator.cpp
+          src/trace_correlation.cpp
+          apps/acim_smoke.cpp
+          tests/simulator_test.cpp
+          tests/simulator_gtest.cpp
+          tests/device_trace_c_test.c
+          tests/trace_test.cpp
+
+      - name: Configure compilation database
+        env:
+          CC: clang
+          CXX: clang++
+        run: >-
+          cmake -S . -B build/ci-tidy -G Ninja
+          -DCMAKE_BUILD_TYPE=Debug
+          -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
+          -DBUILD_TESTING=ON
+
+      - name: Run clang-tidy
+        run: >-
+          clang-tidy -p build/ci-tidy
+          --warnings-as-errors='*'
+          src/simulator.cpp
+          src/trace_correlation.cpp
+          apps/acim_smoke.cpp
+          tests/simulator_test.cpp
+          tests/trace_test.cpp

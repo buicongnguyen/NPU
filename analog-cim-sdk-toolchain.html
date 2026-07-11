@@ -26,6 +26,7 @@
       <a href="analog-cim-sdk-toolchain.html" aria-current="page">SDK</a>
       <a href="analog-cim-board-bringup.html">Bring-up</a>
       <a href="analog-cim-tenstorrent-reuse.html">Reuse</a>
+      <a href="accelerator-repository-blueprint.html">Repository</a>
       <a href="analog-cim-scaleout-llm.html">Scale/LLM</a>
       <a href="analog-cim-interview.html">Interview</a>
       <a href="analog-cim-quiz.html">MCQ Lab</a>
@@ -293,6 +294,16 @@ load_binding_key = hash(
   tools/                     acim-compile, inspect, run, profile, characterize
   tests/{unit,ir,golden,differential,hardware,models}/
   examples/{matmul,onnx_ep,async_pipeline}/</code></pre>
+      </div>
+      <div class="callout top-gap">
+        <p>
+          <strong>Detailed repository guide:</strong> the <a href="accelerator-repository-blueprint.html">accelerator
+          repository blueprint</a> expands this compact ownership sketch into schemas, generated code, C++ and Python
+          packages, GoogleTest and pytest lanes, smoke through qualification tests, CI routing, contribution rules,
+          performance methodology, and a full debug evidence bundle. Its
+          <a href="examples/acim-minimal/README.md">minimal ACiM native example</a> provides the first working
+          CMake/Ninja, compiler, CTest, installation, and functional MVM path.
+        </p>
       </div>
     </section>
 
@@ -863,6 +874,13 @@ acim-profile build/matmul.atrace --summary</code></pre>
           and queue schemas, DMA/MSI-X ordering, firmware boot, analog program/verify, and a staged YOLO path.
         </p>
       </div>
+      <div class="callout top-gap">
+        <p>
+          <strong>Profiling vertical slice:</strong> the <a href="accelerator-repository-blueprint.html#profiling">host
+          Tracy and device cycle-trace guide</a> defines optional CMake integration, scoped host zones, a firmware-safe
+          trace ABI, UMD/KMD drain ownership, clock correlation, ACiM counters, profiling modes, and measurement gates.
+        </p>
+      </div>
     </section>
 
     <section class="section" id="roadmap" data-progress="acim-sdk-roadmap">
@@ -936,7 +954,8 @@ acim-profile build/matmul.atrace --summary</code></pre>
         <article class="source-card"><a href="https://flatbuffers.dev/evolution/">FlatBuffers schema evolution</a><span>Official field-order/ID, deprecation, and <code>flatc --conform</code> compatibility rules.</span></article>
         <article class="source-card"><a href="https://github.com/mlcommons/inference_policies/blob/master/inference_rules.adoc">MLPerf Inference rules</a><span>Primary reference for system-under-test, quality, latency/throughput scenarios, reproducibility, and audit boundaries.</span></article>
         <article class="source-card"><a href="analog-cim-ihw-patents.html">iHW patent study</a><span>Patent mechanisms and evidence limits that motivate, but do not disclose, this software design.</span></article>
-        <article class="source-card"><a href="analog-cim-tenstorrent-reuse.html">Tenstorrent reuse guide</a><span>Repository-level learn/adapt/replace decisions and license/evidence gates.</span></article>
+        <article class="source-card"><a href="analog-cim-tenstorrent-reuse.html">Tenstorrent pattern study</a><span>Applied architecture translation from model import through compiler, runtime, simulator, device control and correlation labs.</span></article>
+        <article class="source-card"><a href="accelerator-repository-blueprint.html">Accelerator repository blueprint</a><span>TT-Metal-inspired code ownership, implementation order, test architecture, CI routing, contribution workflow and debugging.</span></article>
         <article class="source-card"><a href="analog-cim-board-bringup.html">PCIe board bring-up guide</a><span>Concrete UMD/KMD, BAR, DMA, MSI-X, firmware, analog lifecycle, YOLO dataflow, recovery, security, and validation contracts.</span></article>
         <article class="source-card"><a href="analog-cim-scaleout-llm.html">ACiM scale-out and LLM design</a><span>Fault-aware descriptors, logical mesh, distributed placement, hybrid LLM mapping, recovery, and the second vertical slice.</span></article>
         <article class="source-card"><a href="analog-cim-hardware-software-codesign.html">Hardware/software co-design</a><span>Physical bottlenecks, measured-paper solutions, lifecycle, and analog/digital partition context.</span></article>
