@@ -11,29 +11,6 @@
   letter-spacing: 0;
 }
 
-progress.progress-bar {
-  width: 100%;
-  height: 100%;
-  display: block;
-  border: 0;
-  appearance: none;
-  background: transparent;
-}
-
-progress.progress-bar::-webkit-progress-bar {
-  background: transparent;
-}
-
-progress.progress-bar::-webkit-progress-value {
-  background: var(--teal);
-  transition: width 180ms ease;
-}
-
-progress.progress-bar::-moz-progress-bar {
-  background: var(--teal);
-  transition: width 180ms ease;
-}
-
 .evidence-key {
   display: flex;
   flex-wrap: wrap;
@@ -839,6 +816,267 @@ abbr.term {
   grid-template-columns: minmax(520px, 1.25fr) minmax(0, 0.75fr);
 }
 
+.delivery-phase-map {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.delivery-phase-summary {
+  position: relative;
+  min-width: 0;
+  border-top: 4px solid var(--line);
+  padding: 14px;
+  background: var(--surface);
+}
+
+.delivery-phase-summary.foundation {
+  border-top-color: var(--blue);
+}
+
+.delivery-phase-summary.transport {
+  border-top-color: var(--amber);
+}
+
+.delivery-phase-summary.compute {
+  border-top-color: var(--teal);
+}
+
+.delivery-phase-summary.product {
+  border-top-color: var(--red);
+}
+
+.delivery-phase-summary:not(:last-child)::after {
+  content: ">";
+  position: absolute;
+  top: 42px;
+  right: -9px;
+  z-index: 2;
+  width: 17px;
+  display: grid;
+  place-items: center;
+  background: var(--page);
+  color: var(--muted);
+  font-weight: 800;
+}
+
+.delivery-phase-summary b,
+.delivery-phase-summary strong,
+.delivery-phase-summary span,
+.delivery-phase-summary code {
+  display: block;
+  overflow-wrap: anywhere;
+}
+
+.delivery-phase-summary b {
+  color: var(--muted);
+  font-size: 11px;
+  text-transform: uppercase;
+}
+
+.delivery-phase-summary strong {
+  margin: 6px 0;
+}
+
+.delivery-phase-summary span,
+.delivery-phase-summary code {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.delivery-phase-summary code {
+  margin-top: 8px;
+  color: var(--blue);
+}
+
+.delivery-roadmap {
+  display: grid;
+  gap: 30px;
+}
+
+.delivery-phase-block {
+  min-width: 0;
+  padding-top: 18px;
+  border-top: 1px solid var(--line);
+}
+
+.delivery-phase-block:first-child {
+  padding-top: 0;
+  border-top: 0;
+}
+
+.delivery-phase-heading {
+  display: grid;
+  grid-template-columns: 120px minmax(0, 1fr);
+  gap: 14px;
+  align-items: start;
+  margin-bottom: 12px;
+}
+
+.delivery-phase-heading > b {
+  border-left: 4px solid var(--line);
+  padding: 5px 0 5px 10px;
+  color: var(--muted);
+  font-size: 12px;
+  text-transform: uppercase;
+}
+
+.delivery-phase-block.foundation .delivery-phase-heading > b {
+  border-left-color: var(--blue);
+}
+
+.delivery-phase-block.transport .delivery-phase-heading > b {
+  border-left-color: var(--amber);
+}
+
+.delivery-phase-block.compute .delivery-phase-heading > b {
+  border-left-color: var(--teal);
+}
+
+.delivery-phase-block.product .delivery-phase-heading > b {
+  border-left-color: var(--red);
+}
+
+.delivery-phase-heading h3,
+.delivery-phase-heading p {
+  margin: 0;
+}
+
+.delivery-phase-heading h3 {
+  font-size: 21px;
+  line-height: 1.3;
+  letter-spacing: 0;
+}
+
+.delivery-phase-heading p {
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.delivery-milestones {
+  display: grid;
+  gap: 12px;
+}
+
+.delivery-milestone {
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-left: 4px solid var(--line);
+  border-radius: 6px;
+  background: var(--surface);
+}
+
+.delivery-phase-block.foundation .delivery-milestone {
+  border-left-color: var(--blue);
+}
+
+.delivery-phase-block.transport .delivery-milestone {
+  border-left-color: var(--amber);
+}
+
+.delivery-phase-block.compute .delivery-milestone {
+  border-left-color: var(--teal);
+}
+
+.delivery-phase-block.product .delivery-milestone {
+  border-left-color: var(--red);
+}
+
+.milestone-header {
+  display: grid;
+  grid-template-columns: 46px minmax(0, 1fr) auto;
+  gap: 11px;
+  align-items: center;
+  padding: 13px 14px;
+  background: var(--surface-2);
+}
+
+.milestone-number {
+  width: 38px;
+  height: 38px;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: var(--surface);
+  color: var(--ink);
+  font-weight: 900;
+}
+
+.milestone-title h4,
+.milestone-title p {
+  margin: 0;
+}
+
+.milestone-title h4 {
+  font-size: 17px;
+  line-height: 1.3;
+  letter-spacing: 0;
+}
+
+.milestone-title p {
+  margin-top: 3px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.milestone-environment {
+  max-width: 230px;
+  color: var(--blue);
+  font-size: 12px;
+  text-align: right;
+  overflow-wrap: anywhere;
+}
+
+.milestone-details {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 1px;
+  border-top: 1px solid var(--line);
+  background: var(--line);
+}
+
+.milestone-detail {
+  min-width: 0;
+  padding: 12px 13px;
+  background: var(--surface);
+}
+
+.milestone-detail.gate {
+  background: var(--soft-teal);
+}
+
+.milestone-detail strong,
+.milestone-detail span {
+  display: block;
+  overflow-wrap: anywhere;
+}
+
+.milestone-detail strong {
+  margin-bottom: 5px;
+  color: var(--muted);
+  font-size: 11px;
+  text-transform: uppercase;
+}
+
+.milestone-detail span {
+  font-size: 13px;
+}
+
+.milestone-unlock {
+  margin: 0;
+  border-top: 1px solid var(--line);
+  padding: 9px 14px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.milestone-unlock strong {
+  color: var(--ink);
+}
+
 .tree-notes {
   display: grid;
   gap: 8px;
@@ -899,8 +1137,14 @@ abbr.term {
   }
 
   .decision-grid,
-  .proof-grid {
+  .proof-grid,
+  .delivery-phase-map,
+  .milestone-details {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .delivery-phase-summary::after {
+    content: none !important;
   }
 
   .pipeline-flow,
@@ -945,6 +1189,11 @@ abbr.term {
     grid-template-columns: 1fr;
   }
 
+  .delivery-phase-heading {
+    grid-template-columns: 1fr;
+    gap: 7px;
+  }
+
   .system-boundary {
     margin-left: 0;
   }
@@ -973,6 +1222,8 @@ abbr.term {
   .decision-grid,
   .contract-grid,
   .proof-grid,
+  .delivery-phase-map,
+  .milestone-details,
   .formula-strip,
   .pipeline-flow,
   .yolo-flow,
@@ -980,6 +1231,16 @@ abbr.term {
   .boot-flow,
   .state-machine {
     grid-template-columns: 1fr;
+  }
+
+  .milestone-header {
+    grid-template-columns: 42px minmax(0, 1fr);
+  }
+
+  .milestone-environment {
+    grid-column: 2;
+    max-width: none;
+    text-align: left;
   }
 
   .requirement-list li {

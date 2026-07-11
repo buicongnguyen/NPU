@@ -7,7 +7,7 @@
   <title>Analog CIM Board Bring-Up | NPU Study Guide</title>
   <link rel="stylesheet" href="analog-cim.css">
   <link rel="stylesheet" href="npu-engineering.css">
-  <link rel="stylesheet" href="analog-cim-bringup.css?v=20260712-2">
+  <link rel="stylesheet" href="analog-cim-bringup.css?v=20260712-3">
   <script src="npu-engineering.js" defer></script>
 </head>
 <body>
@@ -1638,6 +1638,7 @@ readl(adev-&gt;bar0 + ACIM_DEVICE_STATUS);</code></pre>
 |-- configs/
 |   |-- targets/chip-rev.yaml       # arrays, SRAM, ISA, precision, costs
 |   |-- boards/pcie-card.yaml       # IDs, BARs, DMA, MSI-X, clocks
+|   |-- boards/integrated-soc.yaml  # MMIO, DMA, SMMU, IRQ, power domains
 |   |-- models/yolo.yaml            # preprocessing, shapes, accuracy gates
 |   `-- test-matrices/              # simulator, FPGA, board, PVT lanes
 |-- spec/                            # authoritative binary contracts
@@ -1663,7 +1664,7 @@ readl(adev-&gt;bar0 + ACIM_DEVICE_STATUS);</code></pre>
 |   |-- device.cpp  buffer.cpp  queue.cpp  artifact.cpp
 |   `-- backends/kmd_linux.cpp  fake.cpp  cosim.cpp
 |-- driver/kmd/
-|   |-- pci.c  uapi.c  context.c  memory.c  queue.c  irq.c
+|   |-- pci.c  platform.c  uapi.c  context.c  memory.c  queue.c  irq.c
 |   `-- firmware.c  reset.c  trace.c  health.c  Kbuild
 |-- firmware/
 |   |-- boot/  mailbox/  scheduler/  dma/
@@ -1673,10 +1674,11 @@ readl(adev-&gt;bar0 + ACIM_DEVICE_STATUS);</code></pre>
 |   `-- digital/                     # DSP/vector/scalar fallback kernels
 |-- sim/
 |   |-- functional/  analog/  cycle/
-|   `-- pcie_model/                  # BAR, DMA, MSI-X, reset and fault model
+|   `-- pcie_model/  platform_model/ # transport, reset and fault models
 |-- platforms/
 |   |-- linux-pcie/                  # udev, module config, packages
-|   `-- embedded/board-name/         # DTB, Buildroot/Yocto, boot scripts
+|   |-- linux-soc/                   # DTB, clocks, power, platform package
+|   `-- embedded/board-name/         # Buildroot/Yocto and boot scripts
 |-- apps/
 |   |-- acim-smoke/
 |   `-- acim-yolo/
@@ -1703,8 +1705,8 @@ readl(adev-&gt;bar0 + ACIM_DEVICE_STATUS);</code></pre>
           <div class="tree-note"><strong><code>generated/</code> is mechanical</strong><span>Generate into the build tree by default. Keep a source-tree mirror only when separate RTL/KMD builds or source packages require it; CI must regenerate with no diff. Generator version and schema hash travel with the output.</span></div>
           <div class="tree-note"><strong><code>uapi/</code> is append-only in behavior</strong><span>Run ABI layout checks on 32-bit and 64-bit builds; explicit reserved fields replace compiler padding.</span></div>
           <div class="tree-note"><strong><code>configs/</code> is validated product data</strong><span>A chip target, board, model, and test matrix have schemas, units, revisions, and compatibility tests. They are not informal command-line flags.</span></div>
-          <div class="tree-note"><strong><code>platforms/</code> owns boot integration</strong><span>Keep PCIe packages and embedded BSP files outside runtime logic. The same UMD API should work after either platform reaches READY.</span></div>
-          <div class="tree-note"><strong><code>sim/pcie_model</code> comes before the board</strong><span>Model BAR side effects, ring wrap, posted writes, interrupts, reset epochs, malformed commands and DMA faults.</span></div>
+          <div class="tree-note"><strong><code>platforms/</code> owns boot integration</strong><span>Keep PCIe packages, integrated-SoC resources, and embedded BSP files outside runtime logic. The same UMD API should work after any supported platform reaches READY.</span></div>
+          <div class="tree-note"><strong>Transport models come before the board</strong><span>Model PCIe BAR or integrated MMIO side effects, ring wrap, ordering, interrupts, reset epochs, malformed commands and DMA faults.</span></div>
           <div class="tree-note"><strong><code>tools/</code> are release deliverables</strong><span>Enumeration, firmware, memory test, trace, health and support bundle are necessary to debug customer systems.</span></div>
           <div class="tree-note"><strong><code>models/</code> stores provenance, not arbitrary datasets</strong><span>Record model/dataset versions, preprocessing, quantization statistics, artifact hash, board profile and expected metrics. Keep only permitted small golden inputs in Git.</span></div>
           <div class="tree-note"><strong><code>calibration/</code> contains test fixtures only</strong><span>Model quantization data and per-chip analog calibration are different. Production chip profiles belong in the provisioning/service store, not source control.</span></div>
@@ -1776,7 +1778,7 @@ out/edge-board-release/
       <h3 class="subheading" id="repository-boot-flow">Boot flow: code is loaded, then capabilities and mutable state are negotiated</h3>
       <div class="pipeline-flow" role="group" aria-label="ACiM repository code and data flow during boot">
         <div class="pipeline-stage host"><b>1. Host boot</b><strong><code>platforms/</code></strong><span>Embedded only: bootloader, Linux, rootfs and DTB. A workstation PCIe flow starts at KMD probe on its supported OS.</span></div>
-        <div class="pipeline-stage host"><b>2. KMD probe</b><strong><code>driver/kmd/pci.c</code></strong><span>Reads PCI IDs/BAR/caps and generated board constants; creates device state; configures DMA, IOMMU, MSI-X, reset and trace.</span></div>
+        <div class="pipeline-stage host"><b>2. KMD probe</b><strong><code>pci.c</code> or <code>platform.c</code></strong><span>Reads PCI BAR/caps or platform MMIO/DT resources; creates device state; configures DMA, IOMMU/SMMU, IRQ/MSI-X, reset, power and trace.</span></div>
         <div class="pipeline-stage digital"><b>3. Device control</b><strong><code>driver/kmd/firmware.c</code></strong><span>Works with <code>firmware/boot/</code>; loads firmware when present, checks image/ABI, then starts the controller or verifies fixed RTL control.</span></div>
         <div class="pipeline-stage digital"><b>4. Admin queues</b><strong><code>driver/kmd/memory.c</code></strong><span>Works with <code>queue.c</code>; allocates rings and exchanges IOVAs, depth, generation, vectors, heartbeat and trace clock.</span></div>
         <div class="pipeline-stage host"><b>5. Publish UAPI</b><strong><code>driver/kmd/uapi.c</code></strong><span>Works with <code>health.c</code>; exposes the device only after READY and returns capabilities, health, calibration generation and ABI.</span></div>
@@ -1787,10 +1789,10 @@ out/edge-board-release/
         <table>
           <thead><tr><th scope="col">Boot step</th><th scope="col">Executing code</th><th scope="col">Data entering</th><th scope="col">State produced</th><th scope="col">Failure evidence</th></tr></thead>
           <tbody>
-            <tr><th scope="row">Host boot</th><td>Bootloader and Linux BSP</td><td>Boot image, DTB, rootfs configuration</td><td>PCIe root/platform bus, IOMMU, filesystems, services</td><td>Bootloader/earlycon/kernel serial log</td></tr>
-            <tr><th scope="row">Device discovery</th><td>KMD probe and reset modules</td><td>PCI config, BAR registers, generated board constants and live caps</td><td>Kernel device object, mapped BARs, DMA mask, IRQ vectors</td><td>Kernel tracepoint, AER, IOMMU and probe log</td></tr>
+            <tr><th scope="row">Host boot</th><td>Bootloader and Linux BSP</td><td>Boot image, DTB, rootfs configuration</td><td>PCIe root or platform bus, IOMMU/SMMU, filesystems, services</td><td>Bootloader/earlycon/kernel serial log</td></tr>
+            <tr><th scope="row">Device discovery</th><td>PCI or platform KMD probe and reset modules</td><td>PCI config/BARs or DT/MMIO resources, generated board constants and live caps</td><td>Kernel device object, mapped MMIO, DMA mask, IRQ/MSI-X vectors</td><td>Kernel tracepoint, AER/platform fault, IOMMU/SMMU and probe log</td></tr>
             <tr><th scope="row">Control-plane start</th><td>Boot ROM, KMD firmware loader, optional controller firmware</td><td>Firmware bytes/hash, entry point, compatibility range</td><td>READY, boot epoch, firmware build/ABI, crash area</td><td>Mailbox stage, ROM UART, JTAG/GDB, crash buffer</td></tr>
-            <tr><th scope="row">Queue negotiation</th><td>KMD queue/memory plus firmware scheduler</td><td>Ring IOVAs, size, generation, MSI-X vector, context limits</td><td>Enabled admin/data queues and heartbeat</td><td>Queue indices, descriptor dump, IRQ cause, timeout stage</td></tr>
+            <tr><th scope="row">Queue negotiation</th><td>KMD queue/memory plus firmware scheduler</td><td>Ring IOVAs, size, generation, IRQ/MSI-X vector, context limits</td><td>Enabled admin/data queues and heartbeat</td><td>Queue indices, descriptor dump, IRQ cause, timeout stage</td></tr>
             <tr><th scope="row">Userspace open</th><td>UMD/HAL and KMD UAPI</td><td>Requested API version, process identity and policy</td><td>Context, Buffer Object namespace, queue/event handles</td><td>errno, UAPI trace, negotiated capabilities and reset epoch</td></tr>
           </tbody>
         </table>
@@ -1821,13 +1823,14 @@ out/edge-board-release/
       </div>
     </section>
 
-    <section class="section" id="delivery" data-progress="acim-board-bringup">
+    <section class="section" id="delivery">
       <div class="section-heading">
         <p class="eyebrow">Staged delivery</p>
-        <h2>Implement nine vertical slices; verify each in progressively more realistic environments</h2>
+        <h2>Reach the board through nine evidence-producing milestones</h2>
         <p class="section-note">
-          Each stage preserves the same API and descriptor semantics. Do not begin full YOLO before DMA loopback,
-          queue wrap, interrupt loss, reset, and one-operation numerical correlation are boring and repeatable.
+          Each milestone is a vertical slice with owned code, a reproducible operation, named boundary data, a measurable
+          exit gate, and an explicit capability that it unlocks. Transport semantics remain common while an integrated
+          SoC uses MMIO/DMA/SMMU/IRQ and a PCIe device uses BAR/DMA/IOMMU/MSI-X.
         </p>
       </div>
       <div class="term-reminder" role="note" aria-label="Terminology used in the delivery plan">
@@ -1835,6 +1838,8 @@ out/edge-board-release/
         <span>Protocol v0 = first versioned hardware/software contract</span>
         <span><abbr class="term" title="Field-Programmable Gate Array">FPGA</abbr> = Field-Programmable Gate Array prototype</span>
         <span><abbr class="term" title="Matrix-Vector Multiplication">MVM</abbr> = Matrix-Vector Multiplication</span>
+        <span>Exit gate = evidence required before depending on this milestone</span>
+        <span>Unlock = new work that becomes technically meaningful after the gate passes</span>
         <span>Qualification = evidence required before product release</span>
       </div>
       <div class="callout top-gap">
@@ -1843,40 +1848,184 @@ out/edge-board-release/
           answers <em>where and at what fidelity</em> a test runs, from native model through silicon. These nine delivery
           milestones answer <em>which dependency-ordered code slice</em> the team implements. For example, the queue
           slice should pass first in the fake backend, then QEMU/co-simulation, FPGA, and finally silicon without changing
-          its descriptor semantics.
+          its descriptor semantics or whether the physical transport is integrated or PCIe.
         </p>
       </div>
-      <div class="progress-panel" aria-live="polite">
-        <div class="progress-track"><progress class="progress-bar" data-progress-bar aria-label="Analog CIM board bring-up progress" max="100" value="0">0%</progress></div>
-        <span class="progress-value" data-progress-value>0 / 9 complete</span>
+      <div class="delivery-phase-map top-gap" role="group" aria-label="Four phases of the ACiM delivery roadmap">
+        <article class="delivery-phase-summary foundation"><b>Phase A | milestones 1-2</b><strong>Contracts and virtual hardware</strong><span>Prove interfaces and failure behavior without a physical device.</span><code>host CI | fake | co-sim</code></article>
+        <article class="delivery-phase-summary transport"><b>Phase B | milestones 3-5</b><strong>Device and transport</strong><span>Boot, transfer exact bytes, and complete commands reliably.</span><code>integrated SoC | PCIe | FPGA</code></article>
+        <article class="delivery-phase-summary compute"><b>Phase C | milestones 6-8</b><strong>Analog compute and model</strong><span>Correlate one MVM, a subgraph, then the complete workload.</span><code>calibrated simulator | silicon</code></article>
+        <article class="delivery-phase-summary product"><b>Phase D | milestone 9</b><strong>Product operations</strong><span>Package, isolate, recover, update, and diagnose supported systems.</span><code>platform matrix | qualification</code></article>
       </div>
-      <div class="lab-list">
-        <label class="lab-item"><input type="checkbox" data-step="protocol"><span><strong>1. Freeze protocol v0</strong><span>Register schema, capability record, mailbox, SQ/CQ, opcodes, status, reset generation, UAPI structs, ownership and memory ordering.</span></span></label>
-        <label class="lab-item"><input type="checkbox" data-step="model"><span><strong>2. Build the PCIe device model</strong><span>In-process or QEMU-style model for BARs, DMA, rings, MSI-X, posted writes, faults and reset; run UMD/KMD-facing conformance tests.</span></span></label>
-        <label class="lab-item"><input type="checkbox" data-step="enumerate"><span><strong>3. Enumerate the FPGA/board</strong><span><code>lspci</code>, IDs, BAR claim/map, capability read, reset, firmware mailbox, health handshake and safe remove/reprobe.</span></span></label>
-        <label class="lab-item"><input type="checkbox" data-step="dma"><span><strong>4. Pass DMA loopback</strong><span>Coherent admin ring, streaming payload, scatter/gather boundaries, IOMMU faults, data patterns, sizes, alignment and bandwidth.</span></span></label>
-        <label class="lab-item"><input type="checkbox" data-step="queue"><span><strong>5. Pass queues and MSI-X</strong><span>Wrap, full/empty, multi-queue, interrupt moderation, polling, lost/duplicate interrupt injection, timeout, abort and reset generation.</span></span></label>
-        <label class="lab-item"><input type="checkbox" data-step="mvm"><span><strong>6. Execute one resident MVM</strong><span>Program/verify one weight block, bind calibration, transfer input, run analog path, return output, compare every numerical boundary.</span></span></label>
-        <label class="lab-item"><input type="checkbox" data-step="subgraph"><span><strong>7. Execute a YOLO subgraph</strong><span>Contiguous Conv/activation/route island, device digital fallback, SRAM schedule, one input/output transfer and layer-level differential report.</span></span></label>
-        <label class="lab-item"><input type="checkbox" data-step="yolo"><span><strong>8. Qualify end-to-end YOLO</strong><span>Full validation data, mAP delta, latency percentiles, FPS, power/frame, thermal soak, program reuse, fallback and reproducible manifest.</span></span></label>
-        <label class="lab-item"><input type="checkbox" data-step="product"><span><strong>9. Harden the product path</strong><span>Multi-process isolation, dma-buf, AER, suspend/resume, hot reset, firmware update, fault injection, security review, packaging and support tools.</span></span></label>
-      </div>
-      <h3 class="subheading" id="delivery-crosswalk">Milestone crosswalk: source, artifact, data, and gate</h3>
-      <div class="table-wrap top-gap">
-        <table>
-          <thead><tr><th scope="col">Milestone</th><th scope="col">Primary source paths</th><th scope="col">Artifact and data crossing the boundary</th><th scope="col">Required automated gate</th></tr></thead>
-          <tbody>
-            <tr><th scope="row">1. Protocol v0</th><td><code>spec/</code>, <code>tools/codegen/</code>, <code>generated/</code>, <code>include/uapi/</code></td><td>Register/queue/UAPI definitions, capability fixture, ABI and schema hashes</td><td><code>contract</code>: regenerate, layout, endian, reserved-field, old/new compatibility</td></tr>
-            <tr><th scope="row">2. PCIe model</th><td><code>sim/pcie_model/</code>, <code>runtime/umd/backends/fake.cpp</code>, <code>runtime/umd/backends/cosim.cpp</code></td><td>Fake BAR state, guest/host memory, SQ/CQ, interrupt and injected-fault records</td><td><code>pcie-model</code>: probe, ring wrap, posted-write order, malformed DMA, reset epoch</td></tr>
-            <tr><th scope="row">3. Enumerate board</th><td><code>driver/kmd/pci.c</code>, <code>driver/kmd/reset.c</code>, <code>driver/kmd/firmware.c</code>, <code>platforms/</code></td><td>KMD module, optional firmware, PCI capabilities, READY/health handshake</td><td><code>enumeration</code>: cold boot, 1000 bind/remove/reset cycles, no leak or host crash</td></tr>
-            <tr><th scope="row">4. DMA loopback</th><td><code>driver/kmd/memory.c</code>, <code>firmware/dma/</code>, <code>tools/acim-memtest/</code></td><td>BO handles, scatterlists, IOVAs, patterned payloads, byte/error counters</td><td><code>dma</code>: exact data across sizes/alignment/segments plus IOMMU fault containment</td></tr>
-            <tr><th scope="row">5. Queues + MSI-X</th><td><code>driver/kmd/queue.c</code>, <code>driver/kmd/irq.c</code>, <code>runtime/umd/queue.cpp</code>, <code>firmware/scheduler/</code></td><td>SQ/CQ descriptors, doorbells, generation, vector, deadline and terminal status</td><td><code>queue</code>: wrap/full, concurrency, polling/IRQ, loss/duplicate, timeout/abort/reset</td></tr>
-            <tr><th scope="row">6. One MVM</th><td><code>compiler/target/</code>, <code>kernels/analog/</code>, <code>firmware/analog/</code>, <code>sim/analog/</code></td><td>Tiny <code>.acx</code>, weights, calibration/health profile, input, raw/reconstructed output</td><td><code>mvm</code>: golden checkpoints, programmed-weight verify, tolerance and first divergence</td></tr>
-            <tr><th scope="row">7. YOLO subgraph</th><td><code>compiler/transforms/</code>, <code>scheduling/</code>, <code>runtime/umd/artifact.cpp</code>, <code>apps/acim-yolo/</code></td><td>Partitioned artifact, resident weights, activation BOs, digital fallback and layer traces</td><td><code>subgraph</code>: boundary tensors, SRAM schedule, one H2D/D2H pair and fallback parity</td></tr>
-            <tr><th scope="row">8. End-to-end YOLO</th><td><code>models/</code>, <code>apps/acim-yolo/</code>, <code>tests/end-to-end/</code>, <code>performance/</code></td><td>Model/run manifest, validation inputs, detections, mAP, latency, power and thermal traces</td><td><code>yolo-e2e</code>: full accuracy set plus cold/warm, throughput, soak and recovery scenarios</td></tr>
-            <tr><th scope="row">9. Product path</th><td><code>packaging/</code>, <code>platforms/</code>, <code>tools/</code>, <code>tests/qualification/</code></td><td>Install packages, firmware/model update set, permissions, diagnostics and support bundle</td><td><code>qualification</code>: platform/kernel matrix, isolation, AER/reset, update/rollback and field triage</td></tr>
-          </tbody>
-        </table>
+
+      <h3 class="subheading" id="delivery-crosswalk">Detailed implementation and exit gates</h3>
+      <div class="delivery-roadmap">
+        <section class="delivery-phase-block foundation" aria-labelledby="delivery-phase-a">
+          <div class="delivery-phase-heading">
+            <b>Phase A</b>
+            <div><h3 id="delivery-phase-a">Contracts and virtual hardware</h3><p>Entry: architecture decisions are documented. Exit: host software can exercise the real command semantics and faults without silicon.</p></div>
+          </div>
+          <div class="delivery-milestones">
+            <article class="delivery-milestone" id="delivery-1">
+              <header class="milestone-header">
+                <span class="milestone-number">1</span>
+                <div class="milestone-title"><h4>Freeze protocol v0</h4><p>Create one machine-readable contract before KMD, firmware, simulator, and RTL implementations diverge.</p></div>
+                <code class="milestone-environment">host CI | no board</code>
+              </header>
+              <div class="milestone-details">
+                <div class="milestone-detail"><strong>Implement</strong><span><code>spec/</code>, <code>tools/codegen/</code>, generated C/C++/firmware/RTL definitions, Linux UAPI structures, version rules, ownership, endianness, reset values, and memory ordering.</span></div>
+                <div class="milestone-detail"><strong>Exercise</strong><span>Regenerate every consumer; encode and decode golden capability, mailbox, SQ, CQ, fault, and trace fixtures across languages; reject unknown major versions and nonzero reserved fields.</span></div>
+                <div class="milestone-detail"><strong>Data and evidence</strong><span>Schema and generator hashes, generated diff, structure sizes/offsets, round-trip fixtures, compatibility matrix, and malformed-input results.</span></div>
+                <div class="milestone-detail gate"><strong>Exit gate</strong><span>Regeneration is clean; all consumers agree bit-for-bit; old/new combinations behave exactly as declared; fuzzed lengths, enum values, overflow, and alignment fail safely.</span></div>
+              </div>
+              <p class="milestone-unlock"><strong>Unlocks milestone 2:</strong> simulator, RTL, KMD, and firmware teams can implement against the same stable contract in parallel.</p>
+            </article>
+
+            <article class="delivery-milestone" id="delivery-2">
+              <header class="milestone-header">
+                <span class="milestone-number">2</span>
+                <div class="milestone-title"><h4>Build the transport and device model</h4><p>Represent the control registers, host/device memory, queues, interrupts, reset, and faults before a board is required.</p></div>
+                <code class="milestone-environment">native fake | QEMU/co-sim</code>
+              </header>
+              <div class="milestone-details">
+                <div class="milestone-detail"><strong>Implement</strong><span><code>sim/pcie_model/</code> and/or <code>sim/platform_model/</code>, fake/co-sim HAL backends, MMIO side effects, DMA address spaces, IRQ/MSI-X, posted-write behavior, reset epochs, firmware mailbox, and fault injection.</span></div>
+                <div class="milestone-detail"><strong>Exercise</strong><span>Run the real UMD queue library against the model; wrap rings, fill queues, reorder notifications, drop/duplicate interrupts, issue malformed descriptors, reset in flight, and simulate illegal DMA.</span></div>
+                <div class="milestone-detail"><strong>Data and evidence</strong><span>Register snapshots, queue memory, DMA transactions, interrupt events, command/fault timelines, deterministic seeds, and expected KMD/firmware status codes.</span></div>
+                <div class="milestone-detail gate"><strong>Exit gate</strong><span>The same conformance suite passes for every transport enabled by the target profile; every accepted command has one terminal completion; every injected fault is bounded and reproducible.</span></div>
+              </div>
+              <p class="milestone-unlock"><strong>Unlocks milestone 3:</strong> physical discovery and boot can be compared with a known protocol model instead of debugged from intuition.</p>
+            </article>
+          </div>
+        </section>
+
+        <section class="delivery-phase-block transport" aria-labelledby="delivery-phase-b">
+          <div class="delivery-phase-heading">
+            <b>Phase B</b>
+            <div><h3 id="delivery-phase-b">Device and transport bring-up</h3><p>Entry: protocol/model tests pass. Exit: one physical device moves exact data and completes queued work across reset and interrupt corner cases.</p></div>
+          </div>
+          <div class="delivery-milestones">
+            <article class="delivery-milestone" id="delivery-3">
+              <header class="milestone-header">
+                <span class="milestone-number">3</span>
+                <div class="milestone-title"><h4>Discover, reset, and boot the device</h4><p>Establish identity, resources, firmware/control-plane readiness, health, and a repeatable teardown path.</p></div>
+                <code class="milestone-environment">integrated SoC | PCIe FPGA/board</code>
+              </header>
+              <div class="milestone-details">
+                <div class="milestone-detail"><strong>Implement</strong><span><code>driver/kmd/platform.c</code> and/or <code>pci.c</code>, <code>reset.c</code>, <code>firmware.c</code>, board/DTB integration, resource mapping, SMMU/IOMMU setup, IRQ/MSI-X allocation, health handshake, and safe remove.</span></div>
+                <div class="milestone-detail"><strong>Exercise</strong><span>Cold boot; read IDs/caps; map MMIO/BARs; start optional controller firmware; negotiate ABI and reset generation; publish the device node; open/close; remove/reprobe; force boot timeout and incompatible firmware.</span></div>
+                <div class="milestone-detail"><strong>Data and evidence</strong><span>DTB/platform resources or PCI config, register map version, firmware hash/ABI, READY stages, health/calibration generation, serial log, KMD trace, AER or platform fault state.</span></div>
+                <div class="milestone-detail gate"><strong>Exit gate</strong><span>Cold boot and controlled failure are deterministic; no device node appears before READY; teardown leaves no mapping/IRQ; repeated bind/reset succeeds, targeting 1000 cycles before qualification.</span></div>
+              </div>
+              <p class="milestone-unlock"><strong>Unlocks milestone 4:</strong> the host can safely allocate device-visible memory and test data movement without analog compute.</p>
+            </article>
+
+            <article class="delivery-milestone" id="delivery-4">
+              <header class="milestone-header">
+                <span class="milestone-number">4</span>
+                <div class="milestone-title"><h4>Pass DMA and shared-memory loopback</h4><p>Prove byte-exact ownership transfer through every supported buffer type, size, alignment, and mapping mode.</p></div>
+                <code class="milestone-environment">SMMU/IOMMU | DMA | SRAM</code>
+              </header>
+              <div class="milestone-details">
+                <div class="milestone-detail"><strong>Implement</strong><span><code>driver/kmd/memory.c</code>, firmware DMA handlers, BO allocation/import, IOVA registration, coherent admin memory, streaming payload mappings, cache synchronization, scatter/gather limits, and <code>acim-memtest</code>.</span></div>
+                <div class="milestone-detail"><strong>Exercise</strong><span>Loop deterministic patterns H2D and D2H across boundary sizes, page crossings, unaligned requests, maximum segments, concurrent buffers, wrong direction, unmapped IOVA, context exit, timeout, and reset.</span></div>
+                <div class="milestone-detail"><strong>Data and evidence</strong><span>BO handle, physical pages/scatterlist, IOVA, direction, bytes, pattern hash, guard regions, cache-operation trace, DMA counters, bandwidth, IOMMU/SMMU fault and cleanup record.</span></div>
+                <div class="milestone-detail gate"><strong>Exit gate</strong><span>Payload and guards are exact for the complete matrix; illegal access is contained; every map has one unmap after completion/device loss; bandwidth is explained by transfer and memory counters.</span></div>
+              </div>
+              <p class="milestone-unlock"><strong>Unlocks milestone 5:</strong> queue failures can be investigated without wondering whether descriptor or completion memory is corrupt.</p>
+            </article>
+
+            <article class="delivery-milestone" id="delivery-5">
+              <header class="milestone-header">
+                <span class="milestone-number">5</span>
+                <div class="milestone-title"><h4>Pass queues and completion interrupts</h4><p>Prove command ownership, ordering, wakeup, timeout, abort, and reset semantics under concurrency.</p></div>
+                <code class="milestone-environment">IRQ | MSI-X | polling</code>
+              </header>
+              <div class="milestone-details">
+                <div class="milestone-detail"><strong>Implement</strong><span><code>driver/kmd/queue.c</code>, <code>irq.c</code>, <code>runtime/umd/queue.cpp</code>, firmware scheduler, SQ/CQ ownership barriers, doorbells, moderation, poll/event integration, watchdog, abort, and generation checks.</span></div>
+                <div class="milestone-detail"><strong>Exercise</strong><span>Wrap and fill rings; run multiple queues/processes; switch polling/interrupt mode; delay, lose, and duplicate interrupts; complete out of order where legal; close during work; timeout, abort, reset, and submit stale entries.</span></div>
+                <div class="milestone-detail"><strong>Data and evidence</strong><span>Producer/consumer indices, descriptor bytes, command cookie, queue/context/generation, doorbell and IRQ timestamps, CQ status, watchdog state, wakeup latency, and first-fault trace.</span></div>
+                <div class="milestone-detail gate"><strong>Exit gate</strong><span>Every accepted cookie receives exactly one terminal status; no deadlock or queue corruption occurs at wrap/full; stale generations never execute; polling and interrupt paths return identical results.</span></div>
+              </div>
+              <p class="milestone-unlock"><strong>Unlocks milestone 6:</strong> analog numerical debugging can rely on a trustworthy command, transfer, and completion path.</p>
+            </article>
+          </div>
+        </section>
+
+        <section class="delivery-phase-block compute" aria-labelledby="delivery-phase-c">
+          <div class="delivery-phase-heading">
+            <b>Phase C</b>
+            <div><h3 id="delivery-phase-c">Analog compute and model correlation</h3><p>Entry: transport is exact and recoverable. Exit: one operation, one subgraph, and one full model meet declared numerical and performance gates.</p></div>
+          </div>
+          <div class="delivery-milestones">
+            <article class="delivery-milestone" id="delivery-6">
+              <header class="milestone-header">
+                <span class="milestone-number">6</span>
+                <div class="milestone-title"><h4>Execute one resident MVM</h4><p>Make the smallest analog operation observable from programmed weights through reconstructed output.</p></div>
+                <code class="milestone-environment">analog simulator | calibrated device</code>
+              </header>
+              <div class="milestone-details">
+                <div class="milestone-detail"><strong>Implement</strong><span><code>compiler/target/</code>, <code>kernels/analog/</code>, firmware programming/verify/remap, analog simulator, range/profile selection, raw ADC capture, reconstruction, saturation/retry reporting, and golden reference.</span></div>
+                <div class="milestone-detail"><strong>Exercise</strong><span>Compile a tiny <code>.acx</code>; program and verify a known weight block; bind the correct chip profile; run fixed vectors and corner values; force bad rows, saturation, stale calibration, remap, retry, and digital fallback.</span></div>
+                <div class="milestone-detail"><strong>Data and evidence</strong><span>Weight/program hash, physical placement, defect/remap table, calibration ID/PVT, DAC codes, raw ADC codes, reconstructed values, golden accumulations, error distribution, cycles, energy, and temperature.</span></div>
+                <div class="milestone-detail gate"><strong>Exit gate</strong><span>Program verify succeeds; error distribution stays inside the predeclared budget across required devices/PVT; first numerical divergence is identifiable; all mitigation cost is visible in cycles, arrays, and digital work.</span></div>
+              </div>
+              <p class="milestone-unlock"><strong>Unlocks milestone 7:</strong> compiler partitioning and SRAM scheduling can combine trusted analog and digital operations.</p>
+            </article>
+
+            <article class="delivery-milestone" id="delivery-7">
+              <header class="milestone-header">
+                <span class="milestone-number">7</span>
+                <div class="milestone-title"><h4>Execute a YOLO subgraph</h4><p>Prove one contiguous hybrid island with resident weights, local activation scheduling, and explicit fallback boundaries.</p></div>
+                <code class="milestone-environment">simulator parity | one device</code>
+              </header>
+              <div class="milestone-details">
+                <div class="milestone-detail"><strong>Implement</strong><span><code>compiler/transforms/</code>, scheduling/memory planning, artifact loading, analog Conv/GEMM placement, digital activation/route operators, fallback, layer debugger, boundary tensor capture, and graph-to-command mapping.</span></div>
+                <div class="milestone-detail"><strong>Exercise</strong><span>Compile a fixed Conv/activation/route island; program weights once; run one H2D input and one D2H output; sweep supported shapes; disable fusion to isolate layers; force digital fallback and one SRAM-pressure case.</span></div>
+                <div class="milestone-detail"><strong>Data and evidence</strong><span>Partition report, target/artifact hash, resident program handle, SRAM allocation timeline, boundary tensors/distributions, command trace, fallback reason, H2D/D2H bytes, per-stage cycles, and saturation/retry counts.</span></div>
+                <div class="milestone-detail gate"><strong>Exit gate</strong><span>Every boundary tensor meets its error budget; SRAM lifetimes do not overlap illegally; simulator/device placement agrees; fallback is numerically equivalent; repeated warm runs reuse weights and avoid unexplained transfers.</span></div>
+              </div>
+              <p class="milestone-unlock"><strong>Unlocks milestone 8:</strong> full-model accuracy and end-to-end latency become meaningful rather than hiding a broken layer or excessive host fallback.</p>
+            </article>
+
+            <article class="delivery-milestone" id="delivery-8">
+              <header class="milestone-header">
+                <span class="milestone-number">8</span>
+                <div class="milestone-title"><h4>Qualify end-to-end YOLO</h4><p>Measure the complete deployed workload, including preprocessing, fallback, postprocessing, power, thermal behavior, and recovery.</p></div>
+                <code class="milestone-environment">validation set | performance lab</code>
+              </header>
+              <div class="milestone-details">
+                <div class="milestone-detail"><strong>Implement</strong><span>Versioned model/run manifests, complete application pipeline, validation harness, golden host backend, latency/power collection, profiler correlation, cold/warm scenarios, stream/queue policy, soak, and model-level recovery.</span></div>
+                <div class="milestone-detail"><strong>Exercise</strong><span>Run the declared validation dataset; compare host, simulator, ACiM, and fallback variants; measure cold load, first inference, steady state, throughput, queue depth, thermal soak, calibration refresh, timeout, reset, and model rebind.</span></div>
+                <div class="milestone-detail"><strong>Data and evidence</strong><span>Dataset/model/preprocess versions, detections, mAP and per-class deltas, fallback/operator placement, latency percentiles, FPS, energy/frame, clocks, temperature, transfer bytes, profiler timeline, and recovery bundles.</span></div>
+                <div class="milestone-detail gate"><strong>Exit gate</strong><span>Pre-agreed accuracy and SLO thresholds pass on the complete pipeline; all host/off-chip work is disclosed; stage times explain end-to-end latency; independent reruns reproduce metrics inside declared variance.</span></div>
+              </div>
+              <p class="milestone-unlock"><strong>Unlocks milestone 9:</strong> product hardening can preserve a known-good workload while platform, update, isolation, and recovery behavior expands.</p>
+            </article>
+          </div>
+        </section>
+
+        <section class="delivery-phase-block product" aria-labelledby="delivery-phase-d">
+          <div class="delivery-phase-heading">
+            <b>Phase D</b>
+            <div><h3 id="delivery-phase-d">Product operations and supportability</h3><p>Entry: the target model meets numerical/performance gates. Exit: supported systems can install, isolate, update, recover, and produce actionable evidence.</p></div>
+          </div>
+          <div class="delivery-milestones">
+            <article class="delivery-milestone" id="delivery-9">
+              <header class="milestone-header">
+                <span class="milestone-number">9</span>
+                <div class="milestone-title"><h4>Harden the product path</h4><p>Turn the working board stack into a maintainable platform with explicit compatibility, failure, and service behavior.</p></div>
+                <code class="milestone-environment">platform/kernel matrix | qualification</code>
+              </header>
+              <div class="milestone-details">
+                <div class="milestone-detail"><strong>Implement</strong><span><code>packaging/</code>, platform integration, permissions, multi-process isolation, dma-buf where required, power states, AER or on-chip fault handling, reset escalation, firmware/model updates, rollback, diagnostics, profiler, and support-bundle tools.</span></div>
+                <div class="milestone-detail"><strong>Exercise</strong><span>Clean install/uninstall; old/new ABI matrix; concurrent users; process death; suspend/resume; device removal; link/interconnect faults; firmware panic; calibration/profile update; interrupted update; rollback; thermal fault; and field-style reproduction from one command.</span></div>
+                <div class="milestone-detail"><strong>Data and evidence</strong><span>Package and image hashes, compatibility matrix, permissions/IOMMU groups, update state, reset/fault timeline, resource-leak report, performance regression result, dependency/build provenance, health snapshot, and complete support bundle.</span></div>
+                <div class="milestone-detail gate"><strong>Exit gate</strong><span>Supported platforms pass clean install, isolation, update/rollback, soak, recovery, and regression thresholds; failures never leave stale DMA or silent corruption; one bundle identifies the first failed boundary.</span></div>
+              </div>
+              <p class="milestone-unlock"><strong>Unlocks release qualification:</strong> release approval can be based on a versioned evidence set rather than a successful laboratory demo.</p>
+            </article>
+          </div>
+        </section>
       </div>
       <div class="callout caution top-gap">
         <p>
