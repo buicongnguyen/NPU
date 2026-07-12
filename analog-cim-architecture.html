@@ -6,6 +6,7 @@
   <meta name="description" content="A technical study of Mythic's flash-based analog compute-in-memory architecture, from model quantization and array physics to ADCs, tile dataflow, and system tradeoffs.">
   <title>Mythic &amp; Analog Compute-in-Memory Architecture | NPU Study Guide</title>
   <link rel="stylesheet" href="analog-cim.css">
+  <link rel="stylesheet" href="analog-cim-architecture-detail.css">
   <script src="analog-cim-architecture.js" defer></script>
 </head>
 <body>
@@ -31,7 +32,7 @@
   <main>
     <section class="hero">
       <div class="hero-copy">
-        <p class="eyebrow">Research snapshot <span data-research-date>2026-07-11</span></p>
+        <p class="eyebrow">Research snapshot <span data-research-date>2026-07-12</span></p>
         <h1>Mythic and Analog Compute-in-Memory Architecture</h1>
         <p class="lede">
           A device-to-system explanation of how a neural-network weight becomes a memory conductance, how an array
@@ -39,7 +40,10 @@
           and dataflow determine whether the elegant physics becomes an efficient product.
         </p>
         <div class="hero-actions">
-          <a class="button" href="#signal-path">Trace the signal path</a>
+          <a class="button" href="#matmul-execution">Follow one MatMul</a>
+          <a class="button secondary" href="#control-sequence">See who controls it</a>
+          <a class="button secondary" href="#matmul-partitioning">See array partitioning</a>
+          <a class="button secondary" href="#signal-path">Trace the signal path</a>
           <a class="button secondary" href="analog-cim-evidence.html">Test the accuracy claim</a>
           <a class="button secondary" href="analog-cim-scaleout-llm.html">Scale to an LLM mesh</a>
           <a class="button secondary" href="analog-cim-quiz.html">Practice MCQs</a>
@@ -122,6 +126,265 @@
       </div>
     </section>
 
+    <section class="section" id="matmul-execution">
+      <div class="section-heading">
+        <p class="eyebrow">From tensor operation to physical math</p>
+        <h2>A framework MatMul becomes repeated analog matrix-vector operations</h2>
+        <p class="section-note">
+          Software usually presents a matrix-matrix operation. A conductance array naturally evaluates one input
+          vector against a resident weight matrix. Batch rows, oversized dimensions, signs, and additional bits are
+          handled through repeated firings, parallel arrays, and digital reconstruction.
+        </p>
+      </div>
+
+      <div class="architecture-term-strip" aria-label="MatMul execution terminology">
+        <span><abbr title="General Matrix Multiplication">GEMM</abbr>: matrix by matrix</span>
+        <span><abbr title="Matrix-Vector Multiplication">MVM</abbr>: one vector by resident weights</span>
+        <span><abbr title="Multiply-Accumulate">MAC</abbr>: one product added to a sum</span>
+        <span><strong>Row driver</strong>: presents an activation to array rows</span>
+        <span><strong>Column readout</strong>: senses a dot-product result</span>
+        <span><strong>Partial sum</strong>: one contribution to a larger output</span>
+        <span><strong>Sequencer</strong>: hardware that times drivers, sampling, and conversion</span>
+      </div>
+
+      <div class="callout execution-answer">
+        <h3>Short answer: where does the MatMul happen?</h3>
+        <p>
+          For <code>C[B,N] = A[B,K] x W[K,N]</code>, the compiler places blocks of <code>W</code> into conductance
+          arrays. For each batch row <code>A[b,:]</code>, input circuitry drives a vector onto array rows. Each memory
+          cell performs the physical product <code>V<sub>i</sub>G<sub>ij</sub></code>; each column wire and sensing
+          circuit accumulates those products; the ADC creates digital partial results; and nearby digital logic
+          subtracts signed paths, combines bit planes and array partitions, applies scale and bias, and stores or routes
+          <code>C[b,:]</code>. The RISC-V controller schedules this work; it does not execute the bulk analog MACs.
+        </p>
+      </div>
+
+      <div class="matmul-shape-flow" role="group" aria-label="Matrix multiplication decomposed into matrix-vector operations">
+        <article><b>Input</b><strong><code>A[B,K]</code></strong><span><code>B</code> activation vectors, each with <code>K</code> elements</span></article>
+        <article><b>Resident weights</b><strong><code>W[K,N]</code></strong><span><code>K</code> physical rows by <code>N</code> logical outputs before tiling</span></article>
+        <article><b>Array primitive</b><strong><code>a<sub>b</sub>[K] x W[K,N]</code></strong><span>One logical MVM per batch row, possibly split across arrays and bit phases</span></article>
+        <article><b>Result</b><strong><code>C[B,N]</code></strong><span>Stack or stream the reconstructed <code>N</code>-element output vectors</span></article>
+      </div>
+      <p class="shape-convention-note"><strong>Layout convention:</strong> these diagrams use the mathematical form <code>A[B,K] x W[K,N]</code>. A framework may store a linear-layer weight as <code>W[N,K]</code> and request an implicit transpose. The importer and compiler must normalize that storage convention before physical mapping.</p>
+
+      <div class="lifecycle-pair">
+        <article class="lifecycle-lane weight-lifecycle">
+          <b>Deployment or model change</b>
+          <strong>Weight path is rare and stateful</strong>
+          <div><span>Quantized weights</span><i>&rarr;</i><span>Physical mapping</span><i>&rarr;</i><span>Program + verify</span><i>&rarr;</i><span>Resident conductance handle</span></div>
+          <p>Programming may require write pulses, verify reads, remapping, and calibration. It is not repeated for every inference.</p>
+        </article>
+        <article class="lifecycle-lane activation-lifecycle">
+          <b>Every inference or token</b>
+          <strong>Activation path is streamed</strong>
+          <div><span>Input tensor</span><i>&rarr;</i><span>DMA / NoC</span><i>&rarr;</i><span>Local SRAM</span><i>&rarr;</i><span>Array + ADC</span><i>&rarr;</i><span>Digital result</span></div>
+          <p>Activations, partial sums, and outputs move. Correct mapping tries to keep the much larger weight population stationary.</p>
+        </article>
+      </div>
+
+      <figure class="execution-flow-figure" aria-labelledby="execution-flow-caption">
+        <figcaption id="execution-flow-caption">
+          <strong>One ACiM MatMul execution path</strong>
+          <span>The lanes distinguish orchestration, movement, physical computation, and digital reconstruction.</span>
+        </figcaption>
+        <div class="execution-legend" aria-label="Execution responsibility legend">
+          <span class="legend-control">Control</span>
+          <span class="legend-movement">Transfer / storage</span>
+          <span class="legend-analog">Analog math</span>
+          <span class="legend-digital">Digital math</span>
+          <span class="legend-state">Persistent state</span>
+        </div>
+        <div class="execution-lane control-flow">
+          <b class="lane-title">Control</b>
+          <article><strong>Compiled artifact</strong><span>Placement, buffers, phases, routes, scales</span></article>
+          <article><strong>Host runtime</strong><span>Bind input/output and enqueue graph</span></article>
+          <article><strong>Tile controller</strong><span>Validate state and issue tile commands</span></article>
+          <article><strong>ACE sequencer</strong><span>Generate cycle-level drive, sample, ADC timing</span></article>
+        </div>
+        <div class="execution-lane movement-flow">
+          <b class="lane-title">Movement</b>
+          <article><strong>Host / sensor</strong><span>Produce activation tensor</span></article>
+          <article><strong>DMA or fabric</strong><span>Transfer aligned blocks</span></article>
+          <article><strong>NoC router</strong><span>Deliver to assigned tile</span></article>
+          <article><strong>Local SRAM</strong><span>Buffer input and output blocks</span></article>
+          <article><strong>Input registers</strong><span>Feed row-driver format</span></article>
+          <article><strong>Output SRAM</strong><span>Hold reconstructed tensor</span></article>
+          <article><strong>NoC / DMA</strong><span>Route to next layer or host</span></article>
+        </div>
+        <div class="execution-lane analog-flow">
+          <b class="lane-title">Analog math</b>
+          <article><strong>Input drive</strong><span>Voltage, pulse, duration, or digital approximation</span></article>
+          <article><strong>Memory cells</strong><span><code>I<sub>ij</sub> &asymp; V<sub>i</sub>G<sub>ij</sub></code> performs multiplication</span></article>
+          <article><strong>Column network</strong><span><code>I<sub>j</sub> &asymp; &Sigma;<sub>i</sub>I<sub>ij</sub></code> performs accumulation</span></article>
+          <article><strong>Sample / integrate</strong><span>Capture bounded analog result</span></article>
+          <article><strong>ADC / comparator</strong><span>Convert result to a digital code</span></article>
+        </div>
+        <div class="execution-lane digital-flow">
+          <b class="lane-title">Digital math</b>
+          <article><strong>Signed combine</strong><span>Subtract positive and negative paths</span></article>
+          <article><strong>Bit reconstruction</strong><span>Shift and add input or weight slices</span></article>
+          <article><strong>Partition reduction</strong><span>Add partial vectors from K shards</span></article>
+          <article><strong>Epilogue</strong><span>Scale, zero point, bias, clamp, activation</span></article>
+        </div>
+        <div class="execution-lane state-flow">
+          <b class="lane-title">State</b>
+          <article><strong>Conductances</strong><span>Resident physical weights</span></article>
+          <article><strong>Calibration</strong><span>Driver, column, ADC, scale coefficients</span></article>
+          <article><strong>Health map</strong><span>Defects, remaps, drift, temperature epoch</span></article>
+          <article><strong>Execution binding</strong><span>Validated weight and profile handles</span></article>
+        </div>
+      </figure>
+
+      <div class="array-math-layout">
+        <figure class="crossbar-figure" aria-labelledby="crossbar-caption">
+          <figcaption id="crossbar-caption"><strong>Where the parallel arithmetic physically occurs</strong><span>A small logical 3-input by 3-output example</span></figcaption>
+          <div class="crossbar-grid" role="img" aria-label="Three activation rows crossing three weight columns; each cell multiplies voltage by conductance and each column sums current">
+            <div class="crossbar-row crossbar-head"><b>Driven row</b><span>Output 0</span><span>Output 1</span><span>Output 2</span></div>
+            <div class="crossbar-row"><b><code>x<sub>0</sub> &rarr; V<sub>0</sub></code></b><span><code>V<sub>0</sub>G<sub>00</sub></code></span><span><code>V<sub>0</sub>G<sub>01</sub></code></span><span><code>V<sub>0</sub>G<sub>02</sub></code></span></div>
+            <div class="crossbar-row"><b><code>x<sub>1</sub> &rarr; V<sub>1</sub></code></b><span><code>V<sub>1</sub>G<sub>10</sub></code></span><span><code>V<sub>1</sub>G<sub>11</sub></code></span><span><code>V<sub>1</sub>G<sub>12</sub></code></span></div>
+            <div class="crossbar-row"><b><code>x<sub>2</sub> &rarr; V<sub>2</sub></code></b><span><code>V<sub>2</sub>G<sub>20</sub></code></span><span><code>V<sub>2</sub>G<sub>21</sub></code></span><span><code>V<sub>2</sub>G<sub>22</sub></code></span></div>
+            <div class="crossbar-row crossbar-sum"><b>Column result</b><span><code>&Sigma;<sub>i</sub>V<sub>i</sub>G<sub>i0</sub></code></span><span><code>&Sigma;<sub>i</sub>V<sub>i</sub>G<sub>i1</sub></code></span><span><code>&Sigma;<sub>i</sub>V<sub>i</sub>G<sub>i2</sub></code></span></div>
+            <div class="crossbar-row crossbar-adc"><b>Digital boundary</b><span>ADC 0</span><span>ADC 1</span><span>ADC 2</span></div>
+          </div>
+        </figure>
+        <div class="math-owner-list">
+          <article><b>Multiply</b><strong>Memory cell</strong><span>The programmed conductance interacts with the driven row signal. No instruction is issued for each individual multiply.</span></article>
+          <article><b>Accumulate</b><strong>Column wire and sensing circuit</strong><span>Currents or charge contributions combine by circuit behavior before conversion.</span></article>
+          <article><b>Quantize</b><strong>ADC or comparator</strong><span>The analog result becomes a bounded digital code and may require multiple conversion cycles.</span></article>
+          <article><b>Reconstruct</b><strong>SIMD, DSP, or fixed digital logic</strong><span>Signed paths, bit planes, partitions, scale, bias, and activation become the final tensor value.</span></article>
+        </div>
+      </div>
+
+      <div class="reconstruction-grid">
+        <article><b>Signed weights</b><strong><code>W &prop; G<sup>+</sup> - G<sup>-</sup></code></strong><span>Many arrays cannot represent negative conductance. Positive and negative lines or an offset representation are measured separately and combined digitally.</span></article>
+        <article><b>Multi-bit activation</b><strong><code>x = &Sigma;<sub>p</sub>2<sup>p</sup>x<sup>(p)</sup></code></strong><span>A full DAC may present a multi-level signal, or several bit/pulse phases may be fired and shifted into alignment afterward.</span></article>
+        <article><b>Multi-cell or sliced weight</b><strong><code>W = &Sigma;<sub>s</sub>2<sup>s</sup>W<sup>(s)</sup></code></strong><span>Several conductances or arrays can encode one logical weight; their ADC codes require weighted digital accumulation.</span></article>
+        <article><b>Oversized K dimension</b><strong><code>C<sub>n</sub> = &Sigma;<sub>k</sub>P<sub>k,n</sub></code></strong><span>Each K shard produces a partial output vector. A digital accumulator combines those vectors before the layer is complete.</span></article>
+      </div>
+
+      <div class="callout caution architecture-boundary-note">
+        <p>
+          <strong>Mythic evidence boundary:</strong> the public M1076 brief documents the ACE, RISC-V nano-processor,
+          SIMD processor, SRAM, and NoC router, while the Hot Chips presentation documents flash-resistor MVM,
+          digital input approximation, and ADC readout. Public material does not specify the internal ACE command
+          registers, exact sequencer, firmware ABI, per-cycle schedule, or which digital block owns every reconstruction
+          step. The diagrams above show the required architectural responsibilities and mark the most reasonable block
+          ownership without presenting an undisclosed implementation as fact.
+          <a href="https://mythic.ai/wp-content/uploads/2022/03/M1076-AMP-Product-Brief-v1.0-1.pdf">M1076 brief</a>
+          | <a href="https://old.hotchips.org/hc30/2conf/2.05_Mythic_Mythic_Hot_Chips_2018_V5.pdf">Hot Chips presentation</a>
+        </p>
+      </div>
+    </section>
+
+    <section class="section" id="control-sequence">
+      <div class="section-heading">
+        <p class="eyebrow">Control plane and data plane</p>
+        <h2>Three control timescales turn one graph operation into array pulses</h2>
+        <p class="section-note">Software chooses what should run. Firmware coordinates when resources are ready. Dedicated hardware produces the precise electrical timing.</p>
+      </div>
+
+      <div class="control-timescale-grid">
+        <article><b>Compile time</b><strong>Graph compiler</strong><span>Chooses array tiles, signed/bit representation, K/N partitions, buffer addresses, routes, digital fallback, scales, and command templates.</span></article>
+        <article><b>Command time</b><strong>Runtime and tile controller</strong><span>Validate the executable and device state, bind tensor addresses, wait for dependencies, configure resources, start work, and report completion or faults.</span></article>
+        <article><b>Cycle time</b><strong>ACE-local hardware sequencer</strong><span>Times row drive, settling, sample/integrate, ADC phases, register capture, and backpressure. Software should not toggle every switch directly.</span></article>
+      </div>
+
+      <figure class="control-sequence-figure" aria-labelledby="control-sequence-caption">
+        <figcaption id="control-sequence-caption"><strong>Sequence for one already-programmed weight tile</strong><span>Weight programming and calibration happen before this steady-state path.</span></figcaption>
+        <div class="sequence-grid" role="table" aria-label="Host to array MatMul sequence">
+          <div class="sequence-row sequence-header" role="row"><b role="columnheader">Step</b><span role="columnheader">Host runtime</span><span role="columnheader">Tile controller</span><span role="columnheader">DMA / NoC / SRAM</span><span role="columnheader">ACE + readout</span><span role="columnheader">SIMD / digital</span></div>
+          <div class="sequence-row" role="row"><b role="rowheader">1</b><span class="seq-control" role="cell"><code>enqueue(program, input, output)</code></span><span role="cell"></span><span role="cell"></span><span role="cell"></span><span role="cell"></span></div>
+          <div class="sequence-row" role="row"><b role="rowheader">2</b><span role="cell"></span><span class="seq-control" role="cell">Validate ABI, tensor bounds, resident weight handle, calibration and health epochs</span><span role="cell"></span><span role="cell"></span><span role="cell"></span></div>
+          <div class="sequence-row" role="row"><b role="rowheader">3</b><span role="cell"></span><span class="seq-control" role="cell">Issue input transfer and wait on producer event</span><span class="seq-movement" role="cell">Move activation block to local SRAM; publish input-ready credit</span><span role="cell"></span><span role="cell"></span></div>
+          <div class="sequence-row" role="row"><b role="rowheader">4</b><span role="cell"></span><span class="seq-control" role="cell">Bind row/column ranges, precision mode, phase count, output slot, and start command</span><span role="cell"></span><span role="cell"></span><span role="cell"></span></div>
+          <div class="sequence-row" role="row"><b role="rowheader">5</b><span role="cell"></span><span role="cell"></span><span class="seq-movement" role="cell">Read input register or SRAM slice for the current phase</span><span class="seq-analog" role="cell">Drive rows; cells multiply; columns accumulate; sample or integrate</span><span role="cell"></span></div>
+          <div class="sequence-row" role="row"><b role="rowheader">6</b><span role="cell"></span><span role="cell"></span><span role="cell"></span><span class="seq-analog" role="cell">Run ADC/comparator phases and latch digital column codes</span><span role="cell"></span></div>
+          <div class="sequence-row" role="row"><b role="rowheader">7</b><span role="cell"></span><span role="cell"></span><span role="cell"></span><span role="cell"></span><span class="seq-digital" role="cell">Subtract signed paths; shift/add slices; reduce K partitions; apply scale, bias, clamp, activation</span></div>
+          <div class="sequence-row" role="row"><b role="rowheader">8</b><span role="cell"></span><span class="seq-control" role="cell">Wait for the final write or route barrier, then publish output-ready and release buffer credits</span><span class="seq-movement" role="cell">Store output in SRAM, route it to the next destination, and signal transfer completion</span><span role="cell"></span><span role="cell"></span></div>
+          <div class="sequence-row" role="row"><b role="rowheader">9</b><span class="seq-control" role="cell">Observe completion or continue the captured graph</span><span class="seq-control" role="cell">Update counters; report saturation, retry, timeout, or fault state</span><span role="cell"></span><span role="cell"></span><span role="cell"></span></div>
+        </div>
+      </figure>
+
+      <div class="table-wrap responsibility-table-wrap">
+        <table class="responsibility-table">
+          <thead><tr><th scope="col">Component</th><th scope="col">Primary responsibility</th><th scope="col">Moves tensor data?</th><th scope="col">Performs math?</th><th scope="col">What must be explicit in software</th></tr></thead>
+          <tbody>
+            <tr><th scope="row">Graph compiler</th><td>Convert graph semantics into array placement, schedule, buffers, routes, and a device artifact.</td><td>No runtime transfer</td><td>Constant folding and reference analysis only</td><td>Shapes, precision, tiling, partition reductions, capability and fallback decisions.</td></tr>
+            <tr><th scope="row">Host runtime / driver</th><td>Discover the device, load artifacts, bind buffers, enqueue work, synchronize, handle faults and reset.</td><td>Requests DMA; may copy at external boundaries</td><td>CPU fallback and preprocessing when assigned</td><td>Buffer lifetime, queues, events, timeout, ABI and device-state compatibility.</td></tr>
+            <tr><th scope="row">Tile RISC-V / controller</th><td>Sequence coarse tile operations, dependencies, descriptors, local resource setup, and completion.</td><td>Commands movers; may perform scalar loads/stores</td><td>Small scalar/control work, not the bulk MVM</td><td>Command format, synchronization, firmware ownership, counters, fault and recovery behavior.</td></tr>
+            <tr><th scope="row">DMA / NoC router</th><td>Transfer activations, partial sums, commands, and outputs between host, memory, and tiles.</td><td><strong>Yes</strong></td><td>No neural-network arithmetic</td><td>Address spaces, alignment, routes, bandwidth, multicast, ordering, barriers, and backpressure.</td></tr>
+            <tr><th scope="row">Local SRAM / registers</th><td>Hold activation blocks, output slots, descriptors, temporary partial sums, and digital state.</td><td>Storage endpoint</td><td>No</td><td>Bank ownership, capacity, lifetime, double buffering, layout, and producer/consumer credits.</td></tr>
+            <tr><th scope="row">ACE-local sequencer</th><td>Generate deterministic row-drive, settling, sensing, conversion, and capture timing.</td><td>Feeds local registers and readout</td><td>Controls the circuits that perform math</td><td>Precision modes, phase counts, resource hazards, timeout, saturation, retry and telemetry contract.</td></tr>
+            <tr><th scope="row">Conductance array</th><td>Store weights and evaluate many cell products and column sums in parallel.</td><td>Weights remain in place</td><td><strong>Bulk analog multiply and accumulate</strong></td><td>Array dimensions, conductance encoding, signed mapping, defects, operating range and nonideality model.</td></tr>
+            <tr><th scope="row">ADC / readout</th><td>Sense, integrate or compare column results and produce bounded digital codes.</td><td>Creates the analog-to-digital boundary</td><td>Quantization and sometimes threshold/nonlinearity</td><td>Sharing, range, resolution, latency, energy, calibration, saturation and output format.</td></tr>
+            <tr><th scope="row">SIMD / DSP / fixed digital logic</th><td>Reconstruct slices and partitions; execute supported vector epilogues and non-array operators.</td><td>Reads/writes local buffers</td><td><strong>Digital accumulation and epilogue math</strong></td><td>ISA or kernel API, accumulator width, rounding, saturation, fusion, and fallback cost.</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="callout control-rule">
+        <p><strong>Design rule:</strong> the control processor should issue compact work descriptors and handle exceptional control. A dedicated sequencer should own repetitive cycle-level analog timing. If firmware must micromanage every input phase, ADC lane, and transfer, controller utilization and NoC traffic can erase the array's theoretical advantage.</p>
+      </div>
+    </section>
+
+    <section class="section" id="matmul-partitioning">
+      <div class="section-heading">
+        <p class="eyebrow">Mapping a real layer</p>
+        <h2>Array dimensions determine which results concatenate and which must be added</h2>
+        <p class="section-note">The compiler must distinguish four independent decompositions. Confusing an N shard with a K shard produces the wrong graph even when every local MVM is correct.</p>
+      </div>
+
+      <div class="partition-choice-grid">
+        <article><b>Split N: output columns</b><strong>Concatenate</strong><span>Each array stores a different group of output columns and receives the same activation slice. Outputs represent distinct channels and are joined side by side.</span></article>
+        <article><b>Split K: reduction rows</b><strong>Add partial vectors</strong><span>Each array stores a different K range for the same output channels. Its result is incomplete until a digital accumulator adds every K contribution.</span></article>
+        <article><b>Split B: batch or tokens</b><strong>Repeat or replicate</strong><span>Reuse one resident weight mapping over time, or duplicate weights onto additional arrays to process independent vectors concurrently.</span></article>
+        <article><b>Split precision</b><strong>Shift, scale, and add</strong><span>Spatial weight slices or temporal input phases produce weighted fragments. Digital reconstruction aligns each fragment before summation.</span></article>
+      </div>
+
+      <div class="mapping-example-layout">
+        <figure class="partition-figure" aria-labelledby="partition-caption">
+          <figcaption id="partition-caption"><strong>Example: <code>A[2,3072] x W[3072,4096]</code></strong><span>Hypothetical logical array capacity: 1024 rows by 1024 columns</span></figcaption>
+          <div class="partition-matrix" role="img" aria-label="Weight matrix split into three K row groups and four N column groups, requiring twelve array blocks">
+            <div class="partition-corner">W blocks</div><div class="partition-axis">N0</div><div class="partition-axis">N1</div><div class="partition-axis">N2</div><div class="partition-axis">N3</div>
+            <div class="partition-axis">K0</div><div>W00</div><div>W01</div><div>W02</div><div>W03</div>
+            <div class="partition-axis">K1</div><div>W10</div><div>W11</div><div>W12</div><div>W13</div>
+            <div class="partition-axis">K2</div><div>W20</div><div>W21</div><div>W22</div><div>W23</div>
+          </div>
+        </figure>
+        <div class="mapping-steps">
+          <article><b>1</b><strong>Tile the weight matrix</strong><span><code>ceil(3072/1024) x ceil(4096/1024) = 3 x 4 = 12</code> logical weight blocks, before sign and bit-slice expansion.</span></article>
+          <article><b>2</b><strong>Slice and broadcast one input row</strong><span>Split <code>A[b,:]</code> into K0, K1, and K2. Broadcast each slice to the four arrays in its K row.</span></article>
+          <article><b>3</b><strong>Run twelve local MVMs</strong><span>With enough independent hardware they can run in parallel; otherwise schedule waves under ADC, NoC, SRAM, power, and thermal constraints.</span></article>
+          <article><b>4</b><strong>Reduce along K</strong><span>For each N group, add <code>P0n + P1n + P2n</code> into one 1024-element output block.</span></article>
+          <article><b>5</b><strong>Concatenate along N</strong><span>Join the four reduced blocks to form one 4096-element row of <code>C</code>.</span></article>
+          <article><b>6</b><strong>Handle B=2</strong><span>Repeat for the second row or use a replicated weight mapping. Then stack both result rows into <code>C[2,4096]</code>.</span></article>
+        </div>
+      </div>
+
+      <div class="partition-dataflow" role="group" aria-label="Partitioned MatMul reduction and concatenation flow">
+        <article><b>Input slices</b><strong><code>x[K0], x[K1], x[K2]</code></strong><span>Per-inference data</span></article>
+        <article><b>12 resident blocks</b><strong><code>W[k,n]</code></strong><span>Array-local MVMs</span></article>
+        <article><b>K reductions</b><strong><code>y[n] = &Sigma;<sub>k</sub>P[k,n]</code></strong><span>Four digital partial-sum accumulators</span></article>
+        <article><b>N concatenate</b><strong><code>y = [y0 | y1 | y2 | y3]</code></strong><span>One 4096-element output vector</span></article>
+      </div>
+
+      <div class="card-grid two mapping-notes">
+        <article class="learning-card"><span class="card-label">Convolution</span><h3>Filters become matrix columns</h3><p>Flatten each receptive-field patch across kernel height, kernel width, and input channels into a K-vector. Map output-channel filters to N columns. Stream patches as repeated MVM inputs, then reshape output vectors back to spatial feature maps.</p></article>
+        <article class="learning-card"><span class="card-label">Transformer</span><h3>Linear projections dominate the analog-friendly part</h3><p>Q, K, V, output, and MLP projections are dense MatMuls and can use the same decomposition. Attention score MatMul, softmax, normalization, dynamic KV-cache access, and control generally require the digital companion or another engine.</p></article>
+      </div>
+
+      <div class="callout partition-source-note">
+        <p>
+          Mythic's mapping patent describes partitioning coefficients across multiple arrays, applying inputs, combining
+          outputs, positive/negative paths, multi-row inputs, and serial multi-step input handling. NeuRRAM independently
+          demonstrates the same system need: layers larger than an array are segmented across cores, with intermediate
+          buffers and partial-sum accumulation outside the array in the reported prototype.
+          <a href="https://patents.google.com/patent/US12406021B2/en">Mythic mapping patent</a>
+          | <a href="https://doi.org/10.1038/s41586-022-04992-8">NeuRRAM measured-silicon paper</a>
+        </p>
+      </div>
+    </section>
+
     <section class="section" id="signal-path">
       <div class="section-heading">
         <p class="eyebrow">Interactive architecture map</p>
@@ -137,24 +400,26 @@
     <section class="section" id="mythic-tile">
       <div class="section-heading">
         <p class="eyebrow">Mythic case study</p>
-        <h2>The disclosed M1076 tile is mixed signal, not purely analog</h2>
+        <h2>The disclosed M1076 tile separates bulk analog math from digital orchestration</h2>
         <p class="section-note">
-          The analog compute engine accelerates dense matrix work. A local digital subsystem keeps control, nonlinear,
-          stateful, and unsupported operations close to the weights and activations.
+          The product brief says every tile is driven by a Mythic ACE containing flash weight storage and analog
+          matrix-multiplication circuits, beside a RISC-V nano-processor, SIMD processor, SRAM, and NoC router. The
+          exact internal command and reconstruction boundary is not public, so the responsibilities below distinguish
+          documented blocks from the architectural role they are best suited to perform.
         </p>
       </div>
       <div class="card-grid two">
         <div class="tile-flow" aria-label="Mythic M1076 tile block diagram">
           <article class="tile-block ace">
             <strong>Mythic ACE</strong>
-            <span>Embedded flash weight array</span>
-            <span>Analog matrix multiplication</span>
-            <span>Readout and ADC boundary</span>
+            <span>Embedded flash stores resident weights</span>
+            <span>Cells and columns perform bulk MVM</span>
+            <span>Input drive, sensing, and ADC form the mixed-signal boundary</span>
           </article>
-          <article class="tile-block sram"><strong>Local SRAM</strong><span>Activations, buffers, partial state</span></article>
-          <article class="tile-block simd"><strong>16-bit SIMD</strong><span>Vector and post-processing work</span></article>
-          <article class="tile-block risc"><strong>32-bit RISC-V</strong><span>Sequencing and control</span></article>
-          <article class="tile-block router"><strong>NoC router</strong><span>Deterministic activation flow between tiles</span></article>
+          <article class="tile-block sram"><strong>Local SRAM</strong><span>Per-inference activations, outputs, descriptors, and temporary state</span></article>
+          <article class="tile-block simd"><strong>16-bit SIMD</strong><span>Digital vector and post-processing work; exact operator allocation is not public</span></article>
+          <article class="tile-block risc"><strong>32-bit RISC-V</strong><span>Tile sequencing and control, not the bulk array MACs</span></article>
+          <article class="tile-block router"><strong>NoC router</strong><span>Moves activations, results, commands, and events between tiles</span></article>
         </div>
         <div>
           <div class="callout caution">
@@ -169,6 +434,7 @@
             Mythic's May 2026 Videantis acquisition also makes the hybrid boundary explicit: analog for dense AI matrix
             operations, unified digital compute for attention, signal processing, codecs, SLAM, control, and programmability.
           </p>
+          <p><a href="#control-sequence">Follow the controller-to-array execution sequence</a></p>
         </div>
       </div>
       <div id="mythic-metrics" class="metric-grid" style="margin-top:14px" aria-label="Mythic disclosed metrics"></div>
@@ -263,7 +529,7 @@
   </main>
 
   <footer class="site-footer">
-    <p>Original study synthesis. Research snapshot: <span data-research-date>2026-07-11</span>.</p>
+    <p>Original study synthesis. Research snapshot: <span data-research-date>2026-07-12</span>.</p>
     <div class="footer-links">
       <a href="analog-cim-evidence.html">Next: evidence</a>
       <a href="https://github.com/buicongnguyen/NPU">Source</a>
