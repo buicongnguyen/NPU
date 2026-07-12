@@ -42,6 +42,7 @@
         <div class="hero-actions">
           <a class="button" href="#matmul-execution">Follow one MatMul</a>
           <a class="button secondary" href="#control-sequence">See who controls it</a>
+          <a class="button secondary" href="#engine-owner-map">Compare engine owners</a>
           <a class="button secondary" href="#matmul-partitioning">See array partitioning</a>
           <a class="button secondary" href="#signal-path">Trace the signal path</a>
           <a class="button secondary" href="analog-cim-evidence.html">Test the accuracy claim</a>
@@ -324,6 +325,100 @@
 
       <div class="callout control-rule">
         <p><strong>Design rule:</strong> the control processor should issue compact work descriptors and handle exceptional control. A dedicated sequencer should own repetitive cycle-level analog timing. If firmware must micromanage every input phase, ADC lane, and transfer, controller utilization and NoC traffic can erase the array's theoretical advantage.</p>
+      </div>
+    </section>
+
+    <section class="section" id="engine-owner-map">
+      <div class="section-heading">
+        <p class="eyebrow">TT-Metal-style ownership</p>
+        <h2>Name the controller and the working engine for every data transformation</h2>
+        <p class="section-note">
+          TT-Metal is easy to reason about because its architecture names both sides of each action: a baby RISC-V
+          dispatches work, while a NoC, unpacker, FPU/SFPU, or packer performs it. An implementable ACiM architecture
+          needs the same precision instead of grouping everything under "the analog tile."
+        </p>
+      </div>
+
+      <div class="callout owner-principle">
+        <h3>Controller versus working engine</h3>
+        <p>
+          Tenstorrent documents five baby RISC-V roles per Tensix: Data Movement 0, Data Movement 1, Unpack, Math,
+          and Pack. These processors mainly dispatch and synchronize dedicated peripherals. Likewise, an ACiM tile
+          should distinguish the firmware or state machine that issues an action from the DMA, formatter, row driver,
+          memory array, ADC, or SIMD engine that actually transforms the data.
+        </p>
+      </div>
+
+      <figure class="owner-compare-figure" aria-labelledby="owner-compare-caption">
+        <figcaption id="owner-compare-caption"><strong>Equivalent execution pipelines</strong><span>Each box names the controller first and the working storage or engine second.</span></figcaption>
+        <div class="owner-pipeline tt-owner-pipeline">
+          <b class="owner-row-title">TT-Metal</b>
+          <article><small>Source</small><strong>DRAM / remote L1</strong><span>Tensor pages</span></article>
+          <article><small>Controller</small><strong>DM0 baby RISC-V</strong><span>NoC0 reader moves pages</span></article>
+          <article><small>Storage</small><strong>L1 circular buffer</strong><span>Tiled producer/consumer queue</span></article>
+          <article><small>Controller + engine</small><strong>Unpack RISC-V + unpacker</strong><span>CB tile to source registers</span></article>
+          <article><small>Controller + engine</small><strong>Math RISC-V + FPU/SFPU</strong><span>Matrix or vector arithmetic</span></article>
+          <article><small>Controller + engine</small><strong>Pack RISC-V + packer</strong><span>Destination registers to output CB</span></article>
+          <article><small>Controller</small><strong>DM1 baby RISC-V</strong><span>NoC1 writer moves result</span></article>
+          <article><small>Destination</small><strong>DRAM / next Tensix</strong><span>Stored or forwarded tiles</span></article>
+        </div>
+        <div class="owner-pipeline acim-owner-pipeline">
+          <b class="owner-row-title">ACiM</b>
+          <article><small>Source</small><strong>Host / LPDDR / sensor</strong><span>Quantized activation block</span></article>
+          <article><small>Controller + engine</small><strong>Tile controller + DMA/NoC</strong><span>Move activation to local tile</span></article>
+          <article><small>Storage</small><strong>Local SRAM / input queue</strong><span>Array-native row and phase order</span></article>
+          <article><small>Controller + engine</small><strong>Input sequencer + formatter/driver</strong><span>Bits, pulses, duration, or levels</span></article>
+          <article><small>Working engine</small><strong>Flash array + column network</strong><span>Cell multiply and column accumulate</span></article>
+          <article><small>Working engine</small><strong>Readout + ADC</strong><span>Analog result to digital code</span></article>
+          <article><small>Controller + engine</small><strong>Digital scheduler + SIMD/DSP</strong><span>Signed, slice, partial-sum, epilogue math</span></article>
+          <article><small>Destination</small><strong>Output SRAM + DMA/NoC</strong><span>Next tile, LPDDR, or host</span></article>
+        </div>
+      </figure>
+
+      <div class="table-wrap engine-owner-table-wrap">
+        <table class="engine-owner-table">
+          <thead><tr><th scope="col">Execution stage</th><th scope="col">TT-Metal documented owner</th><th scope="col">Required ACiM owner</th><th scope="col">Data before &rarr; after</th><th scope="col">Mythic public status</th></tr></thead>
+          <tbody>
+            <tr><th scope="row">1. Dispatch</th><td>Host command queue and device dispatch, followed by reader/compute/writer kernels.</td><td>Host runtime, device scheduler, and tile RISC-V or equivalent controller.</td><td>Graph invocation &rarr; validated tile commands</td><td><span class="owner-status owner-partial">Partial</span> RISC-V and dataflow scheduling are disclosed; command queues and firmware ABI are not.</td></tr>
+            <tr><th scope="row">2. Input transfer</th><td>DM0 baby RISC-V issues NoC0 reads into L1 circular buffers.</td><td>DMA/NoC mover controlled by a tile or global scheduler.</td><td>External activation layout &rarr; local SRAM block</td><td><span class="owner-status owner-partial">Partial</span> SRAM and router are disclosed; DMA ownership and queue protocol are not.</td></tr>
+            <tr><th scope="row">3. Local buffering</th><td>L1 circular buffers expose reserve, push, wait, and pop producer/consumer semantics.</td><td>Input/output queues or ping-pong SRAM banks with credits and events.</td><td>Transferred bytes &rarr; array-consumable block</td><td><span class="owner-status owner-unknown">Unknown</span> SRAM exists, but public buffer topology, bank map, and synchronization primitives are absent.</td></tr>
+            <tr><th scope="row">4. Input formatting</th><td>Unpack baby RISC-V dispatches the unpacker to move tiles into compute source registers.</td><td>Formatter, bit-plane generator, input registers, and row driver controlled by an input sequencer.</td><td>Integer activation block &rarr; physical row-drive phases</td><td><span class="owner-status owner-partial">Partial</span> Historical digital input approximation is disclosed; exact owner, format, and timing are not.</td></tr>
+            <tr><th scope="row">5. Bulk compute</th><td>Math baby RISC-V dispatches matrix FPU or vector SFPU operations.</td><td>ACE-local sequencer fires the programmed conductance array and column network.</td><td>Row signals + resident weights &rarr; analog column results</td><td><span class="owner-status owner-known">Documented primitive</span> ACE stores weights and performs matrix multiplication; the internal sequencer is not disclosed.</td></tr>
+            <tr><th scope="row">6. Conversion</th><td>Digital destination registers remain inside the compute path before packing.</td><td>Sample/integrate circuit, ADC or comparator, and output-code registers.</td><td>Analog column state &rarr; bounded digital codes</td><td><span class="owner-status owner-partial">Partial</span> ADC readout is disclosed historically; lane sharing, range modes, and register interface are not.</td></tr>
+            <tr><th scope="row">7. Reconstruction</th><td>Math and Pack paths produce the final tile format; SFPU handles supported vector work.</td><td>SIMD, DSP, fixed logic, or controller-assisted code for signed subtraction, shift/add, K reduction, scale, bias, and activation.</td><td>ADC codes &rarr; framework-equivalent output values</td><td><span class="owner-status owner-unknown">Unknown allocation</span> SIMD is disclosed, but exact reconstruction ownership and accumulator contract are not.</td></tr>
+            <tr><th scope="row">8. Output transfer</th><td>Pack writes an output circular buffer; DM1 issues NoC1 writes to DRAM or another core.</td><td>Output SRAM/queue, egress DMA/NoC mover, completion barrier, and consumer event.</td><td>Local output block &rarr; next tile or host tensor</td><td><span class="owner-status owner-partial">Partial</span> SRAM and router are disclosed; output queue, mover, ordering, and event semantics are not.</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="owner-summary-grid">
+        <article><b>Known</b><strong>Where bulk math happens</strong><span>The ACE flash array and analog circuits store weights and perform matrix multiplication. The RISC-V and SIMD are separate digital blocks.</span></article>
+        <article><b>Reasonable architecture</b><strong>How it should be controlled</strong><span>A tile controller issues coarse descriptors; dedicated sequencers and movers own repetitive timing and transfers; SIMD/DSP owns explicit digital reconstruction.</span></article>
+        <article><b>Still required</b><strong>Which exact block owns each boundary</strong><span>The hardware team must publish registers, queues, formats, events, SRAM maps, converter resources, timing hazards, and telemetry.</span></article>
+      </div>
+
+      <div class="subsection-heading engine-contract-heading">
+        <p class="eyebrow">Minimum executable hardware contract</p>
+        <h3>Information needed to turn the owner map into compiler, firmware, and runtime code</h3>
+      </div>
+      <div class="engine-contract-grid">
+        <article><code>TileResourceDescriptor</code><strong>Enumerate working engines</strong><span>Array regions, SRAM banks, DMA channels, NoC ports, input formatters, row drivers, ADC groups, SIMD/DSP units, controllers, and reset domains.</span></article>
+        <article><code>MvmCommand</code><strong>Define one launch descriptor</strong><span>Weight handle, input/output addresses, K/N ranges, input encoding, sign and slice mode, ADC range, phase count, accumulator target, dependency, and completion event.</span></article>
+        <article><code>BufferLayout</code><strong>Specify every data form</strong><span>Host tensor, transfer block, SRAM layout, row-drive order, bit planes, ADC-code packing, accumulator width, final tensor layout, alignment, and padding.</span></article>
+        <article><code>EngineSchedule</code><strong>State legal overlap and hazards</strong><span>Which DMA, array, ADC, SIMD, and NoC operations can overlap; which share banks, converters, power rails, command FIFOs, or calibration state.</span></article>
+        <article><code>SyncProtocol</code><strong>Name producer and consumer rules</strong><span>Queue depth, reserve/publish/wait/release operations, memory barriers, events, timeouts, cancellation, reset, and behavior after partial completion.</span></article>
+        <article><code>PerformanceCounters</code><strong>Make ownership debuggable</strong><span>Controller busy, input-starved, SRAM conflict, row-drive, array-active, ADC-busy, saturation, retry, SIMD-busy, NoC-stall, output-blocked, power, and temperature counters.</span></article>
+      </div>
+
+      <div class="callout caution owner-evidence-note">
+        <p>
+          <strong>Why the unknown labels matter:</strong> a software stack cannot safely decide tiling, double buffering,
+          prefetch, queue depth, or overlap until these ownership and resource contracts are measured or specified. A
+          simulator may begin with explicit assumptions, but the production compiler must target the real data path.
+          <a href="https://github.com/tenstorrent/tt-metal/blob/main/METALIUM_GUIDE.md">TT-Metalium architecture guide</a>
+          | <a href="https://docs.tenstorrent.com/tt-metal/latest/tt-metalium/tt_metal/examples/matmul_single_core.html">TT-Metalium MatMul example</a>
+          | <a href="https://mythic.ai/wp-content/uploads/2022/03/M1076-AMP-Product-Brief-v1.0-1.pdf">Mythic M1076 product brief</a>
+        </p>
       </div>
     </section>
 

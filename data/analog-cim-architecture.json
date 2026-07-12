@@ -205,6 +205,22 @@
   ],
   "sources": [
     {
+      "id": "tt-metalium-guide",
+      "title": "TT Architecture and Metalium Guide",
+      "publisher": "Tenstorrent",
+      "year": 2026,
+      "type": "Official architecture and programming guide",
+      "url": "https://github.com/tenstorrent/tt-metal/blob/main/METALIUM_GUIDE.md"
+    },
+    {
+      "id": "tt-metalium-matmul",
+      "title": "TT-Metalium Single-Core MatMul",
+      "publisher": "Tenstorrent",
+      "year": 2026,
+      "type": "Official programming example",
+      "url": "https://docs.tenstorrent.com/tt-metal/latest/tt-metalium/tt_metal/examples/matmul_single_core.html"
+    },
+    {
       "id": "mythic-analog",
       "title": "Analog Computing",
       "publisher": "Mythic",
