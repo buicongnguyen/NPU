@@ -6,8 +6,8 @@
   <meta name="description" content="A technical study of Mythic's flash-based analog compute-in-memory architecture, from model quantization and array physics to ADCs, tile dataflow, and system tradeoffs.">
   <title>Mythic &amp; Analog Compute-in-Memory Architecture | NPU Study Guide</title>
   <link rel="stylesheet" href="analog-cim.css">
-  <link rel="stylesheet" href="analog-cim-architecture-detail.css?v=2026-07-12-engine-owner-map">
-  <script src="analog-cim-architecture.js?v=2026-07-12-engine-owner-map" defer></script>
+  <link rel="stylesheet" href="analog-cim-architecture-detail.css?v=2026-07-12-noc-congestion">
+  <script src="analog-cim-architecture.js?v=2026-07-12-noc-congestion" defer></script>
 </head>
 <body>
   <header class="site-header">
@@ -44,6 +44,7 @@
           <a class="button secondary" href="#control-sequence">See who controls it</a>
           <a class="button secondary" href="#engine-owner-map">Compare engine owners</a>
           <a class="button secondary" href="#matmul-partitioning">See array partitioning</a>
+          <a class="button secondary" href="#noc-congestion">Diagnose NoC congestion</a>
           <a class="button secondary" href="#signal-path">Trace the signal path</a>
           <a class="button secondary" href="analog-cim-evidence.html">Test the accuracy claim</a>
           <a class="button secondary" href="analog-cim-scaleout-llm.html">Scale to an LLM mesh</a>
@@ -476,6 +477,165 @@
           buffers and partial-sum accumulation outside the array in the reported prototype.
           <a href="https://patents.google.com/patent/US12406021B2/en">Mythic mapping patent</a>
           | <a href="https://doi.org/10.1038/s41586-022-04992-8">NeuRRAM measured-silicon paper</a>
+        </p>
+      </div>
+    </section>
+
+    <section class="section" id="noc-congestion">
+      <div class="section-heading">
+        <p class="eyebrow">Communication limits and asynchronous execution</p>
+        <h2>More array tiles can reduce performance after the NoC saturates</h2>
+        <p class="section-note">
+          Resident weights remove repeated weight fetches, but activations, ADC codes, partial sums, outputs, commands,
+          and synchronization still move. The compiler must therefore treat NoC links, router ports, SRAM banks, and
+          consumers as bounded resources rather than assuming that every mapped array can fire simultaneously.
+        </p>
+      </div>
+
+      <div class="noc-term-strip" aria-label="NoC and asynchronous execution terminology">
+        <span><abbr title="Network-on-Chip">NoC</abbr>: packet fabric connecting on-chip blocks</span>
+        <span><abbr title="Direct Memory Access">DMA</abbr>: transfer engine that moves blocks without CPU copies</span>
+        <span><abbr title="Virtual Channel">VC</abbr>: logical queue sharing a physical NoC link</span>
+        <span><strong>Backpressure</strong>: a full downstream resource makes upstream senders wait</span>
+        <span><strong>Credit</strong>: permission proving that destination capacity is available</span>
+        <span><strong>Barrier / event</strong>: ordering or completion condition between asynchronous operations</span>
+      </div>
+
+      <div class="callout noc-short-answer">
+        <h3>Short answer: async hides latency; it does not create bandwidth</h3>
+        <p>
+          Let <code>R<sub>offered</sub></code> be activation fan-out, partial-sum, output, command, and event traffic
+          injected per second. When it approaches the effective rate of the busiest link, router output, SRAM port, or
+          consumer, queues grow. Once buffers fill, backpressure stalls DMA and tile controllers. Double buffering can
+          absorb a temporary mismatch, but a sustained <code>R<sub>offered</sub> &ge; R<sub>service</sub></code> remains
+          a bandwidth problem.
+        </p>
+      </div>
+
+      <div class="noc-tiling-grid">
+        <article>
+          <b>Split M: independent rows or tokens</b>
+          <strong>Usually the least cross-core communication</strong>
+          <span>Each shard computes different output rows. This is attractive when batch or token parallelism exists, but autoregressive LLM decode often has only one current token per sequence.</span>
+        </article>
+        <article>
+          <b>Split N: output columns</b>
+          <strong>Activation fan-out</strong>
+          <span>Every N shard needs the same K activation slice. Multicast reduces repeated source injection, although replicated traffic still consumes branch links and receiver bandwidth.</span>
+        </article>
+        <article>
+          <b>Split K: reduction rows</b>
+          <strong>Partial-sum traffic</strong>
+          <span>Every K shard emits an incomplete result for the same output channels. Those vectors must meet at local accumulators, a reduction tree, or a shared digital engine.</span>
+        </article>
+        <article>
+          <b>Split precision</b>
+          <strong>More phases and fragments</strong>
+          <span>Input bits, signed paths, or weight slices can generate several ADC result fragments. Reconstruct them near the array or pay extra NoC traffic and synchronization.</span>
+        </article>
+      </div>
+
+      <figure class="noc-topology-figure" aria-labelledby="noc-topology-caption">
+        <figcaption id="noc-topology-caption">
+          <strong>Traffic created by a <code>P<sub>K</sub> x P<sub>N</sub></code> weight mapping</strong>
+          <span>N partitioning fans one activation slice outward; K partitioning brings partial results back together.</span>
+        </figcaption>
+        <div class="noc-topology" role="img" aria-label="Activation SRAM multicasts K slices to a three by four ACiM tile grid; partial results reduce vertically for each N output group">
+          <div class="noc-source-block"><small>Source SRAM</small><strong><code>x[K0], x[K1], x[K2]</code></strong><span>One input vector</span></div>
+          <div class="noc-direction"><b>&rarr;</b><span>Multicast each K slice across N</span></div>
+          <div class="noc-array-grid">
+            <div class="noc-axis-corner">Arrays</div><div class="noc-axis">N0</div><div class="noc-axis">N1</div><div class="noc-axis">N2</div><div class="noc-axis">N3</div>
+            <div class="noc-axis">K0</div><div>W00</div><div>W01</div><div>W02</div><div>W03</div>
+            <div class="noc-axis">K1</div><div>W10</div><div>W11</div><div>W12</div><div>W13</div>
+            <div class="noc-axis">K2</div><div>W20</div><div>W21</div><div>W22</div><div>W23</div>
+          </div>
+          <div class="noc-direction"><b>&rarr;</b><span>Reduce partials along K</span></div>
+          <div class="noc-reducer-block"><small>Digital reduction</small><strong><code>y[n] = P0n + P1n + P2n</code></strong><span>Four final N blocks</span></div>
+        </div>
+        <p class="figure-note">
+          A useful first-order model is <code>traffic = activation fan-out + K-partial reductions + final outputs + protocol overhead</code>.
+          Small tiles increase headers, descriptors, events, and barriers per useful byte; poor placement adds long shared routes and hotspots.
+        </p>
+      </figure>
+
+      <figure class="congestion-figure" aria-labelledby="congestion-caption">
+        <figcaption id="congestion-caption">
+          <strong>How congestion becomes an array stall</strong>
+          <span>A correct bounded design normally slows producers instead of dropping tensor data.</span>
+        </figcaption>
+        <div class="congestion-chain">
+          <article><b>1</b><strong>Many producers issue traffic</strong><span>DMA reads, multicast, partial sums, outputs, commands</span></article>
+          <article><b>2</b><strong>A shared resource saturates</strong><span>NoC link, router output, destination SRAM port, ADC or reducer</span></article>
+          <article><b>3</b><strong>Queues and circular buffers fill</strong><span>Outstanding requests can no longer retire at the issue rate</span></article>
+          <article><b>4</b><strong>Backpressure moves upstream</strong><span>Writers lose credits; DMA and dispatch wait</span></article>
+          <article><b>5</b><strong>The compute pipeline bubbles</strong><span>Array is input-starved or output-blocked; latency and energy rise</span></article>
+        </div>
+      </figure>
+
+      <div class="subsection-heading async-heading">
+        <p class="eyebrow">Safe overlap</p>
+        <h3>Bound every asynchronous pipeline with ownership, completion, and credits</h3>
+      </div>
+      <div class="async-layout">
+        <figure class="async-timeline-figure" aria-labelledby="async-timeline-caption">
+          <figcaption id="async-timeline-caption"><strong>Desired steady-state overlap</strong><span>Different tiles occupy independent engines at the same time.</span></figcaption>
+          <div class="async-timeline" role="table" aria-label="Pipeline overlap across four time windows">
+            <div class="async-row async-header" role="row"><b role="columnheader">Engine</b><span role="columnheader">t0</span><span role="columnheader">t1</span><span role="columnheader">t2</span><span role="columnheader">t3</span></div>
+            <div class="async-row" role="row"><b role="rowheader">Input DMA</b><span class="active-move">Tile 0</span><span class="active-move">Tile 1</span><span class="active-move">Tile 2</span><span class="active-move">Tile 3</span></div>
+            <div class="async-row" role="row"><b role="rowheader">MVM + ADC</b><span></span><span class="active-analog">Tile 0</span><span class="active-analog">Tile 1</span><span class="active-analog">Tile 2</span></div>
+            <div class="async-row" role="row"><b role="rowheader">SIMD / reduce</b><span></span><span></span><span class="active-digital">Tile 0</span><span class="active-digital">Tile 1</span></div>
+            <div class="async-row" role="row"><b role="rowheader">Output DMA</b><span></span><span></span><span></span><span class="active-output">Tile 0</span></div>
+          </div>
+          <p class="figure-note"><code>T<sub>tile</sub> &ge; max(T<sub>input</sub>, T<sub>MVM+ADC</sub>, T<sub>digital</sub>, T<sub>output</sub>)</code> only when those stages use sufficiently independent resources. Shared NoC links couple input and output time.</p>
+        </figure>
+
+        <figure class="async-protocol-figure" aria-labelledby="async-protocol-caption">
+          <figcaption id="async-protocol-caption"><strong>One bounded producer-consumer transaction</strong><span>Publish validity only after payload completion.</span></figcaption>
+          <div class="async-protocol">
+            <article><b>1</b><strong>Reserve destination slot</strong><span>Consumer credit proves SRAM capacity exists.</span></article>
+            <article><b>2</b><strong>Issue async DMA / NoC transfer</strong><span>Keep the source and destination buffers alive.</span></article>
+            <article><b>3</b><strong>Wait or record completion</strong><span>A transfer barrier orders the payload before its ready event.</span></article>
+            <article><b>4</b><strong>Publish tile-ready</strong><span>The array sequencer may now consume the slot.</span></article>
+            <article><b>5</b><strong>Complete MVM, ADC, and digital work</strong><span>Record consumer-done after the last read or write.</span></article>
+            <article><b>6</b><strong>Release and reuse</strong><span>Return the credit; only now overwrite the ping-pong slot.</span></article>
+          </div>
+        </figure>
+      </div>
+
+      <div class="table-wrap noc-problem-table-wrap">
+        <table class="noc-problem-table">
+          <thead><tr><th scope="col">Problem</th><th scope="col">What goes wrong</th><th scope="col">Observable symptom</th><th scope="col">Implementation control</th></tr></thead>
+          <tbody>
+            <tr><th scope="row">Activation fan-out</th><td>Repeated unicast injects the same K slice once per N shard.</td><td>Source link or SRAM-read port saturates while receivers remain unevenly utilized.</td><td>Multicast once, place receivers along short routes, and reserve every receiver before transmission.</td></tr>
+            <tr><th scope="row">K-partial convergence</th><td>Many arrays send vectors to one reducer or output SRAM bank.</td><td>Reducer busy, destination-bank conflicts, output-blocked array cycles.</td><td>Reduce locally, use a tree, distribute accumulators, and fuse scale or epilogue before egress.</td></tr>
+            <tr><th scope="row">Too many small tiles</th><td>Headers, descriptors, events, and barriers dominate useful payload.</td><td>High command rate and low payload bandwidth despite busy routers.</td><td>Coalesce transfers, enlarge useful work per launch, cache command templates, and avoid unnecessary precision fragments.</td></tr>
+            <tr><th scope="row">Burst synchronization</th><td>All cores inject at the same phase and contend for the same links.</td><td>Periodic queue-depth spikes and long tail latency.</td><td>Schedule waves, stagger launches, cap in-flight work, or map traffic across independent routes.</td></tr>
+            <tr><th scope="row">Early consumption</th><td>The controller starts MVM before an asynchronous transfer completes.</td><td>Nondeterministic wrong outputs or stale activation data.</td><td>Wait on a completion event; order payload writes before publishing tile-ready.</td></tr>
+            <tr><th scope="row">Premature reuse</th><td>A producer overwrites a ping-pong slot still owned by DMA or compute.</td><td>Intermittent corruption that changes with timing or profiling.</td><td>Reserve/publish/wait/release semantics, bounded credits, and explicit buffer lifetimes.</td></tr>
+            <tr><th scope="row">Cross-path reordering</th><td>Data and notification use NoCs or virtual channels without a common ordering guarantee.</td><td>Ready flag observed before payload arrival.</td><td>Use documented same-path ordering where valid; otherwise add explicit NoC barriers and device events.</td></tr>
+            <tr><th scope="row">Cyclic wait</th><td>Producers hold one resource while waiting for credits owned by one another.</td><td>No forward progress, timeout, or watchdog reset.</td><td>Use a global acquisition order, separate traffic classes, bounded queues, timeout diagnostics, and reset recovery.</td></tr>
+            <tr><th scope="row">Excess synchronization</th><td>A barrier is placed after every operation, serializing independent engines.</td><td>Correct results but little DMA/MVM/output overlap.</td><td>Synchronize at ownership boundaries and true hazards, then verify overlap with timestamped counters.</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="noc-solution-grid">
+        <article><b>Compiler</b><strong>Model communication, not just MAC count</strong><span>Estimate bytes and routes for N fan-out, K reductions, precision fragments, outputs, and protocol overhead. Reject mappings whose busiest link or destination exceeds a measured utilization budget.</span></article>
+        <article><b>Runtime and firmware</b><strong>Keep async work bounded</strong><span>Use command-queue limits, credits, dependency events, transfer barriers, cancellation, timeouts, and deterministic recovery instead of allowing unlimited outstanding descriptors.</span></article>
+        <article><b>Hardware</b><strong>Expose traffic classes and telemetry</strong><span>Provide multicast, adequate virtual channels, distributed reducers, bank-aware SRAM access, queue-depth and stall counters, and independent paths where overlap is expected.</span></article>
+        <article><b>Profiler</b><strong>Identify the resource that stopped progress</strong><span>Correlate NoC bytes, link utilization, queue high-water marks, DMA busy, input-starved, output-blocked, reducer busy, and array-active cycles under one execution ID.</span></article>
+      </div>
+
+      <div class="callout caution noc-evidence-note">
+        <p>
+          <strong>Evidence boundary:</strong> Tenstorrent publicly documents asynchronous NoC operations, program order
+          for requests on the same NoC and the same virtual channel, no ordering guarantee across different NoCs or
+          virtual channels, and a semaphore-based multicast MatMul pattern in which receivers reserve space before the sender transmits. Applying those
+          mechanisms to ACiM is a design inference: the exact Mythic or iHW queue, route, barrier, and virtual-channel
+          implementation is not public.
+          <a href="https://docs.tenstorrent.com/tt-metal/latest/tt-metalium/tt_metal/apis/kernel_apis/data_movement/ordering.html">TT-Metal NoC ordering</a>
+          | <a href="https://docs.tenstorrent.com/tt-metal/latest/tt-metalium/tt_metal/labs/matmul/lab3/lab3.html">TT-Metal multicast MatMul lab</a>
+          | <a href="https://github.com/tenstorrent/tt-metal/blob/main/tech_reports/AdvancedPerformanceOptimizationsForModels/AdvancedPerformanceOptimizationsForModels.md">TT-Metal asynchronous queues and events</a>
         </p>
       </div>
     </section>

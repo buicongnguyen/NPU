@@ -162,7 +162,7 @@
     });
   }
 
-  fetch('data/analog-cim-architecture.json?v=2026-07-12-engine-owner-map')
+  fetch('data/analog-cim-architecture.json?v=2026-07-12-noc-congestion')
     .then(function (response) {
       if (!response.ok) throw new Error('HTTP ' + response.status);
       return response.json();

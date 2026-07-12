@@ -221,6 +221,30 @@
       "url": "https://docs.tenstorrent.com/tt-metal/latest/tt-metalium/tt_metal/examples/matmul_single_core.html"
     },
     {
+      "id": "tt-metalium-noc-ordering",
+      "title": "TT-Metalium NoC Request Ordering",
+      "publisher": "Tenstorrent",
+      "year": 2026,
+      "type": "Official data-movement API documentation",
+      "url": "https://docs.tenstorrent.com/tt-metal/latest/tt-metalium/tt_metal/apis/kernel_apis/data_movement/ordering.html"
+    },
+    {
+      "id": "tt-metalium-multicast",
+      "title": "TT-Metalium Multicast MatMul Lab",
+      "publisher": "Tenstorrent",
+      "year": 2026,
+      "type": "Official programming lab",
+      "url": "https://docs.tenstorrent.com/tt-metal/latest/tt-metalium/tt_metal/labs/matmul/lab3/lab3.html"
+    },
+    {
+      "id": "tt-metalium-async-queues",
+      "title": "Advanced Performance Optimizations for Models",
+      "publisher": "Tenstorrent",
+      "year": 2026,
+      "type": "Official technical report",
+      "url": "https://github.com/tenstorrent/tt-metal/blob/main/tech_reports/AdvancedPerformanceOptimizationsForModels/AdvancedPerformanceOptimizationsForModels.md"
+    },
+    {
       "id": "mythic-analog",
       "title": "Analog Computing",
       "publisher": "Mythic",
