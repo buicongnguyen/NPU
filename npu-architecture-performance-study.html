@@ -1,0 +1,622 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="A requirement-driven study lab for NPU architecture and ISA design, Conv/GEMM/Attention optimization, performance verification, hardware-software co-design, productization, and SystemC/TLM modeling.">
+  <title>NPU Architecture &amp; Performance Study Lab | NPU Study Guide</title>
+  <link rel="stylesheet" href="analog-cim.css">
+  <link rel="stylesheet" href="npu-engineering.css">
+  <script src="npu-engineering.js" defer></script>
+</head>
+<body>
+  <header class="site-header">
+    <a class="brand" href="index.html" aria-label="NPU Study Guide home">
+      <img src="https://avatars.githubusercontent.com/u/72680210?v=4" alt="Bui Cong Nguyen avatar">
+      <span>NPU Study Guide</span>
+    </a>
+    <nav class="site-nav" aria-label="NPU engineering studies">
+      <a href="npu-architecture-performance-study.html" aria-current="page">Architecture &amp; Performance</a>
+      <a href="npu-soc-software-architecture.html">SoC Software</a>
+      <a href="npu-framework-compiler-skills.html">Framework &amp; ISA</a>
+      <a href="analog-cim-architecture.html">Analog CIM</a>
+      <a href="npu-practice.html">Practice</a>
+      <a href="index.html">NPU Home</a>
+    </nav>
+  </header>
+
+  <main>
+    <section class="hero">
+      <div class="hero-copy">
+        <p class="eyebrow">Requirement-driven study lab | updated 2026-07-16</p>
+        <h1>NPU Architecture, Operators, and Performance Verification</h1>
+        <p class="lede">
+          Learn the five capabilities as one engineering loop: turn product workloads into measurable requirements,
+          design the architecture and software-visible contract, map Conv/GEMM/Attention efficiently, prove behavior
+          and performance, and correlate a SystemC/TLM model with RTL and silicon evidence.
+        </p>
+        <div class="hero-actions">
+          <a class="button" href="#workflow">Follow the design loop</a>
+          <a class="button secondary" href="#operators">Analyze the operators</a>
+          <a class="button secondary" href="#systemc">Build the TLM model</a>
+          <a class="button secondary" href="#roadmap">Start the eight-week lab</a>
+        </div>
+        <div class="summary-strip" aria-label="Study outcomes">
+          <div><strong>Specify</strong><span>Workloads, targets, ISA, and observable contracts</span></div>
+          <div><strong>Optimize</strong><span>Dataflow, tiling, reuse, fusion, and numerical behavior</span></div>
+          <div><strong>Correlate</strong><span>Analytical model, simulator, RTL, FPGA, and silicon</span></div>
+          <div><strong>Ship</strong><span>Versioning, recovery, security, diagnostics, and support</span></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="requirements">
+      <div class="section-heading">
+        <p class="eyebrow">Read the role correctly</p>
+        <h2>Each experience statement asks for inspectable engineering evidence</h2>
+        <p class="section-note">
+          Memorizing accelerator vocabulary is not enough. For each requirement, be ready to show the decision you made,
+          the contract you wrote, the experiment you ran, and the evidence that changed or confirmed the design.
+        </p>
+      </div>
+      <div class="scope-ledger">
+        <article class="scope-item new">
+          <strong>Architecture, ISA, verification</strong>
+          <span>Derive compute, memory, interconnect, control, precision, and observability from a workload envelope.</span>
+          <a href="#architecture">Produce an architecture and ISA review</a>
+        </article>
+        <article class="scope-item new">
+          <strong>Conv, GEMM, Attention</strong>
+          <span>Derive work and traffic, classify the bottleneck, select a mapping, and verify numerical parity.</span>
+          <a href="#operators">Produce operator optimization reports</a>
+        </article>
+        <article class="scope-item new">
+          <strong>Compiler, RTL, driver co-design</strong>
+          <span>Trace one feature through operator legality, lowering, commands, hardware behavior, submission, and tests.</span>
+          <a href="#collaboration">Produce a cross-team contract</a>
+        </article>
+        <article class="scope-item new">
+          <strong>Product and commercialization</strong>
+          <span>Balance end-to-end targets, PPA and system cost with compatibility, security, recovery, and field support.</span>
+          <a href="#product">Produce a product-readiness review</a>
+        </article>
+        <article class="scope-item new">
+          <strong>SystemC/TLM and simulators</strong>
+          <span>Choose explicit fidelity, model transactions and timing, expose counters, and measure correlation error.</span>
+          <a href="#systemc">Produce a validated virtual platform</a>
+        </article>
+        <article class="scope-item">
+          <strong>Companion foundations</strong>
+          <span>Reuse the existing compiler, runtime, driver, firmware, SDK, profiling, and debugging references.</span>
+          <a href="npu-soc-software-architecture.html">Open the SoC software path</a>
+        </article>
+      </div>
+    </section>
+
+    <section class="section" id="workflow">
+      <div class="section-heading">
+        <p class="eyebrow">The logic flow</p>
+        <h2>Architecture starts with a scenario and ends with reproducible proof</h2>
+        <p class="section-note">
+          Do not begin by choosing an array size or inventing opcodes. Each step consumes a reviewed artifact from the
+          previous step and adds measurable obligations for the next one.
+        </p>
+      </div>
+      <div class="engineering-flow six" aria-label="NPU architecture development flow">
+        <article class="flow-step"><b>01 · Characterize</b><strong>Workload envelope</strong><span>Models, shapes, arrivals, precision, accuracy, lifetime</span></article>
+        <article class="flow-step"><b>02 · Budget</b><strong>Product targets</strong><span>p50/p99 latency, throughput, energy, memory, cost, thermal</span></article>
+        <article class="flow-step"><b>03 · Model</b><strong>Bounds and sweeps</strong><span>Operations, bytes, reuse, Roofline, sensitivity, bottleneck</span></article>
+        <article class="flow-step"><b>04 · Design</b><strong>Architecture and ISA</strong><span>Engines, dataflow, hierarchy, commands, numerical rules</span></article>
+        <article class="flow-step"><b>05 · Contract</b><strong>Full-stack behavior</strong><span>Compiler lowering, RTL, firmware, driver, runtime, telemetry</span></article>
+        <article class="flow-step"><b>06 · Prove</b><strong>Correlated evidence</strong><span>Golden, simulator, RTL, FPGA, silicon, regression, sign-off</span></article>
+      </div>
+      <div class="callout" style="margin-top:12px">
+        <p>
+          <strong>Keep three claims separate.</strong> Functional verification asks whether results and faults match the
+          specification. Performance validation asks whether a fixed implementation meets its targets. Model correlation
+          asks how closely one abstraction predicts another. Passing one does not imply the other two.
+        </p>
+      </div>
+    </section>
+
+    <section class="section" id="architecture">
+      <div class="section-heading">
+        <p class="eyebrow">Architecture and ISA definition</p>
+        <h2>Translate workload reuse and product constraints into explicit resources</h2>
+        <p class="section-note">
+          A useful architecture document connects every resource to a workload need and every software-visible behavior
+          to a test. The ISA is the stable contract; pipelines, arbitration, and implementation scheduling remain
+          microarchitectural unless software can observe them.
+        </p>
+      </div>
+
+      <div class="formula-grid">
+        <article class="formula-card"><strong>Compute budget</strong><code>required ops/s ≥ work ÷ deadline</code><span>Include tail utilization, unsupported work, sparsity rules, and precision-specific peak rates.</span></article>
+        <article class="formula-card"><strong>Bandwidth budget</strong><code>required B/s ≥ transferred bytes ÷ deadline</code><span>Count traffic at a named boundary: DRAM, NoC, SRAM bank, or register file.</span></article>
+        <article class="formula-card"><strong>Capacity budget</strong><code>live bytes = tensors + tiles + queues + state</code><span>Include alignment, double buffers, fragmentation, firmware, and concurrent contexts.</span></article>
+        <article class="formula-card"><strong>Roofline bound</strong><code>rate ≤ min(peak, bandwidth × intensity)</code><span>Operational intensity is work divided by bytes observed at the same memory boundary.</span></article>
+      </div>
+
+      <div class="table-wrap" style="margin-top:12px">
+        <table>
+          <thead>
+            <tr><th scope="col">Architecture plane</th><th scope="col">Decisions to make</th><th scope="col">Evidence to demand</th><th scope="col">Common failure</th></tr>
+          </thead>
+          <tbody>
+            <tr><th scope="row">Compute</th><td>Matrix dimensions, vector/scalar lanes, accumulator width, special functions, sparsity, supported precisions.</td><td>Shape-utilization sweep, dependency schedule, numerical tests, area and timing estimates.</td><td>Quoting peak TOPS while awkward shapes, reductions, or elementwise work leave engines idle.</td></tr>
+            <tr><th scope="row">Memory</th><td>Register files, banked SRAM, cache or scratchpad policy, DMA, compression, address translation, coherency.</td><td>Per-level traffic, bank conflicts, burst efficiency, residency plan, worst-case live set.</td><td>Counting ideal reuse that the actual tile capacity or layout cannot retain.</td></tr>
+            <tr><th scope="row">Interconnect</th><td>Topology, multicast, reduction, routing, virtual channels, arbitration, quality of service, backpressure.</td><td>Contention tests, saturation curves, deadlock proof, fairness and tail-latency distributions.</td><td>Sizing links from average traffic while synchronized bursts overload one cut of the network.</td></tr>
+            <tr><th scope="row">Execution</th><td>Static schedule or dynamic issue, queues, dependencies, preemption, context state, firmware ownership.</td><td>Queue occupancy, overlap timeline, progress guarantees, timeout/reset and multi-context tests.</td><td>Optimizing engine cycles while host launch, DMA, queue wait, or firmware dominates latency.</td></tr>
+            <tr><th scope="row">Observability</th><td>Stable IDs, counters, trace events, error records, snapshots, clock correlation, replay data.</td><td>Counter self-tests, trace schema, overflow behavior, timestamp uncertainty, first-divergence workflow.</td><td>Discovering after RTL freeze that no counter can distinguish compute stalls from memory stalls.</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="card-grid two" style="margin-top:12px">
+        <article class="panel">
+          <span class="status-pill status-measured">Normative contract</span>
+          <h3 style="margin-top:10px">ISA and command definition checklist</h3>
+          <ul class="note-list">
+            <li>Encoding, reserved values, decode precedence, capability discovery, and version negotiation.</li>
+            <li>Operand shapes, ranges, strides, layouts, alignment, address spaces, and alias rules.</li>
+            <li>Accumulation width, rounding, saturation, overflow, NaN behavior, determinism, and quantization.</li>
+            <li>Dependencies, barriers, fences, completion visibility, coherency, and memory ordering.</li>
+            <li>Privilege, isolation, IOMMU behavior, context state, cancellation, timeout, reset, and watchdog.</li>
+            <li>Illegal commands, page faults, engine faults, partial writes, recovery, and error propagation.</li>
+            <li>Debug state, counters, trace identity, assembler/disassembler, simulator, and conformance tests.</li>
+          </ul>
+        </article>
+        <article class="code-panel">
+          <header><strong>Example: one command as a testable contract</strong><span>Illustrative YAML</span></header>
+          <pre><code>command: GEMM_V1
+encoding:
+  opcode: 0x18
+  descriptor_bytes: 64
+operands:
+  A: {dtype: int8, layout: row_major, align: 64}
+  B: {dtype: int8, layout: blocked_k32, align: 64}
+  C: {dtype: int32, layout: row_major, align: 64}
+semantics:
+  value: C[m,n] = sum_k(A[m,k] * B[k,n])
+  accumulator: signed_int32
+  overflow: wrap_twos_complement
+ordering:
+  reads_after: dependency_tokens
+  completion:
+    order: release
+    scope: system
+    covers: [C_writes, status_record]
+faults:
+  bad_alignment: INVALID_DESCRIPTOR
+  unmapped_iova: PAGE_FAULT
+  unsupported_shape: UNSUPPORTED
+observability:
+  counters: [active_cycles, macs, sram_stall_cycles]
+  trace: [command_id, start_tick, end_tick, status]</code></pre>
+        </article>
+      </div>
+
+      <div class="callout caution" style="margin-top:12px">
+        <p>
+          <strong>Convention warning:</strong> this page uses two arithmetic operations per multiply-accumulate when
+          presenting GEMM/Conv operation counts. Hardware data sheets sometimes count one MAC as one operation and
+          sometimes as two. State the convention before comparing throughput claims.
+        </p>
+      </div>
+      <div class="inline-links" style="margin-top:12px">
+        <a href="npu-framework-compiler-skills.html#isa">Deep dive: ISA and device integration</a>
+        <a href="npu-soc-software-architecture.html#contracts">Deep dive: interface contracts</a>
+        <a href="npu-soc-software-architecture.html#profiling">Deep dive: measurement formulas</a>
+      </div>
+    </section>
+
+    <section class="section" id="operators">
+      <div class="section-heading">
+        <p class="eyebrow">Conv, GEMM, and Attention</p>
+        <h2>Use the same operator loop: semantics → work → traffic → mapping → proof</h2>
+        <p class="section-note">
+          Operator names hide the cases that determine a product: depthwise and grouped Conv, skinny and batched GEMM,
+          attention prefill versus decode, odd tails, dynamic shapes, masks, layouts, and low-precision edge behavior.
+        </p>
+      </div>
+
+      <div class="tabbed-explorer" data-tabset>
+        <div class="tab-list" role="tablist" aria-label="Key deep learning operator studies">
+          <button class="tab-button" type="button" id="operator-tab-conv" role="tab" aria-selected="true" aria-controls="operator-conv">
+            <span class="tab-index">1</span><span><strong>Convolution</strong><span>Reuse, halos, groups, layouts</span></span>
+          </button>
+          <button class="tab-button" type="button" id="operator-tab-gemm" role="tab" aria-selected="false" aria-controls="operator-gemm" tabindex="-1">
+            <span class="tab-index">2</span><span><strong>GEMM</strong><span>Hierarchical blocking and tails</span></span>
+          </button>
+          <button class="tab-button" type="button" id="operator-tab-attention" role="tab" aria-selected="false" aria-controls="operator-attention" tabindex="-1">
+            <span class="tab-index">3</span><span><strong>Attention</strong><span>IO-aware prefill and decode</span></span>
+          </button>
+        </div>
+
+        <article class="panel tab-panel" id="operator-conv" role="tabpanel" aria-labelledby="operator-tab-conv">
+          <span class="status-pill status-partial">NCHW notation</span>
+          <h3 style="margin-top:10px">Convolution is a family of reuse patterns, not one kernel</h3>
+          <p>For output N×K×P×Q, filter K×(C/G)×R×S, and G groups, the conventional count is <strong>2×N×P×Q×K×(C/G)×R×S operations</strong>. First derive P and Q from padding, stride, and dilation; then inspect reuse and tail behavior.</p>
+          <div class="contract-grid">
+            <div class="contract-cell"><strong>Classify</strong><span>Regular, 1×1, depthwise, grouped, dilated, or transposed; each changes reuse, reduction width, and array utilization.</span></div>
+            <div class="contract-cell"><strong>Map</strong><span>Choose direct, implicit GEMM, explicit im2col, or Winograd; tile N/P/Q/K/C and account for halo fetches.</span></div>
+            <div class="contract-cell"><strong>Optimize</strong><span>Retain activations/weights/partial sums, align channels, double-buffer, compress zeros, and fuse bias/activation/pooling.</span></div>
+            <div class="contract-cell"><strong>Prove</strong><span>Randomized shape parity, padding/dilation/groups, quantized rounding, edge tiles, traffic counters, and end-to-end layout cost.</span></div>
+          </div>
+          <div class="callout" style="margin-top:12px"><p><strong>Key trap:</strong> explicit im2col simplifies GEMM reuse but can replicate activations and inflate bandwidth. Implicit GEMM forms needed tiles during load, trading address-generation complexity for lower external traffic.</p></div>
+        </article>
+
+        <article class="panel tab-panel" id="operator-gemm" role="tabpanel" aria-labelledby="operator-tab-gemm" hidden>
+          <span class="status-pill status-partial">C[M,N] = A[M,K] × B[K,N]</span>
+          <h3 style="margin-top:10px">GEMM performance follows the entire blocking hierarchy</h3>
+          <p>The conventional count is <strong>2×M×N×K operations</strong>. An idealized compulsory-traffic intensity is 2MNK ÷ (sA×MK + sB×KN + sC×MN), where sA, sB, and sC are bytes per element; add another C read when β is nonzero. Real intensity must also include packing, partial-sum spills, refetches, and the memory level being analyzed.</p>
+          <div class="contract-grid">
+            <div class="contract-cell"><strong>Classify</strong><span>Square, tall-skinny, short-wide, batched, transposed, split-K, and small-launch cases stress different resources.</span></div>
+            <div class="contract-cell"><strong>Map</strong><span>Block DRAM→SRAM→array/register levels; assign M/N spatially, reduce K, and select stationary operands.</span></div>
+            <div class="contract-cell"><strong>Optimize</strong><span>Pack and align vectors, pipeline DMA, double-buffer, fuse epilogues, balance split-K reduction, and specialize edge tiles.</span></div>
+            <div class="contract-cell"><strong>Prove</strong><span>Compare reference output, achieved operations/s, array occupancy, per-level bytes, bank conflicts, launch overhead, and tails.</span></div>
+          </div>
+          <div class="callout" style="margin-top:12px"><p><strong>Key trap:</strong> a tile that maximizes MAC occupancy may exceed SRAM capacity, create bank conflicts, or force partial-sum spills. Optimize measured end-to-end time, not one utilization counter.</p></div>
+        </article>
+
+        <article class="panel tab-panel" id="operator-attention" role="tabpanel" aria-labelledby="operator-tab-attention" hidden>
+          <span class="status-pill status-partial">softmax(QKᵀ / √d + mask)V</span>
+          <h3 style="margin-top:10px">Prefill is compute-rich; autoregressive decode is often KV-traffic dominated</h3>
+          <p>Dense attention score work scales as O(Lq×Lk); it is quadratic when query and key lengths are the same. A naïve implementation also materializes the score matrix. IO-aware tiling with online softmax keeps score blocks on chip and is mathematically exact, although floating-point reduction reordering can still produce tolerance-level differences.</p>
+          <div class="contract-grid">
+            <div class="contract-cell"><strong>Classify</strong><span>Prefill versus decode, causal versus non-causal, self versus cross attention, MHA/GQA/MQA, batch, sequence, and head dimension.</span></div>
+            <div class="contract-cell"><strong>Map</strong><span>Tile Q/K/V, pipeline QKᵀ→online softmax→PV, retain running max/sum, and plan KV-cache layout and paging.</span></div>
+            <div class="contract-cell"><strong>Optimize</strong><span>Fuse masking/scaling/softmax, overlap KV fetch, use grouped query where allowed, fuse dequantization, and avoid score materialization.</span></div>
+            <div class="contract-cell"><strong>Prove</strong><span>Stable softmax, fully masked rows, causal boundaries, variable lengths, cache update/reuse, long sequences, and low-precision error.</span></div>
+          </div>
+          <div class="callout" style="margin-top:12px"><p><strong>Key trap:</strong> changing the head count, attention approximation, or KV representation can change model semantics or quality. Separate an exact implementation optimization from a model-level approximation.</p></div>
+        </article>
+      </div>
+
+      <div class="table-wrap" style="margin-top:12px">
+        <table>
+          <thead><tr><th scope="col">Case</th><th scope="col">Likely limiter</th><th scope="col">First counter or experiment</th><th scope="col">High-value lever</th></tr></thead>
+          <tbody>
+            <tr><th scope="row">3×3 regular Conv</th><td>SRAM/NoC traffic or MAC occupancy, depending on retained reuse.</td><td>Bytes and reuse per level; halo overhead; active MAC lanes.</td><td>Spatial/channel tiling, row/output stationary mapping, double buffering.</td></tr>
+            <tr><th scope="row">Depthwise Conv</th><td>Bandwidth and launch overhead; little cross-channel reuse.</td><td>Operations per transferred byte and vector-lane utilization.</td><td>Fuse adjacent pointwise/activation work and specialize layout.</td></tr>
+            <tr><th scope="row">Large square GEMM</th><td>Compute when blocking retains operands effectively.</td><td>Array active cycles, partial-sum spills, SRAM bank conflicts.</td><td>Hierarchical blocking, pipelined copies, aligned vector access.</td></tr>
+            <tr><th scope="row">Skinny GEMM</th><td>Array underfill, reduction/launch overhead, or bandwidth.</td><td>Per-dimension lane occupancy and fill/drain cycles.</td><td>Batch fusion, alternate array mapping, vector fallback, persistent kernel.</td></tr>
+            <tr><th scope="row">Attention prefill</th><td>Matrix compute plus score-matrix IO for naïve algorithms.</td><td>Score bytes, Q/K/V reuse, softmax/vector overlap, tensor utilization.</td><td>IO-aware tiled attention with online softmax and fusion.</td></tr>
+            <tr><th scope="row">Attention decode</th><td>KV-cache capacity/bandwidth and small GEMM utilization.</td><td>KV bytes per output token, cache hit/page behavior, and inter-token latency; track time-to-first-token separately with prefill.</td><td>KV layout/paging, GQA/MQA when model permits, request batching.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="section" id="verification">
+      <div class="section-heading">
+        <p class="eyebrow">Performance verification</p>
+        <h2>Build a ladder of models and measure the error between adjacent rungs</h2>
+        <p class="section-note">
+          A fast analytical model explores a large design space; a detailed timing model explains contention; RTL proves
+          implementation behavior; FPGA and silicon reveal physical effects. None is a universal oracle.
+        </p>
+      </div>
+
+      <div class="level-grid" aria-label="Performance verification model ladder">
+        <article class="level-card"><b>Level 0</b><strong>Golden semantics</strong><span>Reference math, legal ranges, numerical and fault behavior</span></article>
+        <article class="level-card"><b>Level 1</b><strong>Analytical bounds</strong><span>Operations, compulsory bytes, Roofline, capacity, sensitivity</span></article>
+        <article class="level-card"><b>Level 2</b><strong>Functional / TLM</strong><span>Commands, resources, latency annotations, queues, contention</span></article>
+        <article class="level-card"><b>Level 3</b><strong>RTL / emulation</strong><span>Cycle behavior, protocol assertions, coverage, long regressions</span></article>
+        <article class="level-card"><b>Level 4</b><strong>FPGA / silicon</strong><span>Clock, power, thermal, DRAM, OS, firmware, real counters</span></article>
+      </div>
+
+      <div class="table-wrap" style="margin-top:12px">
+        <table>
+          <thead><tr><th scope="col">Verification layer</th><th scope="col">Required tests</th><th scope="col">Required outputs</th><th scope="col">Gate</th></tr></thead>
+          <tbody>
+            <tr><th scope="row">Operator</th><td>Directed corners, seeded random shapes, dtype/layout/quantization/mask cases, negative constraints.</td><td>Reference diff, tolerance policy, first mismatch, reproducible seed.</td><td>Every legal case matches; every illegal case returns the specified error without unsafe side effects.</td></tr>
+            <tr><th scope="row">ISA / commands</th><td>Encode/decode round trips, legal and illegal streams, dependency cycles, misalignment, reset and fault injection.</td><td>Architectural state diff, command trace, coverage of fields and faults.</td><td>Functional simulator and RTL retire the same visible state or a documented exception.</td></tr>
+            <tr><th scope="row">Microarchitecture</th><td>Compute, memory, NoC, queue, arbitration and backpressure saturation sweeps.</td><td>Cycles, bytes, utilization, stalls, occupancy, service distributions.</td><td>Counters reconcile with events and modeled conservation rules; no unexplained cycles or bytes.</td></tr>
+            <tr><th scope="row">Networks</th><td>Representative models/shapes, concurrency, cold/warm start, fallback, sustained thermal load.</td><td>p50/p90/p99, throughput, energy/inference, accuracy, memory high-water mark.</td><td>Scenario-level product targets pass, including pre/post-processing and boundary transfers.</td></tr>
+            <tr><th scope="row">Correlation</th><td>Same artifact, input, clock, memory parameters, software versions, and trace IDs on adjacent models.</td><td>Absolute/relative error, bias by workload class, confidence interval, root-cause tags.</td><td>Error stays within an agreed envelope; calibration never hides an unmodeled mechanism.</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="card-grid" style="margin-top:12px">
+        <article class="learning-card"><span class="card-label">Benchmark hygiene</span><h3>Fix the measurement boundary</h3><p>State warm-up, repetitions, clocks, temperature, batch and arrival process, included transfers, compile/load time, and percentile calculation.</p></article>
+        <article class="learning-card"><span class="card-label">Counter hygiene</span><h3>Reconcile rather than decorate</h3><p>Check active + stall + idle against elapsed cycles; requested versus delivered bytes; issued versus retired work; overflow and multiplexing behavior.</p></article>
+        <article class="learning-card"><span class="card-label">Claim hygiene</span><h3>Carry correctness with speed</h3><p>A performance result is invalid if operator semantics, model accuracy, precision, fallback, preprocessing, or concurrency changed outside the declared experiment.</p></article>
+      </div>
+    </section>
+
+    <section class="section" id="collaboration">
+      <div class="section-heading">
+        <p class="eyebrow">Cross-functional architecture requirements</p>
+        <h2>One feature must remain traceable from product intent to a passing test</h2>
+        <p class="section-note">
+          Compiler, RTL, firmware, driver, runtime, validation, and product teams should review the same behavioral
+          contract. A requirement is ready only when it is measurable, owned, observable, and testable.
+        </p>
+      </div>
+
+      <div class="engineering-flow six" aria-label="Cross-team requirement trace">
+        <article class="flow-step"><b>Use case</b><strong>Customer outcome</strong><span>Scenario, workload, accuracy, latency, lifecycle</span></article>
+        <article class="flow-step"><b>Compiler</b><strong>Legal lowering</strong><span>Shapes, layout, precision, tiling, fallback, artifact</span></article>
+        <article class="flow-step"><b>ISA / ABI</b><strong>Visible command</strong><span>Encoding, ordering, faults, version, telemetry</span></article>
+        <article class="flow-step"><b>RTL / firmware</b><strong>Execution behavior</strong><span>Resources, scheduling, progress, counters, reset</span></article>
+        <article class="flow-step"><b>Driver / runtime</b><strong>System behavior</strong><span>Buffers, IOVA, queues, fences, timeout, recovery</span></article>
+        <article class="flow-step"><b>Verification</b><strong>Acceptance evidence</strong><span>Golden, negative, stress, performance, correlation</span></article>
+      </div>
+
+      <div class="table-wrap" style="margin-top:12px">
+        <table>
+          <thead><tr><th scope="col">Shared artifact</th><th scope="col">Compiler question</th><th scope="col">RTL question</th><th scope="col">Driver/runtime question</th></tr></thead>
+          <tbody>
+            <tr><th scope="row">Capability manifest</th><td>Which op/shape/dtype/layout combinations are legal and profitable?</td><td>Which target revision and resource limits implement each capability?</td><td>How are revision, firmware, memory, and concurrency limits queried?</td></tr>
+            <tr><th scope="row">ISA and descriptor schema</th><td>How are tiles, addresses, dependencies, relocations, and debug IDs emitted?</td><td>What is normative at decode/retire, and what malformed state is rejected?</td><td>What must be validated before submit, and how are errors returned?</td></tr>
+            <tr><th scope="row">Memory contract</th><td>Which tensors alias, spill, persist, or require layout conversion?</td><td>What alignment, burst, bank, coherency, and page-fault behavior exists?</td><td>Who allocates/maps/unmaps, owns fences, synchronizes CPU access, and recovers faults?</td></tr>
+            <tr><th scope="row">Trace and counters</th><td>Which graph/source ID maps to each command and estimated cost?</td><td>Which events and stalls are counted, at what clock and overflow rule?</td><td>How are sessions, buffers, timestamps, permissions, and schema versions managed?</td></tr>
+            <tr><th scope="row">Compatibility matrix</th><td>Which compiler emits each artifact/ISA version?</td><td>Which hardware/firmware revisions accept it?</td><td>Which driver/runtime combinations negotiate, reject, or translate it?</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="card-grid two" style="margin-top:12px">
+        <article class="code-panel">
+          <header><strong>Feature requirement template</strong><span>Review before implementation</span></header>
+          <pre><code>ID: PERF-ATTN-017
+Scenario: decoder, batch 1..8, context 1k..16k
+Target: p99 next-token latency &lt;= X ms at Y W
+Semantics: ONNX Attention rules + stated cache extension
+Supported: dtype/layout/head/mask/sequence predicates
+Compiler: fusion, tiling, artifact fields, fallback rule
+Hardware: engines, SRAM, DMA, queue and progress behavior
+Driver: buffers, IOVA, fences, timeout, reset, telemetry
+Errors: unsupported, OOM, page fault, timeout, engine fault
+Evidence: golden vectors, stress, counters, model correlation
+Owners: product / compiler / RTL / firmware / driver / DV
+Compatibility: capability bit, ABI version, rollback behavior</code></pre>
+        </article>
+        <article class="panel">
+          <h3>Review questions that prevent late surprises</h3>
+          <ul class="note-list">
+            <li>What exact shapes and arrival patterns represent the product, including the tails?</li>
+            <li>Which behavior is normative, which is a performance hint, and which may change by revision?</li>
+            <li>Who owns every buffer, state transition, timeout, error, counter, and compatibility decision?</li>
+            <li>How does unsupported work fail or fall back, and what is its end-to-end cost?</li>
+            <li>What can be observed before silicon, and what evidence closes the requirement after silicon?</li>
+            <li>Which version combinations are supported, rejected, translated, rolled back, and tested in CI?</li>
+          </ul>
+        </article>
+      </div>
+    </section>
+
+    <section class="section" id="product">
+      <div class="section-heading">
+        <p class="eyebrow">Product development and commercialization</p>
+        <h2>Design the hardware and software interface for years of use, not one demo</h2>
+        <p class="section-note">
+          A commercially useful NPU meets customer workloads within system cost and power while remaining integrable,
+          secure, diagnosable, recoverable, upgradeable, and supportable across hardware and software revisions.
+        </p>
+      </div>
+      <div class="card-grid">
+        <article class="learning-card"><span class="card-label">Value</span><h3>End-to-end workload fit</h3><p>Define customer models, quality, latency distributions, throughput, concurrency, cold start, memory, power, thermal, and fallback—not a single peak metric.</p></article>
+        <article class="learning-card"><span class="card-label">Economics</span><h3>PPA and system cost</h3><p>Trade compute, SRAM, NoC, DRAM bandwidth, die/package area, IP, yield, board memory, cooling, and engineering schedule against the actual workload mix.</p></article>
+        <article class="learning-card"><span class="card-label">Adoption</span><h3>Compiler and SDK coverage</h3><p>Make supported semantics discoverable, failures actionable, examples executable, results reproducible, and migration possible across target revisions.</p></article>
+        <article class="learning-card"><span class="card-label">Compatibility</span><h3>Version every boundary</h3><p>Negotiate capabilities and size-versioned messages; test old/new compiler, artifact, runtime, driver, firmware, and hardware combinations.</p></article>
+        <article class="learning-card"><span class="card-label">Trust</span><h3>Isolation and safe failure</h3><p>Validate descriptors, enforce IOMMU/context ownership, prevent cross-process leakage, bound execution, recover from hangs, and report partial effects.</p></article>
+        <article class="learning-card"><span class="card-label">Operations</span><h3>Field diagnostics and lifecycle</h3><p>Provide health counters, trace/crash capture, firmware update and rollback, manufacturing tests, failure triage, deprecation policy, and support documentation.</p></article>
+      </div>
+
+      <div class="table-wrap" style="margin-top:12px">
+        <table>
+          <thead><tr><th scope="col">Release gate</th><th scope="col">Minimum evidence</th><th scope="col">Question for sign-off</th></tr></thead>
+          <tbody>
+            <tr><th scope="row">Architecture freeze</th><td>Workload census, sensitivity sweeps, PPA estimate, memory/NoC proof, software contract draft, observable counters.</td><td>Which target fails first if workload mix, bandwidth, or SRAM assumption moves by 25%?</td></tr>
+            <tr><th scope="row">RTL freeze</th><td>ISA/ABI conformance, performance-model correlation, fault/recovery coverage, compiler schedule proof, trace/counter validation.</td><td>Can software diagnose every target miss without a new signal or register?</td></tr>
+            <tr><th scope="row">SDK beta</th><td>Representative model coverage, deterministic packaging, examples, profiler, negative diagnostics, compatibility matrix.</td><td>Can an external team reproduce success and distinguish unsupported input from a product defect?</td></tr>
+            <tr><th scope="row">Production</th><td>Scenario benchmarks, accuracy, sustained power/thermal, security, reset/recovery, update/rollback, manufacturing and field diagnostics.</td><td>Can the device fail safely, produce a supportable record, and return to service?</td></tr>
+            <tr><th scope="row">Lifecycle</th><td>Telemetry policy, regression corpus, vulnerability response, revision migration, deprecation dates, fleet rollback and data retention.</td><td>How will a five-year-old application behave after a compiler, firmware, OS, or silicon revision changes?</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="section" id="systemc">
+      <div class="section-heading">
+        <p class="eyebrow">SystemC/TLM and simulator development</p>
+        <h2>Choose fidelity explicitly, then validate every timing claim</h2>
+        <p class="section-note">
+          SystemC supplies an event-driven C++ simulation kernel. TLM-2.0 standardizes transaction interfaces. Neither
+          makes a model cycle-accurate automatically: timing points, contention, arbitration, pipelines, and calibration
+          are deliberate modeling choices.
+        </p>
+      </div>
+
+      <div class="level-grid" aria-label="SystemC and simulator fidelity ladder">
+        <article class="level-card"><b>Untimed</b><strong>Functional model</strong><span>Semantics, software enablement, golden state; highest speed</span></article>
+        <article class="level-card"><b>Register-accurate</b><strong>Programmer view</strong><span>MMIO, descriptors, interrupts, faults, firmware and driver flow</span></article>
+        <article class="level-card"><b>Loosely timed</b><strong>TLM b_transport</strong><span>Coarse annotated delays, temporal decoupling, architecture sweeps</span></article>
+        <article class="level-card"><b>Approximately timed</b><strong>TLM nb_transport</strong><span>Multiple phases, overlap, backpressure, arbitration and contention</span></article>
+        <article class="level-card"><b>Cycle-aware</b><strong>Detailed model / RTL</strong><span>Pipelines, cycle events and validated timing; lowest speed</span></article>
+      </div>
+
+      <div class="tabbed-explorer" data-tabset style="margin-top:12px">
+        <div class="tab-list" role="tablist" aria-label="SystemC TLM modeling choices">
+          <button class="tab-button" type="button" id="tlm-tab-lt" role="tab" aria-selected="true" aria-controls="tlm-lt">
+            <span class="tab-index">LT</span><span><strong>Loosely timed</strong><span>Fast software and design exploration</span></span>
+          </button>
+          <button class="tab-button" type="button" id="tlm-tab-at" role="tab" aria-selected="false" aria-controls="tlm-at" tabindex="-1">
+            <span class="tab-index">AT</span><span><strong>Approximately timed</strong><span>Phases, overlap, and backpressure</span></span>
+          </button>
+          <button class="tab-button" type="button" id="tlm-tab-correlation" role="tab" aria-selected="false" aria-controls="tlm-correlation" tabindex="-1">
+            <span class="tab-index">Δ</span><span><strong>Correlation</strong><span>Make model error visible</span></span>
+          </button>
+        </div>
+
+        <article class="panel tab-panel" id="tlm-lt" role="tabpanel" aria-labelledby="tlm-tab-lt">
+          <span class="status-pill status-measured">Blocking transport</span>
+          <h3 style="margin-top:10px">Use LT to boot software early and sweep architecture parameters quickly</h3>
+          <p>An initiator calls <code>b_transport(payload, delay)</code>. The target executes the transaction in one blocking call and annotates coarse delay. A quantum keeper can let processes run ahead locally before synchronizing, improving simulation speed.</p>
+          <div class="contract-grid">
+            <div class="contract-cell"><strong>Model</strong><span>Registers, memories, commands, functional engines, interrupts, coarse DMA/compute latency, counters, errors.</span></div>
+            <div class="contract-cell"><strong>Do not claim</strong><span>Cycle-level arbitration, exact queue overlap, pipeline bubbles, or tail latency unless those mechanisms are explicitly represented and correlated.</span></div>
+          </div>
+        </article>
+
+        <article class="panel tab-panel" id="tlm-at" role="tabpanel" aria-labelledby="tlm-tab-at" hidden>
+          <span class="status-pill status-conditional">Non-blocking transport</span>
+          <h3 style="margin-top:10px">Use AT where request/response phases and contention change the answer</h3>
+          <p>The base protocol uses <code>nb_transport_fw</code>/<code>nb_transport_bw</code> and four timing points: BEGIN_REQ, END_REQ, BEGIN_RESP, and END_RESP. Multiple transactions may be in flight, so payload lifetime, phase transitions, exclusion rules, and backpressure must be correct.</p>
+          <div class="contract-grid">
+            <div class="contract-cell"><strong>Add detail</strong><span>Queue depth, accept interval, service latency, arbitration, NoC/DRAM contention, DMA overlap, response ordering.</span></div>
+            <div class="contract-cell"><strong>Pay the cost</strong><span>More scheduler interaction, protocol state, validation effort, slower simulation, and harder debugging.</span></div>
+          </div>
+        </article>
+
+        <article class="panel tab-panel" id="tlm-correlation" role="tabpanel" aria-labelledby="tlm-tab-correlation" hidden>
+          <span class="status-pill status-partial">Error is a metric</span>
+          <h3 style="margin-top:10px">Correlate shared events, not unrelated summary numbers</h3>
+          <p>Run the same artifact and input under the same clocks, memory parameters, firmware policy, and measurement boundary. Preserve command/engine IDs across TLM, RTL, FPGA, and silicon traces. Compare per-command cycles and bytes before comparing only total latency.</p>
+          <div class="contract-grid">
+            <div class="contract-cell"><strong>Report</strong><span>Absolute and relative error, bias by operator/shape, confidence, unmatched events, modeled and unmodeled causes.</span></div>
+            <div class="contract-cell"><strong>Regress</strong><span>Freeze calibrated cases, retain raw traces/configuration, and alert when a change improves one class while degrading another.</span></div>
+          </div>
+        </article>
+      </div>
+
+      <div class="card-grid two" style="margin-top:12px">
+        <article class="code-panel">
+          <header><strong>Minimal LT target shape</strong><span>SystemC / TLM-2.0 sketch</span></header>
+          <pre><code>struct npu_target : sc_core::sc_module {
+  tlm_utils::simple_target_socket&lt;npu_target&gt; socket{"socket"};
+
+  SC_CTOR(npu_target) {
+    socket.register_b_transport(this, &amp;npu_target::b_transport);
+  }
+
+  void b_transport(tlm::tlm_generic_payload&amp; tx,
+                   sc_core::sc_time&amp; delay) {
+    const auto address = tx.get_address();
+    auto* data = tx.get_data_ptr();
+
+    if (!data || tx.get_data_length() != 4) {
+      tx.set_response_status(tlm::TLM_BURST_ERROR_RESPONSE);
+      return;
+    }
+
+    if (tx.is_write() &amp;&amp; address == kDoorbell) {
+      const auto command = read_u32(data);
+      const auto arrival_delay =
+          delay + sc_core::sc_time(20, sc_core::SC_NS);
+
+      // A PEQ/event accepts work at the annotated arrival time;
+      // it must not mutate visible state early.
+      schedule_command(command, arrival_delay);
+      delay = arrival_delay;
+      tx.set_response_status(tlm::TLM_OK_RESPONSE);
+      return;
+    }
+
+    tx.set_response_status(tlm::TLM_ADDRESS_ERROR_RESPONSE);
+  }
+};</code></pre>
+        </article>
+        <article class="panel">
+          <h3>Virtual-platform build order</h3>
+          <ol class="note-list">
+            <li>Implement command semantics and deterministic golden state without time.</li>
+            <li>Add register map, memory targets, descriptors, interrupts, errors, and a driver-like test.</li>
+            <li>Annotate compute and DMA latency; expose cycles, bytes, queue occupancy, and stalls.</li>
+            <li>Add contention/backpressure only where sensitivity analysis shows it can change a decision.</li>
+            <li>Replay seeded workloads against functional model and RTL; retain first-divergence traces.</li>
+            <li>Calibrate with documented parameters, report error envelopes, and lock correlation regressions.</li>
+          </ol>
+          <p class="muted" style="margin-top:12px">Also understand generic payload ownership, DMI and invalidation, debug transport, byte enables, streaming width, endianness, delta cycles, SC_THREAD/SC_METHOD behavior, and deterministic event ordering.</p>
+        </article>
+      </div>
+      <div class="inline-links" style="margin-top:12px">
+        <a href="npu-soc-software-architecture.html#modeling">Companion: C++/SystemC/RTL model correlation</a>
+        <a href="npu-soc-software-architecture.html#runtime">Companion: runtime, queue, and driver flow</a>
+      </div>
+    </section>
+
+    <section class="section" id="roadmap" data-progress="npu-architecture-performance-roadmap">
+      <div class="section-heading">
+        <p class="eyebrow">Eight-week build path</p>
+        <h2>Finish with a mini-NPU full-stack evidence package</h2>
+        <p class="section-note">
+          Use INT8 GEMM plus one mapped Conv or attention case. Each week produces a reviewable artifact; the final result
+          should let another engineer reproduce correctness, performance, compatibility, and model limitations.
+        </p>
+      </div>
+      <div class="progress-panel" aria-live="polite">
+        <div class="progress-track"><div class="progress-bar" data-progress-bar role="progressbar" aria-label="NPU architecture and performance roadmap progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"></div></div>
+        <span class="progress-value" data-progress-value>0 / 8 complete</span>
+      </div>
+      <div class="lab-list">
+        <label class="lab-item"><input type="checkbox" data-step="workloads"><span><strong>Week 1 · Workload census</strong><span>Twelve representative Conv/GEMM/Attention cases with semantics, shapes, precision, operations, bytes, targets, and accuracy tolerance.</span></span></label>
+        <label class="lab-item"><input type="checkbox" data-step="roofline"><span><strong>Week 2 · Roofline and sensitivity model</strong><span>Compute/bandwidth/capacity bounds, three candidate configurations, bottleneck predictions, and ±25% parameter sweeps.</span></span></label>
+        <label class="lab-item"><input type="checkbox" data-step="operators"><span><strong>Week 3 · Operator mapping</strong><span>Blocked GEMM and one Conv or attention implementation with reference parity, traffic estimates, tile sweeps, and edge cases.</span></span></label>
+        <label class="lab-item"><input type="checkbox" data-step="architecture"><span><strong>Week 4 · Architecture and ISA</strong><span>Compute/memory/NoC/control design, versioned command schema, numerical semantics, faults, counters, and conformance vectors.</span></span></label>
+        <label class="lab-item"><input type="checkbox" data-step="tlm"><span><strong>Week 5 · SystemC/TLM platform</strong><span>CPU initiator, interconnect, memories, NPU target, driver-like sequence, annotated timing, queues, interrupts, and counters.</span></span></label>
+        <label class="lab-item"><input type="checkbox" data-step="codesign"><span><strong>Week 6 · Cross-team feature RFC</strong><span>Trace one feature through product, compiler, ISA, RTL, firmware, driver/runtime, telemetry, tests, owners, and compatibility.</span></span></label>
+        <label class="lab-item"><input type="checkbox" data-step="verification"><span><strong>Week 7 · Verification and correlation</strong><span>Seeded random streams, functional/timing/RTL comparison, fault injection, counter reconciliation, error envelope, and regressions.</span></span></label>
+        <label class="lab-item"><input type="checkbox" data-step="product"><span><strong>Week 8 · Product-readiness review</strong><span>Scenario results, PPA/system cost, security, recovery, version matrix, diagnostics, update/rollback, limits, and launch decision.</span></span></label>
+      </div>
+    </section>
+
+    <section class="section" id="evidence">
+      <div class="section-heading">
+        <p class="eyebrow">Interview and portfolio evidence</p>
+        <h2>Explain decisions with a compact evidence chain</h2>
+      </div>
+      <div class="skill-grid">
+        <article class="skill-card"><span class="card-label">Architecture</span><h3>Workload → resource</h3><p>Show how shape/utilization, operations, bytes, latency, power, and cost selected array, SRAM, NoC, precision, and control parameters.</p><p class="skill-evidence"><strong>Evidence:</strong> assumptions, sweeps, rejected alternatives, and the trigger that would reopen the decision.</p></article>
+        <article class="skill-card"><span class="card-label">ISA</span><h3>Contract → implementation freedom</h3><p>Separate normative operands, numerical behavior, ordering, faults, state, and versioning from an internal pipeline or schedule.</p><p class="skill-evidence"><strong>Evidence:</strong> schema, pseudocode, encoder/decoder, simulator, illegal cases, and differential tests.</p></article>
+        <article class="skill-card"><span class="card-label">Operators</span><h3>Bottleneck → optimization</h3><p>Derive work/traffic, name the hierarchy, classify the limit, predict a counter change, implement the lever, and retain correctness.</p><p class="skill-evidence"><strong>Evidence:</strong> before/after traces, counters, distributions, reference diff, and regression guard.</p></article>
+        <article class="skill-card"><span class="card-label">Co-design</span><h3>Feature → traceability</h3><p>Connect product scenario to compiler legality, command, RTL resource, firmware policy, driver lifecycle, observable event, and test.</p><p class="skill-evidence"><strong>Evidence:</strong> reviewed RFC, owner matrix, compatibility impact, adversarial cases, and sign-off result.</p></article>
+        <article class="skill-card"><span class="card-label">Product</span><h3>Demo → lifecycle</h3><p>Discuss coverage, system cost, security, multi-process behavior, recovery, field diagnostics, updates, rollback, and support boundaries.</p><p class="skill-evidence"><strong>Evidence:</strong> readiness gates, failure drills, old/new version matrix, known limits, and rollout plan.</p></article>
+        <article class="skill-card"><span class="card-label">Modeling</span><h3>Fidelity → correlation</h3><p>Explain why LT or AT was sufficient, which mechanisms were omitted, how timing was calibrated, and where prediction error remains.</p><p class="skill-evidence"><strong>Evidence:</strong> shared traces, per-class error, raw configuration, first-divergence report, and correlation CI.</p></article>
+      </div>
+    </section>
+
+    <section class="section" id="sources">
+      <div class="section-heading">
+        <p class="eyebrow">Primary specifications and original work</p>
+        <h2>Source-backed reading path</h2>
+        <p class="section-note">Specifications define behavior; original architecture and algorithm papers explain the tradeoffs behind the design.</p>
+      </div>
+      <div class="source-grid">
+        <article class="source-card"><a href="https://research.google/pubs/in-datacenter-performance-analysis-of-a-tensor-processing-unit/">Google: In-Datacenter Performance Analysis of a TPU</a><span>Production workload, systolic matrix unit, software-managed memory, latency, utilization, and energy analysis</span></article>
+        <article class="source-card"><a href="https://eyeriss.mit.edu/">MIT Eyeriss project and papers</a><span>Dataflow, spatial array, memory hierarchy, on-chip network, reuse, and energy-efficient convolution</span></article>
+        <article class="source-card"><a href="https://www2.eecs.berkeley.edu/Pubs/TechRpts/2008/EECS-2008-134.html">Berkeley: Roofline performance model</a><span>Operational intensity, bandwidth and compute ceilings, bottleneck-oriented analysis</span></article>
+        <article class="source-card"><a href="https://research.nvidia.com/publication/2019-03_timeloop-systematic-approach-dnn-accelerator-evaluation">NVIDIA Research: Timeloop</a><span>Systematic evaluation of mappings and architecture configurations for DNN accelerators</span></article>
+        <article class="source-card"><a href="https://docs.nvidia.com/cutlass/latest/media/docs/cpp/efficient_gemm.html">NVIDIA CUTLASS: Efficient GEMM</a><span>Hierarchical tiling, data movement, pipelining, and high-performance GEMM structure</span></article>
+        <article class="source-card"><a href="https://docs.nvidia.com/cutlass/latest/media/docs/cpp/implicit_gemm_convolution.html">NVIDIA CUTLASS: Implicit GEMM convolution</a><span>Convolution-to-GEMM mapping without materializing the full im2col matrix</span></article>
+        <article class="source-card"><a href="https://proceedings.neurips.cc/paper_files/paper/2022/hash/67d57c32e20fd0a7a302cb81d36e40d5-Abstract.html">FlashAttention</a><span>Exact IO-aware attention, on-chip tiling, online softmax, and reduced high-bandwidth-memory traffic</span></article>
+        <article class="source-card"><a href="https://onnx.ai/onnx/operators/onnx__Conv.html">ONNX Conv operator</a><span>Portable convolution semantics, shapes, attributes, grouping, padding, stride, and dilation</span></article>
+        <article class="source-card"><a href="https://onnx.ai/onnx/operators/onnx__Gemm.html">ONNX Gemm operator</a><span>Portable general matrix multiplication semantics and attributes</span></article>
+        <article class="source-card"><a href="https://onnx.ai/onnx/operators/onnx__Attention.html">ONNX Attention operator</a><span>Scaled dot-product attention, self/cross variants, masks, shapes, and cache-related behavior</span></article>
+        <article class="source-card"><a href="https://docs.riscv.org/reference/isa/unpriv/unpriv-index.html">RISC-V unprivileged ISA specification</a><span>Software-visible ISA design, extension structure, memory model, and current ratified specifications</span></article>
+        <article class="source-card"><a href="https://docs.riscv.org/reference/isa/v20250508/unpriv/intro.html">RISC-V ISA overview and custom encoding spaces</a><span>Standard, reserved, and vendor-specific custom extension categories</span></article>
+        <article class="source-card"><a href="https://mlir.llvm.org/docs/Dialects/Linalg/">MLIR Linalg dialect</a><span>Structured operators, tiling, promotion, fusion, vectorization, and lowering toward hardware</span></article>
+        <article class="source-card"><a href="https://mlir.llvm.org/docs/DialectConversion/">MLIR dialect conversion</a><span>Legal targets, rewrite patterns, and type conversion for target-specific lowering contracts</span></article>
+        <article class="source-card"><a href="https://docs.kernel.org/driver-api/dma-buf.html">Linux dma-buf documentation</a><span>Cross-device buffer sharing, ownership, CPU access, asynchronous access, fences, and synchronization</span></article>
+        <article class="source-card"><a href="https://www.accellera.org/images/downloads/standards/systemc/TLM_2_0_LRM.pdf">Accellera TLM-2.0 Language Reference Manual</a><span>Blocking/non-blocking transport, LT/AT styles, phases, temporal decoupling, DMI, and generic payload</span></article>
+        <article class="source-card"><a href="https://systemc.org/overview/systemc-tlm/">SystemC transaction-level modeling overview</a><span>Standard interfaces and use cases for software development, architecture analysis, performance, and verification</span></article>
+        <article class="source-card"><a href="https://www.gem5.org/documentation/learning_gem5/introduction/">gem5 documentation</a><span>Event-driven computer-system modeling, architectural experimentation, statistics, and simulation workflow</span></article>
+        <article class="source-card"><a href="https://docs.mlcommons.org/inference/index_gh/">MLPerf Inference benchmark suite</a><span>Scenario-based latency, throughput, accuracy, system and power measurement methodology</span></article>
+        <article class="source-card"><a href="https://nvdla.org/hw/v1/hwarch.html">NVDLA hardware architecture</a><span>Open convolution accelerator, memory interfaces, execution pipeline, precision, and integration reference</span></article>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <p>Requirement-driven NPU architecture study. State assumptions, preserve semantics, measure the full system, and make every claim reproducible.</p>
+    <div class="footer-links">
+      <a href="npu-soc-software-architecture.html">Companion: SoC software architecture</a>
+      <a href="npu-framework-compiler-skills.html">Companion: framework, compiler, and ISA</a>
+      <a href="https://github.com/buicongnguyen/NPU">Source</a>
+    </div>
+  </footer>
+</body>
+</html>
