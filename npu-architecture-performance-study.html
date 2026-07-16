@@ -3,8 +3,8 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="A requirement-driven study lab for NPU architecture and ISA design, Conv/GEMM/Attention optimization, performance verification, hardware-software co-design, productization, and SystemC/TLM modeling.">
-  <title>NPU Architecture &amp; Performance Study Lab | NPU Study Guide</title>
+  <meta name="description" content="A requirement-driven study lab for NPU architecture, modern AI workloads, low-precision inference, operator optimization, accelerator compilers and runtimes, DSL design, performance verification, fabless product delivery, and SystemC/TLM modeling.">
+  <title>NPU Architecture, Compiler &amp; Performance Study Lab | NPU Study Guide</title>
   <link rel="stylesheet" href="analog-cim.css">
   <link rel="stylesheet" href="npu-engineering.css">
   <script src="npu-engineering.js" defer></script>
@@ -29,23 +29,24 @@
     <section class="hero">
       <div class="hero-copy">
         <p class="eyebrow">Requirement-driven study lab | updated 2026-07-16</p>
-        <h1>NPU Architecture, Operators, and Performance Verification</h1>
+        <h1>NPU Architecture, Compiler Systems, and Performance Verification</h1>
         <p class="lede">
-          Learn the five capabilities as one engineering loop: turn product workloads into measurable requirements,
-          design the architecture and software-visible contract, map Conv/GEMM/Attention efficiently, prove behavior
-          and performance, and correlate a SystemC/TLM model with RTL and silicon evidence.
+          Learn the ten capabilities as one engineering loop: translate modern model workloads and low-precision goals
+          into architecture, map operators, express them through a maintainable DSL/compiler/runtime stack, prove behavior
+          and performance, and carry the design through fabless tape-out, first silicon, SDK release, and sustaining.
         </p>
         <div class="hero-actions">
           <a class="button" href="#workflow">Follow the design loop</a>
-          <a class="button secondary" href="#operators">Analyze the operators</a>
-          <a class="button secondary" href="#systemc">Build the TLM model</a>
-          <a class="button secondary" href="#roadmap">Start the eight-week lab</a>
+          <a class="button secondary" href="#models-precision">Study models &amp; precision</a>
+          <a class="button secondary" href="#operators">Analyze operators</a>
+          <a class="button secondary" href="#compiler-stack">Build the compiler path</a>
+          <a class="button secondary" href="#advanced-roadmap">Start the extension labs</a>
         </div>
         <div class="summary-strip" aria-label="Study outcomes">
-          <div><strong>Specify</strong><span>Workloads, targets, ISA, and observable contracts</span></div>
-          <div><strong>Optimize</strong><span>Dataflow, tiling, reuse, fusion, and numerical behavior</span></div>
-          <div><strong>Correlate</strong><span>Analytical model, simulator, RTL, FPGA, and silicon</span></div>
-          <div><strong>Ship</strong><span>Versioning, recovery, security, diagnostics, and support</span></div>
+          <div><strong>Specify</strong><span>Models, precision, targets, ISA, DSL, and observable contracts</span></div>
+          <div><strong>Optimize</strong><span>Operators, IR, dataflow, schedules, memory, and numerics</span></div>
+          <div><strong>Correlate</strong><span>Reference, compiler, simulator, RTL, FPGA, and silicon</span></div>
+          <div><strong>Ship</strong><span>Tape-out, bring-up, compatibility, diagnostics, and support</span></div>
         </div>
       </div>
     </section>
@@ -85,6 +86,31 @@
           <span>Choose explicit fidelity, model transactions and timing, expose counters, and measure correlation error.</span>
           <a href="#systemc">Produce a validated virtual platform</a>
         </article>
+        <article class="scope-item new">
+          <strong>Fabless accelerator delivery</strong>
+          <span>Own the product, architecture, RTL, software, verification, and customer outcome while coordinating foundry, IP, package, and test partners.</span>
+          <a href="#fabless-lifecycle">Produce a stage-gate and bring-up plan</a>
+        </article>
+        <article class="scope-item new">
+          <strong>Open-source compiler customization</strong>
+          <span>Select the correct TVM, MLIR, LLVM, or OpenXLA extension seam and sustain it with pinned builds, tests, and an upstream policy.</span>
+          <a href="#open-source-stacks">Produce an extension decision record</a>
+        </article>
+        <article class="scope-item new">
+          <strong>Accelerator compiler and runtime</strong>
+          <span>Implement legality, partitioning, lowering, code generation, artifacts, memory, queues, events, profiling, errors, and driver dispatch.</span>
+          <a href="#compiler-runtime-boundary">Produce an end-to-end execution trace</a>
+        </article>
+        <article class="scope-item new">
+          <strong>Modern models and low precision</strong>
+          <span>Classify model workload signatures and negotiate format, scaling, accumulation, accuracy, conversion, and fallback across the stack.</span>
+          <a href="#models-precision">Produce a workload and precision report</a>
+        </article>
+        <article class="scope-item new">
+          <strong>Accelerator DSL and integration</strong>
+          <span>Define precise operations, types, effects, legality, diagnostics, staged lowering, versioning, and a controlled escape hatch.</span>
+          <a href="#accelerator-dsl">Produce a DSL-to-device lowering trace</a>
+        </article>
         <article class="scope-item">
           <strong>Companion foundations</strong>
           <span>Reuse the existing compiler, runtime, driver, firmware, SDK, profiling, and debugging references.</span>
@@ -103,12 +129,12 @@
         </p>
       </div>
       <div class="engineering-flow six" aria-label="NPU architecture development flow">
-        <article class="flow-step"><b>01 · Characterize</b><strong>Workload envelope</strong><span>Models, shapes, arrivals, precision, accuracy, lifetime</span></article>
+        <article class="flow-step"><b>01 · Characterize</b><strong>Model workload</strong><span>Families, operators, shapes, state, arrivals, precision, quality</span></article>
         <article class="flow-step"><b>02 · Budget</b><strong>Product targets</strong><span>p50/p99 latency, throughput, energy, memory, cost, thermal</span></article>
         <article class="flow-step"><b>03 · Model</b><strong>Bounds and sweeps</strong><span>Operations, bytes, reuse, Roofline, sensitivity, bottleneck</span></article>
         <article class="flow-step"><b>04 · Design</b><strong>Architecture and ISA</strong><span>Engines, dataflow, hierarchy, commands, numerical rules</span></article>
-        <article class="flow-step"><b>05 · Contract</b><strong>Full-stack behavior</strong><span>Compiler lowering, RTL, firmware, driver, runtime, telemetry</span></article>
-        <article class="flow-step"><b>06 · Prove</b><strong>Correlated evidence</strong><span>Golden, simulator, RTL, FPGA, silicon, regression, sign-off</span></article>
+        <article class="flow-step"><b>05 · Realize</b><strong>Compiler and runtime</strong><span>DSL, lowering, artifact, firmware, driver, execution, telemetry</span></article>
+        <article class="flow-step"><b>06 · Qualify</b><strong>Correlated product proof</strong><span>Golden, simulator, RTL, tape-out, silicon, SDK, sustaining</span></article>
       </div>
       <div class="callout" style="margin-top:12px">
         <p>
@@ -210,6 +236,87 @@ observability:
       </div>
     </section>
 
+    <section class="section" id="models-precision">
+      <div class="section-heading">
+        <p class="eyebrow">Modern model architectures and low-precision inference</p>
+        <h2>Treat each model as a workload signature and each datatype as a full-stack contract</h2>
+        <p class="section-note">
+          Model names change faster than silicon. Study the stable architectural signatures: dominant operators, tensor
+          shapes, arithmetic intensity, persistent state, dynamic control, communication, and the end-to-end service goal.
+          Then decide precision with measured task quality and real kernels—not bit width alone.
+        </p>
+      </div>
+
+      <div class="table-wrap" id="model-signatures">
+        <table>
+          <thead><tr><th scope="col">Model family</th><th scope="col">Workload signature to study</th><th scope="col">Accelerator consequence</th><th scope="col">Required experiment</th></tr></thead>
+          <tbody>
+            <tr><th scope="row">Dense decoder Transformer</th><td>Causal attention, RoPE, GQA/MQA, gated FFN, normalization, KV cache, continuous batching; separate prompt prefill from token decode.</td><td>Prefill exposes large GEMMs; low-batch decode is often bandwidth- or launch-bound as it repeatedly moves weights and KV state through small GEMM/GEMV work. Batching, cache layout, and inter-token tail latency matter.</td><td>Sweep batch, prompt, generated length, KV precision, and memory bandwidth; report time-to-first-token and inter-token latency separately.</td></tr>
+            <tr><th scope="row">Vision and multimodal Transformer</th><td>Patchification, encoders, projectors, cross-attention, variable image/video token counts, ragged inputs, and modality preprocessing.</td><td>Resolution and patch size sharply change sequence length. Layout conversion, uncached encoder work, cache/reuse policy, host preprocessing, and variable-shape batching can dominate.</td><td>Measure complete request latency across resolutions and modalities, including preprocessing, transfers, and reused versus uncached encoders.</td></tr>
+            <tr><th scope="row">Diffusion models / DiT</th><td>A diffusion system may use a Conv or Transformer denoiser; DiT specifically uses latent patch tokens and Transformer blocks. Study conditioning, guidance, scheduler, repeated model evaluations, and fixed text/VAE stages.</td><td>Denoiser work grows roughly with the number of model evaluations, while fixed encode/decode and scheduler work remains. High-resolution activations, capacity, repeated weight reuse, and conditioning matter more than one block benchmark.</td><td>Profile one denoiser evaluation, fixed stages, and the full generation loop; sweep resolution, evaluations, guidance, batch, memory high-water mark, and output quality.</td></tr>
+            <tr><th scope="row">Sparse mixture of experts</th><td>Router, top-k selection, token permutation, capacity, expert imbalance, expert GEMMs, and all-to-all communication when experts are sharded across devices.</td><td>Nominal active FLOPs omit gather/scatter, padding, irregular tiles, routing latency, communication, and stragglers. Placement and load-aware scheduling become architectural.</td><td>Simulate skewed routing; report expert load, padding, tile utilization, bytes, communication time, and p99—not only average active parameters.</td></tr>
+            <tr><th scope="row">State-space / hybrid sequence model</th><td>Selective state update, scan, short causal Conv, recurrent state, fusion boundaries, plus any interleaved attention layers.</td><td>Linear sequence complexity does not guarantee utilization. Dependencies, elementwise work, state traffic, fusion, and recurrent versus parallel execution determine speed.</td><td>Compare full-sequence and one-token modes; attribute time to projection GEMMs, scan/state movement, elementwise work, synchronization, and fallback.</td></tr>
+            <tr><th scope="row">Recommendation / sparse features</th><td>Large embedding tables, random gathers, pooling, feature interaction, dense MLPs, sharding, and model-parallel traffic.</td><td>Capacity, locality, memory latency, and interconnect can outweigh tensor TOPS. Sparse and dense phases need different resource paths and scheduling policies.</td><td>Sweep table size and access distribution; measure hit rate, effective bandwidth, gather latency, sharding traffic, and transition cost into dense compute.</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="callout" style="margin-top:12px">
+        <p><strong>Architecture rule:</strong> “state of the art” is not a list of model names. Maintain a versioned workload census and trace each family to operator coverage, shapes, state, precision, memory traffic, control flow, system objective, and a reproducible model artifact.</p>
+      </div>
+
+      <div class="formula-grid" style="margin-top:12px" aria-label="Low-precision inference format choices">
+        <article class="formula-card"><strong>BF16 / FP16</strong><code>range versus precision</code><span>BF16 has an FP32-like exponent range with fewer fraction bits; FP16 has a narrower range with more fraction bits. Specify conversion, subnormals, special values, accumulation, and fallback.</span></article>
+        <article class="formula-card"><strong>FP8 / microscaling</strong><code>tensor scale versus block scale</code><span>Conventional FP8 may use current or delayed per-tensor scaling; amax history belongs to delayed recipes. MX formats share compact scales across fixed blocks, constraining metadata, layout, and tiles.</span></article>
+        <article class="formula-card"><strong>INT8 activation + weight</strong><code>q = clamp(round(x / s) + z)</code><span>Define symmetric/asymmetric mode, per-tensor/channel scales, zero point, INT32 accumulation, bias, requantization, rounding, and saturation.</span></article>
+        <article class="formula-card"><strong>INT4 weights and activations</strong><code>packed values + group scales</code><span>Separate weight-only W4A16/BF16 from W4A8 and fully low-bit W4A4/FP4. Count packing, scale metadata, alignment, dequantization, mixed fallback, and native kernel coverage.</span></article>
+      </div>
+
+      <div class="table-wrap" style="margin-top:12px">
+        <table>
+          <thead><tr><th scope="col">Precision stage</th><th scope="col">Engineering work</th><th scope="col">Evidence and gate</th></tr></thead>
+          <tbody>
+            <tr><th scope="row">1 · Baseline</th><td>Freeze model revision, tokenizer/preprocessing, dataset, seeds, FP32/BF16 quality, shapes, latency, memory, and power boundary.</td><td>Reproducible reference metrics and tensor probes; no precision claim without the same evaluation contract.</td></tr>
+            <tr><th scope="row">2 · Calibrate</th><td>Select representative data; sweep clipping, symmetric/asymmetric and tensor/channel/group/block granularity; inspect outliers, saturation, SQNR, and layer error.</td><td>Calibration is separate from evaluation; rare and adversarial cases are retained. Use quantization-aware training (QAT) when post-training quantization (PTQ) cannot meet the quality target.</td></tr>
+            <tr><th scope="row">3 · Transform</th><td>Apply PTQ or QAT, equalization or outlier handling such as SmoothQuant, choose weight-only versus W8A8, and mark higher-precision islands.</td><td>Task quality, not only tensor MSE, passes across the required data distribution with a documented fallback policy.</td></tr>
+            <tr><th scope="row">4 · Lower</th><td>Insert or fold conversions; propagate scales; pack weights and metadata; select aligned fused kernels; plan layouts, accumulation, and epilogues.</td><td>Compiler dumps show every conversion, fallback, and kernel choice; unsupported shapes fail clearly or follow the declared path.</td></tr>
+            <tr><th scope="row">5 · Verify</th><td>Compare a bit-accurate reference, simulator, RTL, and silicon on ties, overflow, minimum values, special floats, partial blocks, and mixed accumulation.</td><td>Integer conversion and packing conformance is exact; reordered floating reductions follow a declared tolerance; end-task quality passes its separate threshold.</td></tr>
+            <tr><th scope="row">6 · Measure</th><td>Measure end-to-end latency, throughput, bytes, capacity, energy, conversion/fallback time, scale traffic, and quality.</td><td>Fewer bits count as an optimization only when the deployed kernels and boundaries improve the product scenario.</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="card-grid two" style="margin-top:12px">
+        <article class="panel" id="precision-contract">
+          <span class="status-pill status-measured">Normative contract</span>
+          <h3 style="margin-top:10px">Write precision semantics before selecting peak TOPS</h3>
+          <ul class="note-list">
+            <li>Encoding, exponent/mantissa or integer range, scale and zero-point ownership, and metadata layout.</li>
+            <li>Per-tensor/channel/group/block granularity, block shape, packing order, alignment, and tail rules.</li>
+            <li>Rounding mode, saturation or wrap, accumulator width, bias precision, reduction order, and determinism.</li>
+            <li>NaN, Inf, signed zero, subnormal, divide-by-zero, overflow, underflow, and conversion behavior.</li>
+            <li>Supported operator/shape/layout combinations, higher-precision islands, fallback, capability discovery, and revisioning.</li>
+          </ul>
+        </article>
+        <article class="panel">
+          <span class="status-pill status-conditional">Quality + systems proof</span>
+          <h3 style="margin-top:10px">Avoid the low-bit performance illusion</h3>
+          <ul class="note-list">
+            <li>Count scale, zero-point, packed-weight, padding, conversion, and temporary-buffer traffic.</li>
+            <li>Confirm that the target shape uses a native kernel rather than unpacking into a wider fallback.</li>
+            <li>Measure end-task perplexity, accuracy, generation or perceptual quality and worst cases—not layer MSE alone.</li>
+            <li>Separate theoretical footprint from allocated memory and theoretical operations/s from full-request latency.</li>
+            <li>Preserve one bit-accurate executable reference shared by compiler, simulator, RTL, firmware, and validation.</li>
+          </ul>
+        </article>
+      </div>
+      <div class="inline-links" style="margin-top:12px">
+        <a href="npu-practice.html#transformer-basics">Practice: Transformer foundations</a>
+        <a href="npu-practice.html#quant">Practice: quantization</a>
+        <a href="#operators">Next: map the dominant operators</a>
+      </div>
+    </section>
+
     <section class="section" id="operators">
       <div class="section-heading">
         <p class="eyebrow">Conv, GEMM, and Attention</p>
@@ -285,6 +392,128 @@ observability:
             <tr><th scope="row">Attention decode</th><td>KV-cache capacity/bandwidth and small GEMM utilization.</td><td>KV bytes per output token, cache hit/page behavior, and inter-token latency; track time-to-first-token separately with prefill.</td><td>KV layout/paging, GQA/MQA when model permits, request batching.</td></tr>
           </tbody>
         </table>
+      </div>
+    </section>
+
+    <section class="section" id="compiler-stack">
+      <div class="section-heading">
+        <p class="eyebrow">Open-source compilers, accelerator runtimes, and domain-specific languages</p>
+        <h2>Choose the smallest durable extension seam, then preserve semantics to the device</h2>
+        <p class="section-note">
+          Internal accelerator support is not one lowering pass. It is a maintained path from imported model semantics
+          through capability decisions, domain IR, scheduling, code generation, a versioned artifact, runtime ownership,
+          driver calls, and device-visible results—with diagnostics at every boundary and fallback only at explicitly
+          designed partition or dispatch seams.
+        </p>
+      </div>
+
+      <div class="engineering-flow six" aria-label="Accelerator compiler and runtime flow">
+        <article class="flow-step"><b>01 · Import</b><strong>Imported / high-level semantics</strong><span>Portable ONNX/StableHLO; framework graphs; TVM Relax; shapes and source IDs</span></article>
+        <article class="flow-step"><b>02 · Decide</b><strong>Legality, then selection</strong><span>Capability: op/shape/dtype/layout/revision; policy: cost, partition, dispatch</span></article>
+        <article class="flow-step"><b>03 · Express</b><strong>Domain and kernel IR</strong><span>Semantic ops, precision, layout, memory, effects, schedules</span></article>
+        <article class="flow-step"><b>04 · Lower</b><strong>Target execution</strong><span>Fusion, tiling, bufferization, instruction selection, dependencies</span></article>
+        <article class="flow-step"><b>05 · Package</b><strong>Executable artifact</strong><span>Code, constants, relocations, metadata, ABI, cache and debug IDs</span></article>
+        <article class="flow-step"><b>06 · Run</b><strong>Runtime to device</strong><span>Discover, allocate, copy, submit, synchronize, profile, recover</span></article>
+      </div>
+
+      <div class="table-wrap" id="open-source-stacks" style="margin-top:12px">
+        <table>
+          <thead><tr><th scope="col">Extension seam</th><th scope="col">Use it when</th><th scope="col">Implementation evidence</th><th scope="col">Boundary to respect</th></tr></thead>
+          <tbody>
+            <tr><th scope="row">TVM BYOC / external codegen</th><td>A supported Relax subgraph can be partitioned and handed to an external compiler or library while TVM retains graph execution.</td><td>Registered patterns and legality predicates; before/after partitioned IR; separate selection/cost decision; <code>RunCodegen</code> output; runtime module; fallback and copy trace.</td><td>First determine legal support from shape, dtype, layout, quantization, alignment, and revision. Then let a separate cost/partition policy decide whether supported work is selected; report “unsupported” versus “supported, not selected.”</td></tr>
+            <tr><th scope="row">Native TVM target/runtime</th><td>The accelerator needs target properties, native code generation, runtime modules, and a device API rather than a bounded library offload.</td><td>Target definition; TIR schedules/tensorization; artifact metadata; module load; allocation/copy/stream behavior; compile-host versus run-device tests.</td><td>Compile-time codegen consumes declared target properties; it must not assume it can query the eventual device.</td></tr>
+            <tr><th scope="row">MLIR dialect and conversion</th><td>A reusable domain or accelerator IR needs custom operations, types, attributes, interfaces, verification, transformations, and progressive lowering.</td><td>ODS/TableGen definitions; parser/printer; valid and invalid tests; canonicalization; conversion legality; type conversion; complete pass-pipeline snapshots.</td><td>Publish precise semantics and require full conversion at boundaries; reject leftover illegal operations and unresolved casts.</td></tr>
+            <tr><th scope="row">LLVM target/backend</th><td>A real custom ISA needs ABI, instruction selection, scheduling, register allocation, object emission, assembly/disassembly, and relocation support.</td><td>Data layout and calling convention; instruction/register descriptions; legalization; scheduling model; MC encoder/decoder; object and round-trip tests.</td><td>Do not add a core LLVM IR instruction just to represent one accelerator feature. Prefer intrinsics, target-specific nodes, or a higher-level dialect unless universal semantics justify the change.</td></tr>
+            <tr><th scope="row">StableHLO + XLA FFI</th><td>A portable HLO graph needs a bounded target-specific escape hatch with typed runtime binding.</td><td>Versioned StableHLO; namespaced <code>custom_call</code>; typed handler; shape/rank, dtype, backend attributes, aliasing, side-effect, and ABI metadata; compatibility tests.</td><td>Custom calls weaken portability. The current XLA FFI API/ABI is documented as experimental, so pin versions and qualify supported combinations.</td></tr>
+            <tr><th scope="row">PJRT plugin</th><td>The whole accelerator should appear to frameworks through a uniform device interface rather than a single external operation.</td><td>Client and device discovery; buffers/transfers; compile and loaded executable; execution/events/errors; topology; packaging; framework smoke test.</td><td>Version the framework binding, PJRT API, portable artifact, compiler, runtime, driver, and hardware capability as one tested matrix.</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="card-grid two" style="margin-top:12px">
+        <article class="panel">
+          <span class="status-pill status-measured">Internal customization policy</span>
+          <h3 style="margin-top:10px">Make the fork burden visible</h3>
+          <ul class="note-list">
+            <li>Write an extension-seam decision record covering ownership, fallback, performance, portability, integration cost, and expected lifetime.</li>
+            <li>Pin the upstream commit and toolchain; make builds reproducible; record patches, licenses, security response, and supported host platforms.</li>
+            <li>Isolate vendor dialects, targets, runtime modules, and feature flags. Keep unavoidable core patches small and review whether generic fixes can go upstream.</li>
+            <li>Budget rebases; test both the pinned baseline and candidate upgrades; retain IR reproducers for pass crashes and changed optimization decisions.</li>
+            <li>Qualify old and new model artifacts, compiler/runtime/driver versions, devices, and cached executables before an internal release.</li>
+          </ul>
+        </article>
+        <article class="panel">
+          <span class="status-pill status-conditional">Acceptance suite</span>
+          <h3 style="margin-top:10px">Test decisions, not only generated answers</h3>
+          <ul class="note-list">
+            <li>Golden import and IR snapshots, round trips, verifier negatives, pass determinism, and source-location preservation.</li>
+            <li>Differential operator/model results across boundary shapes, layouts, dtypes, quantization, dynamic dimensions, and hardware revisions.</li>
+            <li>Visible partition/fallback reasons, cost-model decisions, host/device copies, cache keys, compile time, and unsupported-input diagnostics.</li>
+            <li>Artifact load/reject behavior, buffer lifetime, stream ordering, cancellation, asynchronous errors, faults, and recovery.</li>
+            <li>Stable profiling IDs connecting framework node → IR operation → command → counter/trace event → device result.</li>
+          </ul>
+        </article>
+      </div>
+
+      <div class="table-wrap" id="compiler-runtime-boundary" style="margin-top:12px">
+        <table>
+          <thead><tr><th scope="col">Owner</th><th scope="col">Core responsibilities</th><th scope="col">Inspectable artifact</th><th scope="col">Typical failure</th></tr></thead>
+          <tbody>
+            <tr><th scope="row">Compiler</th><td>Import and inference; legalization; fusion/partition; quantization/layout; memory planning; tiling/scheduling; instruction/code emission; metadata; cost model.</td><td>IR at every boundary, capability decision log, memory plan, target code, executable manifest, source/profile map.</td><td>Claims support from an op name while a shape, layout, precision, alignment, dynamic case, or device revision violates the contract.</td></tr>
+            <tr><th scope="row">Runtime</th><td>Discovery; artifact load/cache; buffer ownership; transfers; queues/streams; execution/events; synchronization; dynamic dispatch; errors; profiling; driver calls.</td><td>Buffer/event state trace, cache manifest, submission log, error chain, latency breakdown, topology/capability record.</td><td>Hidden copy, queue delay, cache mismatch, stale capability, premature free, missing fence, or asynchronous fault makes correct code fail or run slowly.</td></tr>
+            <tr><th scope="row">Shared contract</th><td>Tensor layout/dtype/quantization; alignment; address spaces; ABI; command format; capabilities; hardware revision; event/error semantics; cache keys; artifact and profiling versions.</td><td>Machine-readable schema, compatibility matrix, conformance vectors, negotiation log, old/new integration tests.</td><td>One team silently changes a field, numerical rule, lifetime, ordering guarantee, or cache identity that another layer assumed stable.</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="card-grid two" id="accelerator-dsl" style="margin-top:12px">
+        <article class="code-panel">
+          <header><strong>Example accelerator DSL contract</strong><span>Illustrative, not executable syntax</span></header>
+          <pre><code>kernel qgemm(A: i8[M,K], B: i8[K,N],
+             a_scale: f32, b_scale: f32[N],
+             c_scale: f32, C: i8[M,N])
+  requires K % 32 == 0 and K &lt;= 65535
+    and a_scale &gt; 0 and all(b_scale &gt; 0) and c_scale &gt; 0
+    and aligned(A, 64) and aligned(B, 64)
+
+  numerics {
+    zero_points: A = 0, B = 0, C = 0
+    accumulator: acc[m,n] = sum_k(i32(A[m,k]) * i32(B[k,n]))
+    real_scale:  r[n] = a_scale * b_scale[n] / c_scale
+    output:      C[m,n] = saturate_i8(round_nearest_even(acc[m,n] * r[n]))
+  }
+
+  schedule non_semantic {
+    tile M by 64, N by 64, K by 32
+    double_buffer A, B in scratchpad
+    map [M, N] to matrix_engine
+  }
+
+  lowers_to @npu.gemm_v1
+  fallback  @reference.qgemm</code></pre>
+        </article>
+        <article class="panel">
+          <span class="status-pill status-measured">DSL design review</span>
+          <h3 style="margin-top:10px">Specify meaning before syntax</h3>
+          <ul class="note-list">
+            <li><strong>Purpose:</strong> name the user and abstraction boundary. Separate algorithmic semantics from a retargetable schedule.</li>
+            <li><strong>Types:</strong> define shapes, dynamic dimensions, layouts, precision/scales, memory spaces, ownership, aliases, effects, and synchronization.</li>
+            <li><strong>Numerics:</strong> define accumulation, reduction order, overflow, saturation, rounding, NaNs, determinism, and approximation tolerance.</li>
+            <li><strong>Legality:</strong> implement verifiers with source-located diagnostics and invalid-program tests; do not defer every error to code generation.</li>
+            <li><strong>Lowering:</strong> retain before/after IR for semantic NPU → tiled accelerator → buffer/command → LLVM IR or custom ISA stages.</li>
+            <li><strong>Evolution:</strong> version operations and artifacts, preserve profiling identity, provide a bounded escape hatch, and document deprecation.</li>
+          </ul>
+        </article>
+      </div>
+
+      <div class="callout caution" style="margin-top:12px">
+        <p><strong>Capstone proof:</strong> compile one fused graph through <code>StableHLO or Relax → semantic NPU DSL → scheduled/bufferized IR → executable + metadata → runtime → mock driver/device</code>. Retain partition decisions, every IR stage, reference diffs, artifact compatibility, buffer/event traces, unsupported cases, and a latency breakdown of compile, transfer, queue, and device time.</p>
+      </div>
+      <div class="inline-links" style="margin-top:12px">
+        <a href="npu-framework-compiler-skills.html#tvm">Companion: TVM path</a>
+        <a href="npu-soc-software-architecture.html#scheduling">Companion: scheduling and memory planning</a>
+        <a href="npu-soc-software-architecture.html#runtime">Companion: runtime and queues</a>
+        <a href="index.html#llvm-mlir">Foundation: LLVM and MLIR</a>
       </div>
     </section>
 
@@ -406,12 +635,63 @@ Compatibility: capability bit, ABI version, rollback behavior</code></pre>
         <article class="learning-card"><span class="card-label">Operations</span><h3>Field diagnostics and lifecycle</h3><p>Provide health counters, trace/crash capture, firmware update and rollback, manufacturing tests, failure triage, deprecation policy, and support documentation.</p></article>
       </div>
 
+      <div class="callout" id="fabless-lifecycle" style="margin-top:12px">
+        <p><strong>Commercialization perspective:</strong> a fabless accelerator team typically owns product definition, architecture, RTL, software, verification, validation, and the customer result while coordinating external manufacturing and ecosystem partners, including outsourced semiconductor assembly and test (OSAT). Outsourcing wafer fabrication does not outsource technical accountability: process, memories and PHY IP, package, thermal limits, test access and automated test equipment (ATE), yield, board design, compiler coverage, bring-up, and customer qualification must enter architecture decisions early.</p>
+      </div>
+
+      <div class="engineering-flow six" style="margin-top:12px" aria-label="Fabless AI accelerator product lifecycle">
+        <article class="flow-step"><b>01 · Discover</b><strong>Product and customer</strong><span>Workloads, scenarios, quality, PPA, cost, SKU, schedule, acceptance</span></article>
+        <article class="flow-step"><b>02 · Co-design</b><strong>Architecture and software</strong><span>Model, ISA/ABI, node, memory/IP, package, compiler, runtime, debug</span></article>
+        <article class="flow-step"><b>03 · Close</b><strong>RTL to tape-out</strong><span>DV/formal, emulation, DFT/ATE readiness, P&amp;R, timing, power, IR/EM, DRC/LVS</span></article>
+        <article class="flow-step"><b>04 · Produce</b><strong>Wafer, package, and test</strong><span>Mask release, fabrication, wafer probe, package assembly, final test, yield</span></article>
+        <article class="flow-step"><b>05 · Correlate</b><strong>First silicon</strong><span>Boot, SRAM/DMA/DRAM, PVT, counters, ATE, model/RTL delta, errata</span></article>
+        <article class="flow-step"><b>06 · Sustain</b><strong>SDK and customer release</strong><span>Qualification, yield/binning, model matrix, support, RMA, updates, respin</span></article>
+      </div>
+
+      <div class="table-wrap" style="margin-top:12px">
+        <table>
+          <thead><tr><th scope="col">Fabless stage</th><th scope="col">Required outputs</th><th scope="col">Critical interfaces</th><th scope="col">Review question</th></tr></thead>
+          <tbody>
+            <tr><th scope="row">Product discovery</th><td>Target customers and workload envelope; latency/throughput/quality/power/cost limits; process/package assumptions; SKU, schedule, benchmark, and acceptance criteria.</td><td>Product, customers, ML applications, architecture, finance, sales, supply chain.</td><td>Is the product objective measurable end to end, and does its volume/value justify the silicon and software schedule?</td></tr>
+            <tr><th scope="row">Architecture co-design</th><td>Executable golden model; performance/power model; architecture; ISA/ABI; memory map; operator and precision matrix; compiler/runtime/driver, debug, and profiling plan.</td><td>Architecture, compiler, runtime, driver, firmware, RTL/DV, physical design, foundry, EDA and IP vendors, package team.</td><td>Which external assumption—process, SRAM, PHY, package, bandwidth, IP, license, or tool—can invalidate the architecture?</td></tr>
+            <tr><th scope="row">RTL to tape-out</th><td>Requirements-to-tests trace; formal/DV coverage; emulation; DFT/scan/BIST; synthesis/P&amp;R; STA; power; IR/EM; CDC/RDC; DRC/LVS; package SI/PI; firmware smoke image.</td><td>RTL, DV, DFT, physical design, firmware, EDA support, foundry, package and OSAT/test partners.</td><td>Can every sign-off exception be traced to an owner, risk, containment, first-silicon test, and schedule decision?</td></tr>
+            <tr><th scope="row">Fabrication, package, and test</th><td>Mask release and manufacturing data; front-end wafer fabrication; wafer sort/probe; package assembly; final test; lot, bin, test, and yield-learning records; reviewed handoffs.</td><td>Foundry, mask operations, OSAT, package, product/test engineering, quality, physical design, DFT, supply chain.</td><td>Are foundry-to-probe-to-package-to-final-test data, ownership, excursion response, sample traceability, and yield feedback unambiguous?</td></tr>
+            <tr><th scope="row">First silicon</th><td>Power/clock/reset and boot plan; register/ISA known-answer tests; SRAM/DMA/DRAM; interrupts; PVT characterization; counter/model/RTL correlation; ATE correlation; errata/workarounds.</td><td>Lab, firmware, driver, compiler/runtime, DV, board, test/product engineering, foundry and package/test partners.</td><td>Can the team isolate power, signal/package, RTL, firmware, driver, compiler, model, test, and workload causes with existing observability?</td></tr>
+            <tr><th scope="row">Qualification, volume, and sustaining</th><td>Reliability/qualification; yield and binning; cost; security; SDK/model support matrix; customer enablement; telemetry/RMA diagnostics; revision, deprecation, and respin criteria.</td><td>Quality, manufacturing/test, software release, security, field applications, customers, sales and supply chain.</td><td>Can shipped systems be supported safely across device, board, firmware, driver, compiler, framework, model, and OS revisions?</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="card-grid two" style="margin-top:12px">
+        <article class="panel">
+          <h3>Artifacts that show fabless accelerator experience</h3>
+          <ul class="note-list">
+            <li>Measurable PRD and workload, precision, and operator support matrix tied to architecture and software milestones.</li>
+            <li>Versioned ISA, ABI, firmware, and driver contracts plus requirements-to-tests traceability and a responsible, accountable, consulted, and informed (RACI) ownership matrix.</li>
+            <li>PPA and system-cost model with foundry, IP, package, memory, EDA, license, supply, software, and schedule risks.</li>
+            <li>Tape-out, bring-up, ATE correlation, qualification, SDK and customer-release, errata, and sustaining checklists.</li>
+          </ul>
+        </article>
+        <article class="panel">
+          <h3>First-silicon debugging order</h3>
+          <ol class="note-list">
+            <li>Prove safe power, clocks, reset, scan/JTAG access, boot, register reads, and controlled shutdown.</li>
+            <li>Run SRAM, DMA, external-memory, interrupt, address-translation, and fault-path known-answer tests.</li>
+            <li>Execute one command from a fixed artifact; compare golden, simulator, RTL, firmware, driver, and silicon IDs.</li>
+            <li>Reconcile cycles, bytes, clocks, voltage, temperature, and ATE/lab measurements before tuning the model.</li>
+            <li>Record erratum, impact, containment, software workaround, qualification evidence, and respin criterion.</li>
+          </ol>
+        </article>
+      </div>
+
       <div class="table-wrap" style="margin-top:12px">
         <table>
           <thead><tr><th scope="col">Release gate</th><th scope="col">Minimum evidence</th><th scope="col">Question for sign-off</th></tr></thead>
           <tbody>
             <tr><th scope="row">Architecture freeze</th><td>Workload census, sensitivity sweeps, PPA estimate, memory/NoC proof, software contract draft, observable counters.</td><td>Which target fails first if workload mix, bandwidth, or SRAM assumption moves by 25%?</td></tr>
             <tr><th scope="row">RTL freeze</th><td>ISA/ABI conformance, performance-model correlation, fault/recovery coverage, compiler schedule proof, trace/counter validation.</td><td>Can software diagnose every target miss without a new signal or register?</td></tr>
+            <tr><th scope="row">Tape-out release</th><td>DV/formal and coverage closure; DFT/ATE readiness; physical and package sign-off; approved waivers; mask/foundry/OSAT handoffs; bring-up vectors, firmware, boards, owners, and containment plans.</td><td>Is every residual risk accepted with a detectable first-silicon symptom, owner, containment, and schedule impact?</td></tr>
+            <tr><th scope="row">First-silicon / qualification release</th><td>Power/boot and subsystem bring-up; model/RTL/ATE correlation; PVT, reliability, yield/binning, security and recovery evidence; errata/workarounds; SDK and board readiness.</td><td>Does measured silicon meet the qualified operating envelope, and are every deviation and customer-visible workaround controlled?</td></tr>
             <tr><th scope="row">SDK beta</th><td>Representative model coverage, deterministic packaging, examples, profiler, negative diagnostics, compatibility matrix.</td><td>Can an external team reproduce success and distinguish unsupported input from a product defect?</td></tr>
             <tr><th scope="row">Production</th><td>Scenario benchmarks, accuracy, sustained power/thermal, security, reset/recovery, update/rollback, manufacturing and field diagnostics.</td><td>Can the device fail safely, produce a supportable record, and return to service?</td></tr>
             <tr><th scope="row">Lifecycle</th><td>Telemetry policy, regression corpus, vulnerability response, revision migration, deprecation dates, fleet rollback and data retention.</td><td>How will a five-year-old application behave after a compiler, firmware, OS, or silicon revision changes?</td></tr>
@@ -564,6 +844,31 @@ Compatibility: capability bit, ABI version, rollback behavior</code></pre>
       </div>
     </section>
 
+    <section class="section" id="advanced-roadmap" data-progress="npu-compiler-product-extension">
+      <div class="section-heading">
+        <p class="eyebrow">Five-lab compiler and product extension</p>
+        <h2>Turn the added requirements into one portfolio-grade accelerator path</h2>
+        <p class="section-note">
+          Complete this after, or alongside, the core eight-week lab. Reuse one model slice and one target contract so the
+          evidence connects from workload and precision through DSL/compiler/runtime to a fabless release decision.
+        </p>
+      </div>
+      <div class="progress-panel" aria-live="polite">
+        <div class="progress-track"><div class="progress-bar" data-progress-bar role="progressbar" aria-label="Compiler and product extension progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"></div></div>
+        <span class="progress-value" data-progress-value>0 / 5 complete</span>
+      </div>
+      <div class="lab-list">
+        <label class="lab-item"><input type="checkbox" data-step="model-precision"><span><strong>Lab 1 · Model signature and precision sweep</strong><span>Trace one dense LLM plus one DiT, MoE, SSM, multimodal, or recommendation case. Inventory shapes, work, bytes, state, dynamic behavior, and service goals; compare BF16, FP8-emulated, INT8, and groupwise INT4 for task quality, footprint, metadata, transfers, and fallback. Emulation validates numerics only; measure latency on native supported kernels and never infer speed from emulation.</span></span></label>
+        <label class="lab-item"><input type="checkbox" data-step="compiler-extension"><span><strong>Lab 2 · Open-source compiler extension</strong><span>Write an extension-seam decision record, then implement a small TVM BYOC/native target, MLIR dialect, LLVM mini-target, or StableHLO/XLA FFI path. Preserve before/after IR, support predicates, fallback reasons, pinned builds, negative tests, and an upstream-versus-fork policy.</span></span></label>
+        <label class="lab-item"><input type="checkbox" data-step="accelerator-dsl"><span><strong>Lab 3 · Accelerator DSL and lowering</strong><span>Define two semantic operations with types, shapes, layouts, precision, memory/effects, rounding and invalid cases. Add parser/printer, verifier, canonicalization, source diagnostics, and a staged semantic → scheduled → buffer/command → target lowering trace.</span></span></label>
+        <label class="lab-item"><input type="checkbox" data-step="accelerator-runtime"><span><strong>Lab 4 · Accelerator compiler/runtime execution</strong><span>Package a versioned executable and mock device path with discovery, allocation, copies, queues, events, cache identity, driver dispatch, profiling IDs, asynchronous errors, cancellation, and recovery. Report compile, transfer, queue, and device time separately.</span></span></label>
+        <label class="lab-item"><input type="checkbox" data-step="fabless-capstone"><span><strong>Lab 5 · Fabless tape-out and first-silicon capstone</strong><span>Run a go/no-go tabletop covering PRD traceability, PPA/system cost, DV/formal, DFT, physical sign-off, foundry/IP/package/test dependencies, software readiness, bring-up known-answer tests, ATE/model correlation, errata, qualification, SDK/customer release, and respin criteria.</span></span></label>
+      </div>
+      <div class="callout" style="margin-top:12px">
+        <p><strong>Final evidence chain:</strong> reviewed model artifact → workload/precision report → extension decision → DSL and IR snapshots → executable manifest → runtime/driver trace → reference/simulator/RTL comparison → tape-out and first-silicon review. A reviewer should be able to reproduce the result and identify every unsupported or unproven claim.</p>
+      </div>
+    </section>
+
     <section class="section" id="evidence">
       <div class="section-heading">
         <p class="eyebrow">Interview and portfolio evidence</p>
@@ -576,6 +881,11 @@ Compatibility: capability bit, ABI version, rollback behavior</code></pre>
         <article class="skill-card"><span class="card-label">Co-design</span><h3>Feature → traceability</h3><p>Connect product scenario to compiler legality, command, RTL resource, firmware policy, driver lifecycle, observable event, and test.</p><p class="skill-evidence"><strong>Evidence:</strong> reviewed RFC, owner matrix, compatibility impact, adversarial cases, and sign-off result.</p></article>
         <article class="skill-card"><span class="card-label">Product</span><h3>Demo → lifecycle</h3><p>Discuss coverage, system cost, security, multi-process behavior, recovery, field diagnostics, updates, rollback, and support boundaries.</p><p class="skill-evidence"><strong>Evidence:</strong> readiness gates, failure drills, old/new version matrix, known limits, and rollout plan.</p></article>
         <article class="skill-card"><span class="card-label">Modeling</span><h3>Fidelity → correlation</h3><p>Explain why LT or AT was sufficient, which mechanisms were omitted, how timing was calibrated, and where prediction error remains.</p><p class="skill-evidence"><strong>Evidence:</strong> shared traces, per-class error, raw configuration, first-divergence report, and correlation CI.</p></article>
+        <article class="skill-card"><span class="card-label">Fabless delivery</span><h3>Requirement → shipped silicon</h3><p>Connect customer goals to architecture/software milestones, partner dependencies, tape-out sign-off, first-silicon correlation, qualification, SDK release, and sustaining.</p><p class="skill-evidence"><strong>Evidence:</strong> stage-gate RACI, risk register, bring-up plan, errata/workaround record, and customer acceptance result.</p></article>
+        <article class="skill-card"><span class="card-label">Compiler stack</span><h3>Extension seam → maintainability</h3><p>Explain why BYOC, a native target, MLIR dialect, LLVM backend, XLA FFI, or PJRT was the correct ownership and portability boundary.</p><p class="skill-evidence"><strong>Evidence:</strong> pinned build, small patch surface, decision log, golden/negative tests, rebase report, and upstream policy.</p></article>
+        <article class="skill-card"><span class="card-label">Runtime</span><h3>Artifact → device lifecycle</h3><p>Trace discovery, compile/load/cache, buffers, transfers, queues, events, driver calls, profiling, asynchronous errors, cancellation, and recovery.</p><p class="skill-evidence"><strong>Evidence:</strong> versioned manifest, buffer/event trace, error injection, compatibility matrix, and full latency breakdown.</p></article>
+        <article class="skill-card"><span class="card-label">Models &amp; precision</span><h3>Workload signature → numerical contract</h3><p>Relate current model families to operations, state, control, traffic, service goals, and mixed BF16/FP8/INT8/INT4 choices.</p><p class="skill-evidence"><strong>Evidence:</strong> workload census, calibration record, bit-accurate tests, task-quality results, kernel coverage, bytes, and end-to-end speed.</p></article>
+        <article class="skill-card"><span class="card-label">Accelerator DSL</span><h3>Semantics → staged lowering</h3><p>Separate domain meaning from target schedule while specifying types, shapes, layout, precision, memory, effects, legality, diagnostics, versioning, and escape hatches.</p><p class="skill-evidence"><strong>Evidence:</strong> language spec, valid/invalid corpus, IR snapshots, source maps, complete conversion, and target execution.</p></article>
       </div>
     </section>
 
@@ -606,6 +916,35 @@ Compatibility: capability bit, ABI version, rollback behavior</code></pre>
         <article class="source-card"><a href="https://www.gem5.org/documentation/learning_gem5/introduction/">gem5 documentation</a><span>Event-driven computer-system modeling, architectural experimentation, statistics, and simulation workflow</span></article>
         <article class="source-card"><a href="https://docs.mlcommons.org/inference/index_gh/">MLPerf Inference benchmark suite</a><span>Scenario-based latency, throughput, accuracy, system and power measurement methodology</span></article>
         <article class="source-card"><a href="https://nvdla.org/hw/v1/hwarch.html">NVDLA hardware architecture</a><span>Open convolution accelerator, memory interfaces, execution pipeline, precision, and integration reference</span></article>
+        <article class="source-card"><a href="https://arxiv.org/abs/1706.03762">Attention Is All You Need</a><span>Original Transformer architecture, self-attention, multi-head attention, feed-forward blocks, and sequence modeling</span></article>
+        <article class="source-card"><a href="https://arxiv.org/abs/2407.21783">The Llama 3 Herd of Models</a><span>Modern dense decoder model design, grouped-query attention, training, evaluation, safety, and deployment considerations</span></article>
+        <article class="source-card"><a href="https://arxiv.org/abs/2010.11929">An Image Is Worth 16×16 Words</a><span>Vision Transformer patch tokens and the relationship among resolution, patch size, sequence length, and attention</span></article>
+        <article class="source-card"><a href="https://arxiv.org/abs/2103.00020">Learning Transferable Visual Models From Natural Language Supervision</a><span>CLIP dual encoders, contrastive image-text training, modality-specific preprocessing, projection, and zero-shot transfer</span></article>
+        <article class="source-card"><a href="https://openaccess.thecvf.com/content/ICCV2023/html/Peebles_Scalable_Diffusion_Models_with_Transformers_ICCV_2023_paper.html">Scalable Diffusion Models with Transformers</a><span>Diffusion Transformer architecture, latent patches, conditioning, scaling, and full denoising-loop workload</span></article>
+        <article class="source-card"><a href="https://www.jmlr.org/papers/v23/21-0998.html">Switch Transformers</a><span>Sparse expert routing, capacity, load balancing, communication, scale, and low-precision training challenges</span></article>
+        <article class="source-card"><a href="https://arxiv.org/abs/2312.00752">Mamba: Linear-Time Sequence Modeling</a><span>Selective state-space models, recurrent state, hardware-aware scan, and sequence-length scaling</span></article>
+        <article class="source-card"><a href="https://arxiv.org/abs/1906.00091">Deep Learning Recommendation Model</a><span>Sparse embeddings, feature interactions, dense compute, memory capacity, bandwidth, and recommendation benchmarking</span></article>
+        <article class="source-card"><a href="https://docs.nvidia.com/deeplearning/transformer-engine/user-guide/examples/fp8_primer.html">NVIDIA Transformer Engine FP8 primer</a><span>E4M3/E5M2 formats, scaling recipes, accumulation, alignment, FP8 applicability, and current FP4/microscaling guidance</span></article>
+        <article class="source-card"><a href="https://docs.cloud.google.com/tpu/docs/bfloat16">Google Cloud TPU bfloat16 guide</a><span>BF16 exponent/significand tradeoff, conversion, accumulation, range, precision, and platform-specific numerical behavior</span></article>
+        <article class="source-card"><a href="https://www.opencompute.org/documents/ocp-microscaling-formats-mx-v1-0-spec-final-pdf">OCP Microscaling Formats specification</a><span>MX block-scale encodings, element formats, scale semantics, block sizes, conversion, and numerical behavior</span></article>
+        <article class="source-card"><a href="https://proceedings.mlr.press/v202/xiao23c.html">SmoothQuant</a><span>Post-training W8A8 LLM quantization through mathematically equivalent channel scaling of activation outliers</span></article>
+        <article class="source-card"><a href="https://arxiv.org/abs/2306.00978">AWQ: Activation-aware Weight Quantization</a><span>Low-bit weight-only LLM quantization that protects salient channels using activation observations</span></article>
+        <article class="source-card"><a href="https://tvm.apache.org/docs/arch/index.html">Apache TVM design and architecture</a><span>Relax graph IR, TensorIR kernels, cross-level transformations, scheduling, target translation, and runtime architecture</span></article>
+        <article class="source-card"><a href="https://tvm.apache.org/docs/arch/external_library_dispatch.html">TVM external library dispatch / BYOC</a><span>Pattern registration, fusion and partitioning, external code generation, runtime modules, and deployable execution</span></article>
+        <article class="source-card"><a href="https://tvm.apache.org/docs/arch/device_target_interactions.html">TVM device and target interactions</a><span>Compile-time target properties versus runtime device discovery and execution responsibilities</span></article>
+        <article class="source-card"><a href="https://mlir.llvm.org/docs/DefiningDialects/">MLIR defining dialects</a><span>Dialect operations, types, attributes, interfaces, services, and declarative definitions</span></article>
+        <article class="source-card"><a href="https://mlir.llvm.org/docs/DefiningDialects/Operations/">MLIR operation definition specification</a><span>ODS/TableGen operation syntax, constraints, builders, verification, assembly format, and generated code</span></article>
+        <article class="source-card"><a href="https://mlir.llvm.org/docs/PassManagement/">MLIR pass infrastructure</a><span>Pass construction, nesting, dependent dialects, reproducible pipelines, crash reproducers, threading, statistics, and instrumentation</span></article>
+        <article class="source-card"><a href="https://mlir.llvm.org/docs/BytecodeFormat/">MLIR bytecode format</a><span>Bytecode encoding, dialect-specific resources, versioning hooks, compatibility, and safe evolution of serialized IR</span></article>
+        <article class="source-card"><a href="https://llvm.org/docs/WritingAnLLVMBackend.html">LLVM: Writing an LLVM backend</a><span>Target machine, registers, instructions, instruction selection, scheduling, assembly printing, and backend structure</span></article>
+        <article class="source-card"><a href="https://llvm.org/docs/CodeGenerator.html">LLVM target-independent code generator</a><span>Code-generation pipeline, instruction selection, scheduling, register allocation, prolog/epilog, late passes, and MC emission</span></article>
+        <article class="source-card"><a href="https://openxla.org/stablehlo/spec">StableHLO specification</a><span>Portable high-level operation semantics, types, quantization, custom calls, effects, alias metadata, and extensibility surface</span></article>
+        <article class="source-card"><a href="https://openxla.org/stablehlo/compatibility">StableHLO compatibility</a><span>Version policy, backward and forward compatibility, artifact upgrades/downgrades, and compatibility testing</span></article>
+        <article class="source-card"><a href="https://openxla.org/xla/custom_call">OpenXLA custom calls and typed FFI</a><span>Target-specific HLO escape hatches, typed runtime handlers, attributes, buffers, registration, and API/ABI status</span></article>
+        <article class="source-card"><a href="https://openxla.org/xla/pjrt">OpenXLA PJRT device API</a><span>Uniform accelerator client, device, buffer, compile, executable, execution, event, error, topology, and plugin concepts</span></article>
+        <article class="source-card"><a href="https://openxla.org/xla/pjrt/pjrt_integration">OpenXLA PJRT plugin integration</a><span>Plugin initialization, framework discovery, API version checks, packaging, dynamic loading, and integration testing</span></article>
+        <article class="source-card"><a href="https://www.semiconductors.org/semiconductor-industry-primer-the-stages-of-production-and-business-models/">SIA semiconductor production and business-model primer</a><span>Design, front-end wafer fabrication, back-end assembly/test, and fabless/foundry/IDM production roles</span></article>
+        <article class="source-card"><a href="https://www.tsmc.com/english/dedicatedFoundry/oip">TSMC Open Innovation Platform</a><span>Foundry process and design enablement ecosystem spanning EDA, silicon-proven IP, design services, cloud, and packaging</span></article>
       </div>
     </section>
   </main>
