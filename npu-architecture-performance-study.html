@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="A requirement-driven study lab for NPU architecture, modern AI workloads, low-precision inference, operator optimization, accelerator compilers and runtimes, DSL design, performance verification, fabless product delivery, and SystemC/TLM modeling.">
+  <meta name="description" content="A requirement-driven study lab for NPU architecture, modern AI workloads, low-precision inference, operator optimization, frontend/backend accelerator compilers, runtimes, DSL design, performance verification, fabless product delivery, and SystemC/TLM modeling.">
   <title>NPU Architecture, Compiler &amp; Performance Study Lab | NPU Study Guide</title>
   <link rel="stylesheet" href="analog-cim.css">
   <link rel="stylesheet" href="npu-engineering.css">
@@ -97,9 +97,9 @@
           <a href="#open-source-stacks">Produce an extension decision record</a>
         </article>
         <article class="scope-item new">
-          <strong>Accelerator compiler and runtime</strong>
-          <span>Implement legality, partitioning, lowering, code generation, artifacts, memory, queues, events, profiling, errors, and driver dispatch.</span>
-          <a href="#compiler-runtime-boundary">Produce an end-to-end execution trace</a>
+          <strong>Frontend compiler, backend interface, and runtime</strong>
+          <span>Develop graph-level optimization passes and operator-level lowering passes, schedule dataflow and memory, emit a versioned backend contract, then execute, manage resources, and profile compiled code.</span>
+          <a href="#compiler-runtime-boundary">Produce a boundary contract and performance trace</a>
         </article>
         <article class="scope-item new">
           <strong>Modern models and low precision</strong>
@@ -340,7 +340,7 @@ observability:
           </button>
         </div>
 
-        <article class="panel tab-panel" id="operator-conv" role="tabpanel" aria-labelledby="operator-tab-conv">
+        <div class="panel tab-panel" id="operator-conv" role="tabpanel" aria-labelledby="operator-tab-conv">
           <span class="status-pill status-partial">NCHW notation</span>
           <h3 style="margin-top:10px">Convolution is a family of reuse patterns, not one kernel</h3>
           <p>For output N×K×P×Q, filter K×(C/G)×R×S, and G groups, the conventional count is <strong>2×N×P×Q×K×(C/G)×R×S operations</strong>. First derive P and Q from padding, stride, and dilation; then inspect reuse and tail behavior.</p>
@@ -351,9 +351,9 @@ observability:
             <div class="contract-cell"><strong>Prove</strong><span>Randomized shape parity, padding/dilation/groups, quantized rounding, edge tiles, traffic counters, and end-to-end layout cost.</span></div>
           </div>
           <div class="callout" style="margin-top:12px"><p><strong>Key trap:</strong> explicit im2col simplifies GEMM reuse but can replicate activations and inflate bandwidth. Implicit GEMM forms needed tiles during load, trading address-generation complexity for lower external traffic.</p></div>
-        </article>
+        </div>
 
-        <article class="panel tab-panel" id="operator-gemm" role="tabpanel" aria-labelledby="operator-tab-gemm" hidden>
+        <div class="panel tab-panel" id="operator-gemm" role="tabpanel" aria-labelledby="operator-tab-gemm" hidden>
           <span class="status-pill status-partial">C[M,N] = A[M,K] × B[K,N]</span>
           <h3 style="margin-top:10px">GEMM performance follows the entire blocking hierarchy</h3>
           <p>The conventional count is <strong>2×M×N×K operations</strong>. An idealized compulsory-traffic intensity is 2MNK ÷ (sA×MK + sB×KN + sC×MN), where sA, sB, and sC are bytes per element; add another C read when β is nonzero. Real intensity must also include packing, partial-sum spills, refetches, and the memory level being analyzed.</p>
@@ -364,9 +364,9 @@ observability:
             <div class="contract-cell"><strong>Prove</strong><span>Compare reference output, achieved operations/s, array occupancy, per-level bytes, bank conflicts, launch overhead, and tails.</span></div>
           </div>
           <div class="callout" style="margin-top:12px"><p><strong>Key trap:</strong> a tile that maximizes MAC occupancy may exceed SRAM capacity, create bank conflicts, or force partial-sum spills. Optimize measured end-to-end time, not one utilization counter.</p></div>
-        </article>
+        </div>
 
-        <article class="panel tab-panel" id="operator-attention" role="tabpanel" aria-labelledby="operator-tab-attention" hidden>
+        <div class="panel tab-panel" id="operator-attention" role="tabpanel" aria-labelledby="operator-tab-attention" hidden>
           <span class="status-pill status-partial">softmax(QKᵀ / √d + mask)V</span>
           <h3 style="margin-top:10px">Prefill is compute-rich; autoregressive decode is often KV-traffic dominated</h3>
           <p>Dense attention score work scales as O(Lq×Lk); it is quadratic when query and key lengths are the same. A naïve implementation also materializes the score matrix. IO-aware tiling with online softmax keeps score blocks on chip and is mathematically exact, although floating-point reduction reordering can still produce tolerance-level differences.</p>
@@ -377,7 +377,7 @@ observability:
             <div class="contract-cell"><strong>Prove</strong><span>Stable softmax, fully masked rows, causal boundaries, variable lengths, cache update/reuse, long sequences, and low-precision error.</span></div>
           </div>
           <div class="callout" style="margin-top:12px"><p><strong>Key trap:</strong> changing the head count, attention approximation, or KV representation can change model semantics or quality. Separate an exact implementation optimization from a model-level approximation.</p></div>
-        </article>
+        </div>
       </div>
 
       <div class="table-wrap" style="margin-top:12px">
@@ -397,23 +397,29 @@ observability:
 
     <section class="section" id="compiler-stack">
       <div class="section-heading">
-        <p class="eyebrow">Open-source compilers, accelerator runtimes, and domain-specific languages</p>
+        <p class="eyebrow">Frontend compilers, backend interfaces, accelerator runtimes, and domain-specific languages</p>
         <h2>Choose the smallest durable extension seam, then preserve semantics to the device</h2>
         <p class="section-note">
-          Internal accelerator support is not one lowering pass. It is a maintained path from imported model semantics
-          through capability decisions, domain IR, scheduling, code generation, a versioned artifact, runtime ownership,
-          driver calls, and device-visible results—with diagnostics at every boundary and fallback only at explicitly
-          designed partition or dispatch seams.
+          The frontend owns a verified IR handoff contract for the backend: graph optimization, operator lowering,
+          dataflow and memory scheduling, IR invariants, and provenance. The backend turns that contract into target code;
+          the runtime owns concrete execution and resource lifetimes. Correlated evidence must flow back across all three.
         </p>
       </div>
 
       <div class="engineering-flow six" aria-label="Accelerator compiler and runtime flow">
-        <article class="flow-step"><b>01 · Import</b><strong>Imported / high-level semantics</strong><span>Portable ONNX/StableHLO; framework graphs; TVM Relax; shapes and source IDs</span></article>
-        <article class="flow-step"><b>02 · Decide</b><strong>Legality, then selection</strong><span>Capability: op/shape/dtype/layout/revision; policy: cost, partition, dispatch</span></article>
-        <article class="flow-step"><b>03 · Express</b><strong>Domain and kernel IR</strong><span>Semantic ops, precision, layout, memory, effects, schedules</span></article>
-        <article class="flow-step"><b>04 · Lower</b><strong>Target execution</strong><span>Fusion, tiling, bufferization, instruction selection, dependencies</span></article>
-        <article class="flow-step"><b>05 · Package</b><strong>Executable artifact</strong><span>Code, constants, relocations, metadata, ABI, cache and debug IDs</span></article>
-        <article class="flow-step"><b>06 · Run</b><strong>Runtime to device</strong><span>Discover, allocate, copy, submit, synchronize, profile, recover</span></article>
+        <article class="flow-step"><b>01 · Import</b><strong>Validate semantics</strong><span>IR/opset version, types, possible shapes, effects, source IDs</span></article>
+        <article class="flow-step"><b>02 · Optimize</b><strong>Transform the graph</strong><span>Fold, CSE/DCE, canonicalize, graph/operator fusion, propagate layout/precision</span></article>
+        <article class="flow-step"><b>03 · Decide</b><strong>Select ownership</strong><span>Contract-based capability query, cost selection, partition, specialization, fallback</span></article>
+        <article class="flow-step"><b>04 · Lower &amp; schedule</b><strong>Commit the implementation</strong><span>Operator/type conversion, tiles, layouts, memory spaces, liveness, DMA overlap</span></article>
+        <article class="flow-step"><b>05 · Handoff &amp; generate</b><strong>IR contract → target artifact</strong><span>Backend physical/resource legality, kernels/instructions, code object, executable ABI</span></article>
+        <article class="flow-step"><b>06 · Run</b><strong>Execute and correlate</strong><span>Validate/cache, allocate, queue, synchronize, profile, recover, feed back</span></article>
+      </div>
+
+      <div class="contract-grid" style="margin-top:12px" aria-label="Compiler transformation distinctions">
+        <div class="contract-cell"><strong>Optimize</strong><span>Preserve defined observable semantics while improving a cost, usually without the deliberate target commitment of lowering; prove equivalence and measure the change.</span></div>
+        <div class="contract-cell"><strong>Partition</strong><span>Choose which compiler or device owns each legal region; keep unsupported and legal-but-not-selected reasons distinct.</span></div>
+        <div class="contract-cell"><strong>Lower</strong><span>Move to an IR with fewer abstractions and more target commitments while preserving padding, broadcasting, numerics, effects, and errors.</span></div>
+        <div class="contract-cell"><strong>Schedule</strong><span>Choose when and where computation and movement occur: producer-consumer or loop fusion, tiles, layouts, memory spaces, lifetimes, overlap, barriers, and tails.</span></div>
       </div>
 
       <div class="table-wrap" id="open-source-stacks" style="margin-top:12px">
@@ -459,11 +465,19 @@ observability:
         <table>
           <thead><tr><th scope="col">Owner</th><th scope="col">Core responsibilities</th><th scope="col">Inspectable artifact</th><th scope="col">Typical failure</th></tr></thead>
           <tbody>
-            <tr><th scope="row">Compiler</th><td>Import and inference; legalization; fusion/partition; quantization/layout; memory planning; tiling/scheduling; instruction/code emission; metadata; cost model.</td><td>IR at every boundary, capability decision log, memory plan, target code, executable manifest, source/profile map.</td><td>Claims support from an op name while a shape, layout, precision, alignment, dynamic case, or device revision violates the contract.</td></tr>
-            <tr><th scope="row">Runtime</th><td>Discovery; artifact load/cache; buffer ownership; transfers; queues/streams; execution/events; synchronization; dynamic dispatch; errors; profiling; driver calls.</td><td>Buffer/event state trace, cache manifest, submission log, error chain, latency breakdown, topology/capability record.</td><td>Hidden copy, queue delay, cache mismatch, stale capability, premature free, missing fence, or asynchronous fault makes correct code fail or run slowly.</td></tr>
-            <tr><th scope="row">Shared contract</th><td>Tensor layout/dtype/quantization; alignment; address spaces; ABI; command format; capabilities; hardware revision; event/error semantics; cache keys; artifact and profiling versions.</td><td>Machine-readable schema, compatibility matrix, conformance vectors, negotiation log, old/new integration tests.</td><td>One team silently changes a field, numerical rule, lifetime, ordering guarantee, or cache identity that another layer assumed stable.</td></tr>
+            <tr><th scope="row">Frontend graph optimizer</th><td>Import, type and shape inference; canonicalization, folding, CSE/DCE; fusion; layout and precision propagation; capability-aware partitioning.</td><td>Versioned input, before/after IR, pass statistics, semantic differential, and support, rejection, or fallback log.</td><td>A topology-only pattern ignores extra consumers, effects, dtypes, or dynamic cases; over-fusion increases live ranges, spills, and transfers.</td></tr>
+            <tr><th scope="row">Frontend lowering and scheduler</th><td>Decompose, legalize, and convert types; lower operators to target or kernel IR; choose tiles, layouts, memory spaces, liveness/reuse, bufferization, and DMA overlap.</td><td>Legality matrix, lowering snapshots, memory plan and live ranges, traffic/capacity estimate, and edge/tail tests.</td><td>Lowering loses broadcast, padding, reduction, or numerical semantics; early bufferization can freeze alias/reuse decisions, introduce allocations or copies, and prevent later tensor-level fusion.</td></tr>
+            <tr><th scope="row">Frontend ↔ backend IR contract</th><td>Version operations, types, possible shapes, layouts, precision, effects, memory-space intent, target capabilities, rejection reasons, and source/profile provenance.</td><td>Machine-readable capability and IR schemas, verifier and negative vectors, supported/unsupported decision logs, and two-revision consumer tests.</td><td>An implicit semantic or legality rule causes a code-generation mismatch, silent fallback, lost provenance, or wrong result.</td></tr>
+            <tr><th scope="row">Backend compiler and code generation</th><td>Enforce target legality; map and schedule target operations; select kernels or instructions; allocate registers and scratch resources; emit, link, and relocate code.</td><td>Code object or disassembly, resource report, symbol/relocation map, backend diagnostics, and source-to-kernel profile map.</td><td>Frontend-legal work is physically infeasible, or backend layout, buffer-order, numerical, or resource decisions erase the predicted gain.</td></tr>
+            <tr><th scope="row">Backend ↔ runtime executable contract</th><td>Version code objects, entry points, argument bindings, constants, layouts, alignment, ownership/lifetimes, workspace, dependencies/events, target/ISA/firmware/driver compatibility, cache identity, and debug maps.</td><td>Executable manifest and ABI schema, loader conformance and negative vectors, compatibility matrix, cache-key tests, and two-revision load/execute tests.</td><td>A changed binding, lifetime, workspace, event, compatibility, or cache rule causes load rejection, stale execution, corruption, a leak, or a race.</td></tr>
+            <tr><th scope="row">Runtime</th><td>Discover devices/topology; validate, load, and cache artifacts; manage quotas, pools, buffers, and transfers; submit queues/events; synchronize; dispatch; recover; profile.</td><td>Lifecycle trace, cache key, allocation high-water mark and fragmentation, queue timeline, structured errors, and device capability record.</td><td>Hidden copies, premature reclamation, asynchronous timing without a fence, stale cache, fragmentation, or command overhead dominates execution.</td></tr>
+            <tr><th scope="row">Joint performance loop</th><td>Separate compile, load, allocate, copy, queue, device, and synchronization time; correlate stable IDs; classify the bottleneck; assign an owner and test one change.</td><td>Aligned graph/IR/kernel/runtime/counter trace, before/after distributions and counters, correctness/quality result, and cost-model update.</td><td>A microkernel improves while end-to-end or p99 worsens; an estimate is reported as measured data; learning never reaches the compiler or architecture model.</td></tr>
           </tbody>
         </table>
+      </div>
+
+      <div class="callout caution" style="margin-top:12px">
+        <p><strong>Boundary diagnosis rule:</strong> preserve stable identity from <code>framework node → graph IR → lowered operation → backend kernel/command → runtime event → device counter</code>. First label a case <em>unsupported</em>, <em>legal but not selected</em>, or <em>selected and failed</em>. Then split latency into compile, load, allocation, copy, queue, device, and synchronization time; inspect reformats, spills, fragmentation, launches, fallback, and utilization. Change one factor, recheck correctness or task quality plus p50/p99, throughput, and peak memory, then feed the result into capability, cost, and architecture models.</p>
       </div>
 
       <div class="card-grid two" id="accelerator-dsl" style="margin-top:12px">
@@ -507,7 +521,7 @@ observability:
       </div>
 
       <div class="callout caution" style="margin-top:12px">
-        <p><strong>Capstone proof:</strong> compile one fused graph through <code>StableHLO or Relax → semantic NPU DSL → scheduled/bufferized IR → executable + metadata → runtime → mock driver/device</code>. Retain partition decisions, every IR stage, reference diffs, artifact compatibility, buffer/event traces, unsupported cases, and a latency breakdown of compile, transfer, queue, and device time.</p>
+        <p><strong>Capstone proof:</strong> compile one fused graph through <code>StableHLO or Relax → graph optimization → semantic NPU DSL → scheduled/bufferized IR → backend target code → executable + metadata → runtime → mock driver/device</code>. Retain partition and lowering decisions, every IR stage, reference diffs, interface and artifact compatibility, buffer/event traces, unsupported cases, and a correlated latency breakdown of compile, load, allocation, transfer, queue, device, and synchronization time.</p>
       </div>
       <div class="inline-links" style="margin-top:12px">
         <a href="npu-framework-compiler-skills.html#tvm">Companion: TVM path</a>
@@ -732,7 +746,7 @@ Compatibility: capability bit, ABI version, rollback behavior</code></pre>
           </button>
         </div>
 
-        <article class="panel tab-panel" id="tlm-lt" role="tabpanel" aria-labelledby="tlm-tab-lt">
+        <div class="panel tab-panel" id="tlm-lt" role="tabpanel" aria-labelledby="tlm-tab-lt">
           <span class="status-pill status-measured">Blocking transport</span>
           <h3 style="margin-top:10px">Use LT to boot software early and sweep architecture parameters quickly</h3>
           <p>An initiator calls <code>b_transport(payload, delay)</code>. The target executes the transaction in one blocking call and annotates coarse delay. A quantum keeper can let processes run ahead locally before synchronizing, improving simulation speed.</p>
@@ -740,9 +754,9 @@ Compatibility: capability bit, ABI version, rollback behavior</code></pre>
             <div class="contract-cell"><strong>Model</strong><span>Registers, memories, commands, functional engines, interrupts, coarse DMA/compute latency, counters, errors.</span></div>
             <div class="contract-cell"><strong>Do not claim</strong><span>Cycle-level arbitration, exact queue overlap, pipeline bubbles, or tail latency unless those mechanisms are explicitly represented and correlated.</span></div>
           </div>
-        </article>
+        </div>
 
-        <article class="panel tab-panel" id="tlm-at" role="tabpanel" aria-labelledby="tlm-tab-at" hidden>
+        <div class="panel tab-panel" id="tlm-at" role="tabpanel" aria-labelledby="tlm-tab-at" hidden>
           <span class="status-pill status-conditional">Non-blocking transport</span>
           <h3 style="margin-top:10px">Use AT where request/response phases and contention change the answer</h3>
           <p>The base protocol uses <code>nb_transport_fw</code>/<code>nb_transport_bw</code> and four timing points: BEGIN_REQ, END_REQ, BEGIN_RESP, and END_RESP. Multiple transactions may be in flight, so payload lifetime, phase transitions, exclusion rules, and backpressure must be correct.</p>
@@ -750,9 +764,9 @@ Compatibility: capability bit, ABI version, rollback behavior</code></pre>
             <div class="contract-cell"><strong>Add detail</strong><span>Queue depth, accept interval, service latency, arbitration, NoC/DRAM contention, DMA overlap, response ordering.</span></div>
             <div class="contract-cell"><strong>Pay the cost</strong><span>More scheduler interaction, protocol state, validation effort, slower simulation, and harder debugging.</span></div>
           </div>
-        </article>
+        </div>
 
-        <article class="panel tab-panel" id="tlm-correlation" role="tabpanel" aria-labelledby="tlm-tab-correlation" hidden>
+        <div class="panel tab-panel" id="tlm-correlation" role="tabpanel" aria-labelledby="tlm-tab-correlation" hidden>
           <span class="status-pill status-partial">Error is a metric</span>
           <h3 style="margin-top:10px">Correlate shared events, not unrelated summary numbers</h3>
           <p>Run the same artifact and input under the same clocks, memory parameters, firmware policy, and measurement boundary. Preserve command/engine IDs across TLM, RTL, FPGA, and silicon traces. Compare per-command cycles and bytes before comparing only total latency.</p>
@@ -760,7 +774,7 @@ Compatibility: capability bit, ABI version, rollback behavior</code></pre>
             <div class="contract-cell"><strong>Report</strong><span>Absolute and relative error, bias by operator/shape, confidence, unmatched events, modeled and unmodeled causes.</span></div>
             <div class="contract-cell"><strong>Regress</strong><span>Freeze calibrated cases, retain raw traces/configuration, and alert when a change improves one class while degrading another.</span></div>
           </div>
-        </article>
+        </div>
       </div>
 
       <div class="card-grid two" style="margin-top:12px">
@@ -859,9 +873,9 @@ Compatibility: capability bit, ABI version, rollback behavior</code></pre>
       </div>
       <div class="lab-list">
         <label class="lab-item"><input type="checkbox" data-step="model-precision"><span><strong>Lab 1 · Model signature and precision sweep</strong><span>Trace one dense LLM plus one DiT, MoE, SSM, multimodal, or recommendation case. Inventory shapes, work, bytes, state, dynamic behavior, and service goals; compare BF16, FP8-emulated, INT8, and groupwise INT4 for task quality, footprint, metadata, transfers, and fallback. Emulation validates numerics only; measure latency on native supported kernels and never infer speed from emulation.</span></span></label>
-        <label class="lab-item"><input type="checkbox" data-step="compiler-extension"><span><strong>Lab 2 · Open-source compiler extension</strong><span>Write an extension-seam decision record, then implement a small TVM BYOC/native target, MLIR dialect, LLVM mini-target, or StableHLO/XLA FFI path. Preserve before/after IR, support predicates, fallback reasons, pinned builds, negative tests, and an upstream-versus-fork policy.</span></span></label>
+        <label class="lab-item"><input type="checkbox" data-step="frontend-backend-compiler-v2"><span><strong>Lab 2 · Frontend compiler and backend interface</strong><span>First justify the extension seam, pin a reproducible build, and record patch surface, rebase cost, and upstream-versus-fork policy. Then implement one capability-aware graph optimization and one operator-level lowering in TVM Relax, MLIR/StableHLO, or XLA HLO; use LLVM only for the backend/code-generation portion. Add a dataflow and memory-hierarchy schedule, emit a versioned backend interface schema, and retain before/after IR, legality and rejection decisions, negative/fallback tests, kernel count, transfers, peak live bytes, and end-to-end latency.</span></span></label>
         <label class="lab-item"><input type="checkbox" data-step="accelerator-dsl"><span><strong>Lab 3 · Accelerator DSL and lowering</strong><span>Define two semantic operations with types, shapes, layouts, precision, memory/effects, rounding and invalid cases. Add parser/printer, verifier, canonicalization, source diagnostics, and a staged semantic → scheduled → buffer/command → target lowering trace.</span></span></label>
-        <label class="lab-item"><input type="checkbox" data-step="accelerator-runtime"><span><strong>Lab 4 · Accelerator compiler/runtime execution</strong><span>Package a versioned executable and mock device path with discovery, allocation, copies, queues, events, cache identity, driver dispatch, profiling IDs, asynchronous errors, cancellation, and recovery. Report compile, transfer, queue, and device time separately.</span></span></label>
+        <label class="lab-item"><input type="checkbox" data-step="runtime-correlated-profiling-v2"><span><strong>Lab 4 · Runtime execution and correlated profiling</strong><span>Load, validate, and cache a versioned executable; discover capabilities; manage memory pools, quotas, buffers, queues, events, and asynchronous lifetimes; add structured errors and recovery; preserve stable profile IDs. Report cold/warm and p99 results with load, allocation, copy, queue, device, and synchronization time separated.</span></span></label>
         <label class="lab-item"><input type="checkbox" data-step="fabless-capstone"><span><strong>Lab 5 · Fabless tape-out and first-silicon capstone</strong><span>Run a go/no-go tabletop covering PRD traceability, PPA/system cost, DV/formal, DFT, physical sign-off, foundry/IP/package/test dependencies, software readiness, bring-up known-answer tests, ATE/model correlation, errata, qualification, SDK/customer release, and respin criteria.</span></span></label>
       </div>
       <div class="callout" style="margin-top:12px">
@@ -882,8 +896,8 @@ Compatibility: capability bit, ABI version, rollback behavior</code></pre>
         <article class="skill-card"><span class="card-label">Product</span><h3>Demo → lifecycle</h3><p>Discuss coverage, system cost, security, multi-process behavior, recovery, field diagnostics, updates, rollback, and support boundaries.</p><p class="skill-evidence"><strong>Evidence:</strong> readiness gates, failure drills, old/new version matrix, known limits, and rollout plan.</p></article>
         <article class="skill-card"><span class="card-label">Modeling</span><h3>Fidelity → correlation</h3><p>Explain why LT or AT was sufficient, which mechanisms were omitted, how timing was calibrated, and where prediction error remains.</p><p class="skill-evidence"><strong>Evidence:</strong> shared traces, per-class error, raw configuration, first-divergence report, and correlation CI.</p></article>
         <article class="skill-card"><span class="card-label">Fabless delivery</span><h3>Requirement → shipped silicon</h3><p>Connect customer goals to architecture/software milestones, partner dependencies, tape-out sign-off, first-silicon correlation, qualification, SDK release, and sustaining.</p><p class="skill-evidence"><strong>Evidence:</strong> stage-gate RACI, risk register, bring-up plan, errata/workaround record, and customer acceptance result.</p></article>
-        <article class="skill-card"><span class="card-label">Compiler stack</span><h3>Extension seam → maintainability</h3><p>Explain why BYOC, a native target, MLIR dialect, LLVM backend, XLA FFI, or PJRT was the correct ownership and portability boundary.</p><p class="skill-evidence"><strong>Evidence:</strong> pinned build, small patch surface, decision log, golden/negative tests, rebase report, and upstream policy.</p></article>
-        <article class="skill-card"><span class="card-label">Runtime</span><h3>Artifact → device lifecycle</h3><p>Trace discovery, compile/load/cache, buffers, transfers, queues, events, driver calls, profiling, asynchronous errors, cancellation, and recovery.</p><p class="skill-evidence"><strong>Evidence:</strong> versioned manifest, buffer/event trace, error injection, compatibility matrix, and full latency breakdown.</p></article>
+        <article class="skill-card"><span class="card-label">Frontend compiler stack</span><h3>Extension seam → verified IR handoff</h3><p>Justify the maintained TVM, MLIR, XLA, or LLVM/backend extension boundary, then explain the graph transformation, operator lowering, dataflow/memory schedule, IR invariant, and versioned interface that let the backend generate correct target code.</p><p class="skill-evidence"><strong>Evidence:</strong> pinned build, patch/rebase/upstream policy, before/after IR, semantic and legality checks, capability decisions, memory plan, interface schema, target artifact, source map, and end-to-end result.</p></article>
+        <article class="skill-card"><span class="card-label">Runtime</span><h3>Artifact → correlated execution</h3><p>Trace validation and caching, device capabilities, resource ownership and lifetimes, transfers, queues/events, driver calls, profiling, asynchronous errors, and recovery.</p><p class="skill-evidence"><strong>Evidence:</strong> versioned manifest, allocation and buffer/event trace, stable profile IDs, error injection, compatibility matrix, and full latency breakdown.</p></article>
         <article class="skill-card"><span class="card-label">Models &amp; precision</span><h3>Workload signature → numerical contract</h3><p>Relate current model families to operations, state, control, traffic, service goals, and mixed BF16/FP8/INT8/INT4 choices.</p><p class="skill-evidence"><strong>Evidence:</strong> workload census, calibration record, bit-accurate tests, task-quality results, kernel coverage, bytes, and end-to-end speed.</p></article>
         <article class="skill-card"><span class="card-label">Accelerator DSL</span><h3>Semantics → staged lowering</h3><p>Separate domain meaning from target schedule while specifying types, shapes, layout, precision, memory, effects, legality, diagnostics, versioning, and escape hatches.</p><p class="skill-evidence"><strong>Evidence:</strong> language spec, valid/invalid corpus, IR snapshots, source maps, complete conversion, and target execution.</p></article>
       </div>
@@ -906,10 +920,15 @@ Compatibility: capability bit, ABI version, rollback behavior</code></pre>
         <article class="source-card"><a href="https://onnx.ai/onnx/operators/onnx__Conv.html">ONNX Conv operator</a><span>Portable convolution semantics, shapes, attributes, grouping, padding, stride, and dilation</span></article>
         <article class="source-card"><a href="https://onnx.ai/onnx/operators/onnx__Gemm.html">ONNX Gemm operator</a><span>Portable general matrix multiplication semantics and attributes</span></article>
         <article class="source-card"><a href="https://onnx.ai/onnx/operators/onnx__Attention.html">ONNX Attention operator</a><span>Scaled dot-product attention, self/cross variants, masks, shapes, and cache-related behavior</span></article>
+        <article class="source-card"><a href="https://onnx.ai/onnx/repo-docs/IR.html">ONNX IR specification</a><span>Versioned, runtime-agnostic SSA graphs, types, shapes, operator sets, metadata, and compatibility rules for frontend import</span></article>
         <article class="source-card"><a href="https://docs.riscv.org/reference/isa/unpriv/unpriv-index.html">RISC-V unprivileged ISA specification</a><span>Software-visible ISA design, extension structure, memory model, and current ratified specifications</span></article>
         <article class="source-card"><a href="https://docs.riscv.org/reference/isa/v20250508/unpriv/intro.html">RISC-V ISA overview and custom encoding spaces</a><span>Standard, reserved, and vendor-specific custom extension categories</span></article>
         <article class="source-card"><a href="https://mlir.llvm.org/docs/Dialects/Linalg/">MLIR Linalg dialect</a><span>Structured operators, tiling, promotion, fusion, vectorization, and lowering toward hardware</span></article>
         <article class="source-card"><a href="https://mlir.llvm.org/docs/DialectConversion/">MLIR dialect conversion</a><span>Legal targets, rewrite patterns, and type conversion for target-specific lowering contracts</span></article>
+        <article class="source-card"><a href="https://mlir.llvm.org/docs/PatternRewriter/">MLIR pattern rewriting</a><span>Rewrite benefits, constraints, drivers, bounded recursion, diagnostics, and safe IR mutation for graph and lowering passes</span></article>
+        <article class="source-card"><a href="https://mlir.llvm.org/docs/Canonicalization/">MLIR canonicalization</a><span>Best-effort canonical forms, greedy rewriting, folding, convergence, and the limits of treating canonicalization as a guaranteed normal form</span></article>
+        <article class="source-card"><a href="https://mlir.llvm.org/docs/Bufferization/">MLIR bufferization</a><span>Tensor-to-memref conversion, in-place alias analysis, operation interfaces, late bufferization, and separate ownership deallocation</span></article>
+        <article class="source-card"><a href="https://mlir.llvm.org/docs/Remarks/">MLIR remarks</a><span>Structured optimization diagnostics and location-aware explanations for missed, applied, and analysis decisions</span></article>
         <article class="source-card"><a href="https://docs.kernel.org/driver-api/dma-buf.html">Linux dma-buf documentation</a><span>Cross-device buffer sharing, ownership, CPU access, asynchronous access, fences, and synchronization</span></article>
         <article class="source-card"><a href="https://www.accellera.org/images/downloads/standards/systemc/TLM_2_0_LRM.pdf">Accellera TLM-2.0 Language Reference Manual</a><span>Blocking/non-blocking transport, LT/AT styles, phases, temporal decoupling, DMI, and generic payload</span></article>
         <article class="source-card"><a href="https://systemc.org/overview/systemc-tlm/">SystemC transaction-level modeling overview</a><span>Standard interfaces and use cases for software development, architecture analysis, performance, and verification</span></article>
@@ -932,6 +951,7 @@ Compatibility: capability bit, ABI version, rollback behavior</code></pre>
         <article class="source-card"><a href="https://tvm.apache.org/docs/arch/index.html">Apache TVM design and architecture</a><span>Relax graph IR, TensorIR kernels, cross-level transformations, scheduling, target translation, and runtime architecture</span></article>
         <article class="source-card"><a href="https://tvm.apache.org/docs/arch/external_library_dispatch.html">TVM external library dispatch / BYOC</a><span>Pattern registration, fusion and partitioning, external code generation, runtime modules, and deployable execution</span></article>
         <article class="source-card"><a href="https://tvm.apache.org/docs/arch/device_target_interactions.html">TVM device and target interactions</a><span>Compile-time target properties versus runtime device discovery and execution responsibilities</span></article>
+        <article class="source-card"><a href="https://tvm.apache.org/docs/arch/relax_vm.html">TVM Relax virtual machine</a><span>Graph optimization and buffer planning, VM bytecode plus native kernels, executable packaging, devices, and allocator initialization</span></article>
         <article class="source-card"><a href="https://mlir.llvm.org/docs/DefiningDialects/">MLIR defining dialects</a><span>Dialect operations, types, attributes, interfaces, services, and declarative definitions</span></article>
         <article class="source-card"><a href="https://mlir.llvm.org/docs/DefiningDialects/Operations/">MLIR operation definition specification</a><span>ODS/TableGen operation syntax, constraints, builders, verification, assembly format, and generated code</span></article>
         <article class="source-card"><a href="https://mlir.llvm.org/docs/PassManagement/">MLIR pass infrastructure</a><span>Pass construction, nesting, dependent dialects, reproducible pipelines, crash reproducers, threading, statistics, and instrumentation</span></article>
@@ -940,9 +960,12 @@ Compatibility: capability bit, ABI version, rollback behavior</code></pre>
         <article class="source-card"><a href="https://llvm.org/docs/CodeGenerator.html">LLVM target-independent code generator</a><span>Code-generation pipeline, instruction selection, scheduling, register allocation, prolog/epilog, late passes, and MC emission</span></article>
         <article class="source-card"><a href="https://openxla.org/stablehlo/spec">StableHLO specification</a><span>Portable high-level operation semantics, types, quantization, custom calls, effects, alias metadata, and extensibility surface</span></article>
         <article class="source-card"><a href="https://openxla.org/stablehlo/compatibility">StableHLO compatibility</a><span>Version policy, backward and forward compatibility, artifact upgrades/downgrades, and compatibility testing</span></article>
+        <article class="source-card"><a href="https://openxla.org/xla/architecture">XLA architecture</a><span>StableHLO input, target-independent HLO optimization, backend-specific passes, target code generation, and executable production</span></article>
         <article class="source-card"><a href="https://openxla.org/xla/custom_call">OpenXLA custom calls and typed FFI</a><span>Target-specific HLO escape hatches, typed runtime handlers, attributes, buffers, registration, and API/ABI status</span></article>
-        <article class="source-card"><a href="https://openxla.org/xla/pjrt">OpenXLA PJRT device API</a><span>Uniform accelerator client, device, buffer, compile, executable, execution, event, error, topology, and plugin concepts</span></article>
+        <article class="source-card"><a href="https://openxla.org/xla/pjrt">OpenXLA PJRT device API</a><span>Uniform framework/device API and plugin model with C API, versioning, integration, and implementation resources</span></article>
+        <article class="source-card"><a href="https://openxla.org/xla/pjrt/cpp_api_overview">PJRT C++ API overview</a><span>Client, device, memory-space, buffer, compiler, executable, ownership, and asynchronous execution interfaces</span></article>
         <article class="source-card"><a href="https://openxla.org/xla/pjrt/pjrt_integration">OpenXLA PJRT plugin integration</a><span>Plugin initialization, framework discovery, API version checks, packaging, dynamic loading, and integration testing</span></article>
+        <article class="source-card"><a href="https://openxla.org/xprof">OpenXLA XProf</a><span>Trace, graph, memory, operation, and Roofline views that correlate compiler metadata with hardware events and counters</span></article>
         <article class="source-card"><a href="https://www.semiconductors.org/semiconductor-industry-primer-the-stages-of-production-and-business-models/">SIA semiconductor production and business-model primer</a><span>Design, front-end wafer fabrication, back-end assembly/test, and fabless/foundry/IDM production roles</span></article>
         <article class="source-card"><a href="https://www.tsmc.com/english/dedicatedFoundry/oip">TSMC Open Innovation Platform</a><span>Foundry process and design enablement ecosystem spanning EDA, silicon-proven IP, design services, cloud, and packaging</span></article>
       </div>
