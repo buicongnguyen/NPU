@@ -9,6 +9,9 @@
   <link rel="stylesheet" href="npu-engineering.css">
   <link rel="stylesheet" href="accelerator-repository-blueprint.css">
   <script src="npu-engineering.js" defer></script>
+  <script src="scroll-accessibility.js" defer></script>
+  <link rel="stylesheet" href="book-shell.css">
+  <script src="book-shell.js"></script>
 </head>
 <body class="repo-page">
   <header class="site-header">
@@ -144,7 +147,7 @@
       <div class="repo-tree-layout">
         <div class="code-panel repo-tree-panel">
           <header><strong>Proposed repository tree</strong><span>Start narrow; expand each branch only with a working owner and test</span></header>
-          <pre><code><span class="tree-root">acim-stack/</span>
+          <pre aria-label="Proposed repository tree"><code><span class="tree-root">acim-stack/</span>
 |-- README.md
 |-- CONTRIBUTING.md
 |-- CODE_OF_CONDUCT.md
@@ -1316,7 +1319,7 @@ acim-triage compare --left functional --right hardware --first-divergence</code>
       </div>
       <div class="progress-panel" aria-live="polite">
         <div class="progress-track"><progress class="progress-bar" data-progress-bar aria-label="Accelerator repository readiness progress" max="100" value="0">0%</progress></div>
-        <span class="progress-value" data-progress-value>0 / 10 complete</span>
+        <span class="progress-value" data-progress-value>0 / 11 complete</span>
       </div>
       <div class="lab-list">
         <label class="lab-item"><input type="checkbox" data-step="bootstrap"><span><strong>Reproducible bootstrap</strong><span>A clean checkout configures, builds, installs, imports and runs host-only tests with documented commands.</span></span></label>

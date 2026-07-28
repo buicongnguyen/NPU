@@ -4,6 +4,11 @@ Standalone GitHub Pages project for AI accelerator and compiler study notes.
 
 Live site: https://buicongnguyen.github.io/NPU/
 
+Every study page uses the same book-style reader: a fixed chapter rail on
+desktop, an accessible off-canvas chapter drawer on mobile, an in-page outline,
+previous/next chapter links, reading position, and a persisted light/dark theme.
+`index.html` is the canonical overview; `npu.html` remains a supported alias.
+
 The guide covers NPU, VPU, LPU, GPU, and TPU accelerator tradeoffs, AI model
 deployment paths, LLVM/MLIR compiler concepts, Tenstorrent notes, and related
 interview practice pages.
@@ -34,3 +39,25 @@ material:
 
 - NPU and SoC software architecture: https://buicongnguyen.github.io/NPU/npu-soc-software-architecture.html
 - Framework, compiler, ISA, and tooling skills: https://buicongnguyen.github.io/NPU/npu-framework-compiler-skills.html
+
+## Validate site changes
+
+Site validation uses Node.js 22 and a pinned npm lockfile. Install Chromium once,
+then run the complete check used by the GitHub Pages deployment:
+
+```console
+npm ci
+npx playwright install chromium
+npm run check:ci
+```
+
+For a faster local pass that omits the dependency audit and Lighthouse, run
+`npm run check`.
+
+The complete check covers dependency advisories, HTML structure, JSON schemas and
+source references, every rendered
+internal link and fragment, navigation and mobile smoke tests, JSON-backed views,
+practice filtering, quiz state transitions, chapter-manifest coverage, desktop
+and mobile reader behavior, theme persistence, axe WCAG A/AA rules in both the
+closed and open-drawer states, and Lighthouse performance, accessibility,
+best-practices, and SEO budgets.

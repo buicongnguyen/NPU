@@ -1,0 +1,32 @@
+{
+  "name": "npu-study-guide-ci",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Validation and browser smoke tests for the NPU Study Guide",
+  "type": "module",
+  "scripts": {
+    "check": "npm run check:html && npm run check:json && npm run test:links && npm run test:site && npm run test:a11y",
+    "check:ci": "npm run check:dependencies && npm run check && npm run test:lighthouse",
+    "check:dependencies": "npm audit --audit-level=high",
+    "check:html": "html-validate \"*.html\"",
+    "check:json": "node scripts/validate-json.mjs",
+    "test:links": "playwright test tests/site/links.spec.mjs",
+    "test:site": "playwright test tests/site/smoke.spec.mjs tests/site/book-shell.spec.mjs",
+    "test:a11y": "playwright test tests/site/accessibility.spec.mjs",
+    "test:lighthouse": "node scripts/run-lighthouse.mjs"
+  },
+  "devDependencies": {
+    "@axe-core/playwright": "4.12.1",
+    "@lhci/cli": "0.15.1",
+    "@playwright/test": "1.61.1",
+    "ajv": "8.20.0",
+    "ajv-formats": "3.0.1",
+    "html-validate": "11.5.6"
+  },
+  "overrides": {
+    "chrome-launcher": "1.2.1",
+    "fast-uri": "3.1.4",
+    "tmp": "0.2.7",
+    "uuid": "11.1.1"
+  }
+}

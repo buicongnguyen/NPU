@@ -5,8 +5,12 @@
 #include <array>
 #include <cmath>
 #include <cstdint>
+#include <initializer_list>
 #include <iostream>
+#include <limits>
+#include <random>
 #include <string_view>
+#include <vector>
 
 namespace {
 
@@ -17,6 +21,20 @@ void expect(const bool condition, const std::string_view message) {
         ++failures;
         std::cerr << "FAIL: " << message << '\n';
     }
+}
+
+template <typename T>
+bool has_bytes(const T &value, const std::size_t offset,
+               const std::initializer_list<std::uint8_t> expected) {
+    const auto *bytes = reinterpret_cast<const std::uint8_t *>(&value);
+    std::size_t index = 0;
+    for (const std::uint8_t byte : expected) {
+        if (bytes[offset + index] != byte) {
+            return false;
+        }
+        ++index;
+    }
+    return true;
 }
 
 void test_device_trace_batch_and_overflow() {
@@ -45,6 +63,7 @@ void test_device_trace_batch_and_overflow() {
     expect(header.clock_epoch == 9u, "clock epoch metadata");
     expect(header.event_dictionary_version == ACIM_DEVICE_EVENT_DICTIONARY_VERSION,
            "event dictionary version");
+    expect(header.byte_order == ACIM_TRACE_BYTE_ORDER_LITTLE_ENDIAN, "wire byte order");
     expect(header.capture_id == 42u, "capture correlation ID");
     expect(records[0].command_id == 101u, "command correlation ID");
     expect(records[0].kind == ACIM_TRACE_KIND_ZONE_BEGIN, "zone begin kind");
@@ -53,6 +72,40 @@ void test_device_trace_batch_and_overflow() {
 
     acim_trace_set_command_id(&buffer, 102u);
     expect(buffer.current_command_id == 102u, "producer command context should be mutable");
+}
+
+void test_device_trace_cycle_contract_and_wire_bytes() {
+    AcimTraceBatchHeader header{};
+    std::array<AcimTraceRecord, 3> records{};
+    AcimTraceBuffer buffer{};
+
+    expect(acim_trace_native_byte_order_supported(), "test host must support the trace byte order");
+    expect(acim_trace_buffer_init(&buffer, &header, records.data(), 3u, 0x0102'0304u,
+                                  ACIM_DEVICE_EVENT_DICTIONARY_VERSION, 0x0102'0304'0506'0708u,
+                                  0x1112'1314'1516'1718u, 0x2122'2324'2526'2728u, 0x99AA'BBCCu),
+           "wire fixture should initialize");
+    expect(acim_trace_counter(&buffer, 0x0102'0304'0506'0708u, 0x1122'3344u, 0x5566u,
+                              0x0102'0304'0506'0708),
+           "first wire record should fit");
+    expect(acim_trace_counter(&buffer, 0x0102'0304'0506'0708u, 0x1122'3344u, 0x5566u, 2),
+           "events in the same cycle should be allowed");
+    expect(!acim_trace_counter(&buffer, 0x0102'0304'0506'0707u, 0x1122'3344u, 0x5566u, 3),
+           "a backwards cycle should be rejected");
+    expect(header.record_count == 2u && header.dropped_records == 1u,
+           "a backwards cycle should be counted without consuming a slot");
+
+    expect(has_bytes(header, 0u, {0x02u, 0x00u, 0x00u, 0x00u}), "ABI version wire bytes");
+    expect(has_bytes(header, 20u, {0x04u, 0x03u, 0x02u, 0x01u}), "clock-domain wire bytes");
+    expect(has_bytes(header, 28u, {0x01u, 0x00u, 0x00u, 0x00u}), "byte-order wire bytes");
+    expect(has_bytes(header, 32u, {0x08u, 0x07u, 0x06u, 0x05u, 0x04u, 0x03u, 0x02u, 0x01u}),
+           "clock-frequency wire bytes");
+    expect(has_bytes(records[0], 0u, {0x08u, 0x07u, 0x06u, 0x05u, 0x04u, 0x03u, 0x02u, 0x01u}),
+           "cycle wire bytes");
+    expect(has_bytes(records[0], 8u, {0x08u, 0x07u, 0x06u, 0x05u, 0x04u, 0x03u, 0x02u, 0x01u}),
+           "counter-value wire bytes");
+    expect(has_bytes(records[0], 20u, {0x44u, 0x33u, 0x22u, 0x11u}), "event-ID wire bytes");
+    expect(has_bytes(records[0], 24u, {0x66u, 0x55u}), "source-ID wire bytes");
+    expect(has_bytes(records[0], 28u, {0xCCu, 0xBBu, 0xAAu, 0x99u}), "command-ID wire bytes");
 }
 
 void test_clock_correlation() {
@@ -77,6 +130,23 @@ void test_clock_correlation() {
     expect(correlation->sample_count == samples.size(), "sync sample count");
 }
 
+void test_clock_epoch_rearms_a_completed_slot() {
+    AcimTraceBatchHeader header{};
+    std::array<AcimTraceRecord, 2> records{};
+    AcimTraceBuffer buffer{};
+    expect(acim_trace_buffer_init(&buffer, &header, records.data(), 2u, 1u,
+                                  ACIM_DEVICE_EVENT_DICTIONARY_VERSION, 500'000'000u, 7u, 1u, 10u),
+           "first epoch should initialize");
+    expect(acim_trace_counter(&buffer, 100u, ACIM_EVENT_RETRY_COUNT, 1u, 1), "first epoch record");
+    expect(acim_trace_buffer_init(&buffer, &header, records.data(), 2u, 1u,
+                                  ACIM_DEVICE_EVENT_DICTIONARY_VERSION, 500'000'000u, 8u, 2u, 11u),
+           "new epoch should rearm the slot");
+    expect(header.clock_epoch == 8u && header.capture_id == 2u,
+           "new epoch metadata should replace the previous capture");
+    expect(header.record_count == 0u && buffer.next_sequence == 0u,
+           "new epoch should reset record and sequence counters");
+}
+
 void test_invalid_clock_samples() {
     constexpr std::array<acim::trace::ClockSyncSample, 1> one_sample{
         acim::trace::ClockSyncSample{100u, 10u, 120u},
@@ -96,14 +166,114 @@ void test_invalid_clock_samples() {
            "host receive time cannot precede send time");
     expect(!acim::trace::fit_clock_correlation(same_device_cycle).has_value(),
            "device cycles must span time");
+
+    constexpr std::array<acim::trace::ClockSyncSample, 2> wrapped_cycle{
+        acim::trace::ClockSyncSample{100u, std::numeric_limits<std::uint64_t>::max() - 5u, 120u},
+        acim::trace::ClockSyncSample{200u, 4u, 220u},
+    };
+    expect(!acim::trace::fit_clock_correlation(wrapped_cycle).has_value(),
+           "a clock wrap must start a new correlation epoch");
+}
+
+void test_large_cycle_and_timestamp_precision() {
+    constexpr std::uint64_t cycle_base = std::numeric_limits<std::uint64_t>::max() - 1'000u;
+    constexpr std::uint64_t host_base = 1'000'000'000'000'000'000u;
+    constexpr std::array<acim::trace::ClockSyncSample, 4> samples{
+        acim::trace::ClockSyncSample{host_base + 190u, cycle_base + 100u, host_base + 210u},
+        acim::trace::ClockSyncSample{host_base + 390u, cycle_base + 200u, host_base + 410u},
+        acim::trace::ClockSyncSample{host_base + 590u, cycle_base + 300u, host_base + 610u},
+        acim::trace::ClockSyncSample{host_base + 790u, cycle_base + 400u, host_base + 810u},
+    };
+    const auto correlation = acim::trace::fit_clock_correlation(samples);
+    expect(correlation.has_value(), "large clocks and timestamps should retain their deltas");
+    if (correlation) {
+        expect(std::abs(correlation->nanoseconds_per_cycle - 2.0) < 1e-12, "large clock slope");
+        expect(correlation->maximum_fit_residual_ns < 1e-9, "large timestamp residual");
+        const auto timestamp =
+            acim::trace::device_cycle_to_host_timestamp_ns(*correlation, cycle_base + 250u);
+        expect(timestamp == host_base + 500u, "large integer timestamp mapping");
+    }
+}
+
+void test_checked_timestamp_boundaries() {
+    constexpr acim::trace::ClockCorrelation zero_anchored{
+        1.0, 100u, 0u, 0.0, 0.0, 0.0, 2u,
+    };
+    expect(acim::trace::device_cycle_to_host_timestamp_ns(zero_anchored, 100u) == 0u,
+           "zero host timestamp should be representable");
+    expect(!acim::trace::device_cycle_to_host_timestamp_ns(zero_anchored, 99u).has_value(),
+           "timestamp conversion should reject uint64 underflow");
+
+    constexpr acim::trace::ClockCorrelation maximum_anchored{
+        1.0, 100u, std::numeric_limits<std::uint64_t>::max(), 0.0, 0.0, 0.0, 2u,
+    };
+    expect(acim::trace::device_cycle_to_host_timestamp_ns(maximum_anchored, 100u) ==
+               std::numeric_limits<std::uint64_t>::max(),
+           "maximum host timestamp should be representable");
+    expect(!acim::trace::device_cycle_to_host_timestamp_ns(maximum_anchored, 101u).has_value(),
+           "timestamp conversion should reject uint64 overflow");
+
+    acim::trace::ClockCorrelation nonfinite_slope = zero_anchored;
+    nonfinite_slope.nanoseconds_per_cycle = std::numeric_limits<double>::quiet_NaN();
+    expect(!acim::trace::device_cycle_to_host_timestamp_ns(nonfinite_slope, 101u).has_value(),
+           "timestamp conversion should reject a nonfinite slope");
+
+    acim::trace::ClockCorrelation nonfinite_offset = zero_anchored;
+    nonfinite_offset.reference_host_offset_ns = std::numeric_limits<double>::infinity();
+    expect(!acim::trace::device_cycle_to_host_timestamp_ns(nonfinite_offset, 100u).has_value(),
+           "timestamp conversion should reject a nonfinite offset");
+}
+
+void test_outlier_is_reported() {
+    constexpr std::array<acim::trace::ClockSyncSample, 5> samples{
+        acim::trace::ClockSyncSample{90u, 0u, 110u},
+        acim::trace::ClockSyncSample{290u, 100u, 310u},
+        acim::trace::ClockSyncSample{490u, 200u, 510u},
+        acim::trace::ClockSyncSample{1'690u, 300u, 1'710u},
+        acim::trace::ClockSyncSample{890u, 400u, 910u},
+    };
+    const auto correlation = acim::trace::fit_clock_correlation(samples);
+    expect(correlation.has_value(), "an outlier should produce diagnosable fit metadata");
+    if (correlation) {
+        expect(correlation->maximum_fit_residual_ns > 500.0,
+               "outlier should appear in maximum residual");
+    }
+}
+
+void test_randomized_clock_fit() {
+    // A fixed seed keeps fit regressions reproducible in CI.
+    // NOLINTNEXTLINE(bugprone-random-generator-seed)
+    std::mt19937_64 generator(0xC10Cu);
+    std::uniform_int_distribution<int> jitter(-10, 10);
+    std::vector<acim::trace::ClockSyncSample> samples;
+    for (std::uint64_t index = 0; index < 100u; ++index) {
+        const std::uint64_t cycle = 10'000u + index * 250u;
+        const std::int64_t midpoint =
+            1'000'000 + static_cast<std::int64_t>(cycle * 2u) + jitter(generator);
+        samples.push_back({static_cast<std::uint64_t>(midpoint - 20), cycle,
+                           static_cast<std::uint64_t>(midpoint + 20)});
+    }
+    const auto correlation = acim::trace::fit_clock_correlation(samples);
+    expect(correlation.has_value(), "randomized monotonic samples should fit");
+    if (correlation) {
+        expect(std::abs(correlation->nanoseconds_per_cycle - 2.0) < 0.001, "randomized fit slope");
+        expect(correlation->maximum_fit_residual_ns < 20.0,
+               "bounded jitter should have bounded residual");
+    }
 }
 
 } // namespace
 
 int main() {
     test_device_trace_batch_and_overflow();
+    test_device_trace_cycle_contract_and_wire_bytes();
     test_clock_correlation();
+    test_clock_epoch_rearms_a_completed_slot();
     test_invalid_clock_samples();
+    test_large_cycle_and_timestamp_precision();
+    test_checked_timestamp_boundaries();
+    test_outlier_is_reported();
+    test_randomized_clock_fit();
 
     if (failures != 0) {
         std::cerr << failures << " trace test(s) failed\n";

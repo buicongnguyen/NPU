@@ -25,6 +25,7 @@ body {
 }
 a { color: var(--accent); text-decoration: none; }
 a:hover { text-decoration: underline; }
+#resources-root a { text-decoration: underline; text-underline-offset: .15em; }
 header {
   padding: 34px clamp(18px, 5vw, 64px);
   border-bottom: 1px solid var(--line);

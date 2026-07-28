@@ -1,0 +1,100 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://buicongnguyen.github.io/NPU/schemas/analog-cim-architecture.schema.json",
+  "title": "Analog CIM architecture learning data",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["meta", "signalPath", "mythicSnapshot", "technologyComparison", "sources"],
+  "properties": {
+    "meta": { "$ref": "#/$defs/metadata" },
+    "signalPath": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "order", "label", "domain", "summary", "detail", "failureMode", "mitigation", "interviewPrompt", "sourceIds"],
+        "properties": {
+          "id": { "$ref": "#/$defs/id" },
+          "order": { "type": "integer", "minimum": 1 },
+          "label": { "$ref": "#/$defs/text" },
+          "domain": { "$ref": "#/$defs/text" },
+          "summary": { "$ref": "#/$defs/text" },
+          "detail": { "$ref": "#/$defs/text" },
+          "failureMode": { "$ref": "#/$defs/text" },
+          "mitigation": { "$ref": "#/$defs/text" },
+          "interviewPrompt": { "$ref": "#/$defs/text" },
+          "sourceIds": { "$ref": "#/$defs/sourceIds" }
+        }
+      }
+    },
+    "mythicSnapshot": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["value", "label", "context", "evidence", "sourceId"],
+        "properties": {
+          "value": { "$ref": "#/$defs/text" },
+          "label": { "$ref": "#/$defs/text" },
+          "context": { "$ref": "#/$defs/text" },
+          "evidence": { "$ref": "#/$defs/text" },
+          "sourceId": { "$ref": "#/$defs/id" }
+        }
+      }
+    },
+    "technologyComparison": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["system", "memory", "weightRole", "inputOutput", "bestFit", "mainCaveat"],
+        "properties": {
+          "system": { "$ref": "#/$defs/text" },
+          "memory": { "$ref": "#/$defs/text" },
+          "weightRole": { "$ref": "#/$defs/text" },
+          "inputOutput": { "$ref": "#/$defs/text" },
+          "bestFit": { "$ref": "#/$defs/text" },
+          "mainCaveat": { "$ref": "#/$defs/text" }
+        }
+      }
+    },
+    "sources": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/source" }
+    }
+  },
+  "$defs": {
+    "id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$" },
+    "text": { "type": "string", "minLength": 1 },
+    "sourceIds": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "$ref": "#/$defs/id" } },
+    "metadata": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["title", "updated", "scope", "terminology"],
+      "properties": {
+        "title": { "$ref": "#/$defs/text" },
+        "updated": { "type": "string", "format": "date" },
+        "scope": { "$ref": "#/$defs/text" },
+        "terminology": { "$ref": "#/$defs/text" }
+      }
+    },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "title", "publisher", "year", "type", "url"],
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "title": { "$ref": "#/$defs/text" },
+        "publisher": { "$ref": "#/$defs/text" },
+        "year": { "type": "integer", "minimum": 1900, "maximum": 2200 },
+        "type": { "$ref": "#/$defs/text" },
+        "url": { "$ref": "#/$defs/httpsUrl" }
+      }
+    },
+    "httpsUrl": { "type": "string", "format": "uri", "pattern": "^https://" }
+  }
+}

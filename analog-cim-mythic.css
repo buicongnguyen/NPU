@@ -205,19 +205,17 @@
   padding: 4px 9px;
   border-radius: 6px;
   background: color-mix(in srgb, var(--teal) 16%, var(--surface-2));
-  color: var(--teal);
+  color: var(--ink);
   font-size: 13px;
   font-weight: 800;
 }
 
 .score-value.medium {
   background: color-mix(in srgb, var(--amber) 16%, var(--surface-2));
-  color: var(--amber);
 }
 
 .score-value.low {
   background: color-mix(in srgb, var(--red) 16%, var(--surface-2));
-  color: var(--red);
 }
 
 .boundary-band {

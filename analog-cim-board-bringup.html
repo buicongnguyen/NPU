@@ -9,6 +9,9 @@
   <link rel="stylesheet" href="npu-engineering.css">
   <link rel="stylesheet" href="analog-cim-bringup.css?v=20260712-5">
   <script src="npu-engineering.js" defer></script>
+  <script src="scroll-accessibility.js" defer></script>
+  <link rel="stylesheet" href="book-shell.css">
+  <script src="book-shell.js"></script>
 </head>
 <body>
   <header class="site-header">
@@ -993,7 +996,7 @@ acim-smi health show --json</code></pre>
           <div class="bar-chip optional"><strong>BAR2: aperture</strong><span>Optional and capability-gated</span><code>Device SRAM/program window for bring-up, not raw production mapping</code></div>
           <div class="bar-chip optional"><strong>BAR4: trace</strong><span>Optional read-only window</span><code>Snapshot or streaming trace when DMA trace is unavailable</code></div>
         </div>
-        <div class="register-map" role="group" aria-label="Proposed PCIe BAR0 register map" tabindex="0">
+        <div class="register-map" role="group" aria-label="Proposed PCIe BAR0 register map">
           <div class="register-row"><span>Offset</span><span>Register</span><span>Access</span><span>Required semantics</span></div>
           <div class="register-row"><code>0x0000</code><strong>DEVICE_ID</strong><code>RO</code><span>Magic, hardware revision, register-layout major/minor.</span></div>
           <div class="register-row"><code>0x0010</code><strong>CAPS0 / CAPS1</strong><code>RO</code><span>DMA width, queues, MSI-X, reset, trace, memory, analog and digital features.</span></div>
@@ -1385,7 +1388,7 @@ readl(adev-&gt;bar0 + ACIM_DEVICE_STATUS);</code></pre>
         <span><abbr class="term" title="Submission Queue">SQ</abbr>/<abbr class="term" title="Completion Queue">CQ</abbr> = command/completion rings</span>
         <span><abbr class="term" title="Interrupt Request">IRQ</abbr> = Interrupt Request</span>
       </div>
-      <div class="sequence-wrap" tabindex="0" aria-label="Scrollable first inference sequence diagram">
+      <div class="sequence-wrap" aria-label="Scrollable first inference sequence diagram">
         <div class="sequence-diagram" role="group" aria-label="Application to Analog CIM inference sequence">
           <div></div>
           <div class="sequence-lane">Application / ONNX Runtime (ORT)</div>
@@ -1628,7 +1631,7 @@ readl(adev-&gt;bar0 + ACIM_DEVICE_STATUS);</code></pre>
       <div class="repository-tree source-tree">
         <div class="code-panel">
           <header><strong>Proposed source layout</strong><span>Source, generated contracts, platform integration, tests, and packaging have different owners</span></header>
-          <pre><code>acim-stack/
+          <pre aria-label="Proposed source repository layout"><code>acim-stack/
 |-- CMakeLists.txt
 |-- CMakePresets.json
 |-- .github/
@@ -1718,7 +1721,7 @@ readl(adev-&gt;bar0 + ACIM_DEVICE_STATUS);</code></pre>
       <div class="repository-tree">
         <div class="code-panel">
           <header><strong>Illustrative output layout</strong><span>Produced below an ignored <code>out/&lt;preset&gt;/</code> directory or CI artifact store</span></header>
-          <pre><code>out/linux-x86_64-release/
+          <pre aria-label="Illustrative build output layout"><code>out/linux-x86_64-release/
 |-- host/
 |   |-- bin/acim-run
 |   |-- bin/acim-smi
@@ -1879,7 +1882,7 @@ out/edge-board-release/
       </div>
 
       <h3 class="subheading" id="delivery-sequence">Sequence graph: code, commands, tensors, and evidence cross different owners</h3>
-      <div class="sequence-wrap" tabindex="0" aria-label="Scrollable ACiM delivery sequence graph">
+      <div class="sequence-wrap" aria-label="Scrollable ACiM delivery sequence graph">
         <div class="sequence-diagram" role="group" aria-label="Milestone sequence across build host device data plane and evidence actors">
           <div></div>
           <div class="sequence-lane">Build / compiler / CI</div>

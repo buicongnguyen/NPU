@@ -7,6 +7,7 @@
   --muted: #59666b;
   --line: #cbd4d7;
   --teal: #006b61;
+  --on-teal: #ffffff;
   --teal-strong: #005149;
   --blue: #285a8c;
   --red: #a63a3a;
@@ -27,6 +28,7 @@
     --muted: #b2bec1;
     --line: #354247;
     --teal: #79d7c7;
+    --on-teal: #07111f;
     --teal-strong: #9be6d8;
     --blue: #9bc5f2;
     --red: #f3a4a0;
@@ -204,7 +206,7 @@ h3 {
 .button {
   border-color: var(--teal);
   background: var(--teal);
-  color: #ffffff;
+  color: var(--on-teal);
   cursor: pointer;
 }
 
@@ -624,6 +626,8 @@ tbody th {
 }
 
 .source-card {
+  min-width: 0;
+  overflow-wrap: anywhere;
   box-shadow: none;
 }
 
