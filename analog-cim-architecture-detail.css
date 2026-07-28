@@ -1257,6 +1257,11 @@
   background: var(--line);
 }
 
+.async-timeline {
+  max-width: 100%;
+  overflow-x: auto;
+}
+
 .async-row {
   display: grid;
   grid-template-columns: minmax(100px, 1.25fr) repeat(4, minmax(58px, 1fr));

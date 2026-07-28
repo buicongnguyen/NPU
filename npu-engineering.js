@@ -63,7 +63,8 @@
 
     let saved = {};
     try {
-      saved = JSON.parse(localStorage.getItem(storageKey) || '{}');
+      const parsed = JSON.parse(localStorage.getItem(storageKey) || '{}');
+      saved = parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : {};
     } catch (_) {
       saved = {};
     }
@@ -84,7 +85,7 @@
     };
 
     checks.forEach((check) => {
-      check.checked = Boolean(saved[check.getAttribute('data-step')]);
+      check.checked = saved[check.getAttribute('data-step')] === true;
       check.addEventListener('change', () => {
         saved[check.getAttribute('data-step')] = check.checked;
         try {

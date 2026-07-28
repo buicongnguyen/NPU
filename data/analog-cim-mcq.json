@@ -2,7 +2,7 @@
   "meta": {
     "title": "Mythic and analog compute-in-memory MCQ bank",
     "updated": "2026-07-11",
-    "questionCount": 30,
+    "questionCount": 32,
     "answerIndexing": "zero-based",
     "choiceOrder": "Canonical source order; the interactive quiz shuffles displayed choices.",
     "license": "Original study questions. Source IDs point to the primary material used for each explanation."

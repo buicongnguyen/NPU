@@ -9,6 +9,7 @@ project(
 
 include(CTest)
 include(GNUInstallDirs)
+include(CMakePackageConfigHelpers)
 
 option(ACIM_WARNINGS_AS_ERRORS "Treat warnings in ACiM-owned targets as errors" OFF)
 option(ACIM_ENABLE_SANITIZERS "Enable AddressSanitizer and UndefinedBehaviorSanitizer" OFF)
@@ -16,6 +17,7 @@ option(ACIM_ENABLE_GTEST "Build the optional GoogleTest suite" OFF)
 option(ACIM_FETCH_GTEST "Fetch the pinned GoogleTest source when it is not installed" OFF)
 option(ACIM_ENABLE_TRACY "Instrument host targets with the Tracy profiler" OFF)
 option(ACIM_FETCH_TRACY "Fetch the pinned Tracy source when it is not installed" OFF)
+option(ACIM_ENABLE_FUZZING "Build libFuzzer targets with Clang" OFF)
 
 if(ACIM_FETCH_GTEST AND NOT ACIM_ENABLE_GTEST)
     message(FATAL_ERROR "ACIM_FETCH_GTEST requires ACIM_ENABLE_GTEST=ON")
@@ -25,11 +27,22 @@ if(ACIM_FETCH_TRACY AND NOT ACIM_ENABLE_TRACY)
     message(FATAL_ERROR "ACIM_FETCH_TRACY requires ACIM_ENABLE_TRACY=ON")
 endif()
 
+if(ACIM_ENABLE_FUZZING AND NOT ACIM_ENABLE_SANITIZERS)
+    message(FATAL_ERROR "ACIM_ENABLE_FUZZING requires ACIM_ENABLE_SANITIZERS=ON")
+endif()
+
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 include(ProjectOptions)
 
 add_library(acim_profiling INTERFACE)
 add_library(acim::profiling ALIAS acim_profiling)
+set_target_properties(acim_profiling PROPERTIES EXPORT_NAME profiling)
+target_include_directories(
+    acim_profiling
+    INTERFACE
+        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+        $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
+)
 
 if(ACIM_ENABLE_TRACY)
     if(ACIM_FETCH_TRACY)
@@ -55,6 +68,7 @@ endif()
 
 add_library(acim_device_trace INTERFACE)
 add_library(acim::device_trace ALIAS acim_device_trace)
+set_target_properties(acim_device_trace PROPERTIES EXPORT_NAME device_trace)
 target_include_directories(
     acim_device_trace
     INTERFACE
@@ -70,6 +84,7 @@ configure_file(
 
 add_library(acim_sim STATIC src/simulator.cpp)
 add_library(acim::sim ALIAS acim_sim)
+set_target_properties(acim_sim PROPERTIES EXPORT_NAME sim)
 
 target_compile_features(acim_sim PUBLIC cxx_std_20)
 target_include_directories(
@@ -83,6 +98,7 @@ acim_configure_target(acim_sim)
 
 add_library(acim_trace STATIC src/trace_correlation.cpp)
 add_library(acim::trace ALIAS acim_trace)
+set_target_properties(acim_trace PROPERTIES EXPORT_NAME trace)
 target_compile_features(acim_trace PUBLIC cxx_std_20)
 target_include_directories(
     acim_trace
@@ -111,6 +127,10 @@ if(BUILD_TESTING)
     target_link_libraries(acim_device_trace_c_test PRIVATE acim::device_trace)
     acim_configure_target(acim_device_trace_c_test)
 
+    add_executable(acim_profiling_interface_test tests/profiling_interface_test.cpp)
+    target_link_libraries(acim_profiling_interface_test PRIVATE acim::profiling)
+    acim_configure_target(acim_profiling_interface_test)
+
     add_test(NAME acim.unit.functional_simulator COMMAND acim_unit_tests)
     set_tests_properties(
         acim.unit.functional_simulator
@@ -127,6 +147,12 @@ if(BUILD_TESTING)
     set_tests_properties(
         acim.unit.device_trace_c_abi
         PROPERTIES LABELS "unit;device-trace;c-abi" TIMEOUT 10
+    )
+
+    add_test(NAME acim.unit.profiling_interface COMMAND acim_profiling_interface_test)
+    set_tests_properties(
+        acim.unit.profiling_interface
+        PROPERTIES LABELS "unit;profiling" TIMEOUT 10
     )
 
     add_test(NAME acim.smoke.functional_simulator COMMAND acim_smoke)
@@ -161,10 +187,27 @@ if(BUILD_TESTING)
             DISCOVERY_TIMEOUT 30
         )
     endif()
+
+endif()
+
+if(ACIM_ENABLE_FUZZING)
+    if(NOT CMAKE_CXX_COMPILER_ID MATCHES "Clang" OR WIN32)
+        message(FATAL_ERROR "ACIM_ENABLE_FUZZING requires Clang on a non-Windows host")
+    endif()
+
+    foreach(fuzz_target IN ITEMS acim_device_trace_fuzzer acim_trace_correlation_fuzzer)
+        add_executable(${fuzz_target} "fuzz/${fuzz_target}.cpp")
+        target_compile_options(${fuzz_target} PRIVATE -fsanitize=fuzzer)
+        target_link_options(${fuzz_target} PRIVATE -fsanitize=fuzzer,address,undefined)
+        acim_configure_target(${fuzz_target})
+    endforeach()
+    target_link_libraries(acim_device_trace_fuzzer PRIVATE acim::device_trace)
+    target_link_libraries(acim_trace_correlation_fuzzer PRIVATE acim::trace)
 endif()
 
 install(
-    TARGETS acim_sim acim_trace acim_smoke
+    TARGETS acim_sim acim_trace acim_device_trace acim_profiling acim_smoke
+    EXPORT acim_minimalTargets
     ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
     LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
     RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
@@ -176,3 +219,28 @@ install(
     FILES "${CMAKE_CURRENT_BINARY_DIR}/acim-build-manifest.txt"
     DESTINATION "${CMAKE_INSTALL_DATADIR}/acim-minimal"
 )
+
+set(acim_minimal_cmake_install_dir "${CMAKE_INSTALL_LIBDIR}/cmake/acim_minimal")
+configure_package_config_file(
+    cmake/acim_minimalConfig.cmake.in
+    "${CMAKE_CURRENT_BINARY_DIR}/acim_minimalConfig.cmake"
+    INSTALL_DESTINATION "${acim_minimal_cmake_install_dir}"
+)
+write_basic_package_version_file(
+    "${CMAKE_CURRENT_BINARY_DIR}/acim_minimalConfigVersion.cmake"
+    VERSION "${PROJECT_VERSION}"
+    COMPATIBILITY SameMajorVersion
+)
+install(
+    EXPORT acim_minimalTargets
+    FILE acim_minimalTargets.cmake
+    NAMESPACE acim::
+    DESTINATION "${acim_minimal_cmake_install_dir}"
+)
+install(
+    FILES
+        "${CMAKE_CURRENT_BINARY_DIR}/acim_minimalConfig.cmake"
+        "${CMAKE_CURRENT_BINARY_DIR}/acim_minimalConfigVersion.cmake"
+    DESTINATION "${acim_minimal_cmake_install_dir}"
+)
+install(FILES docs/trace-abi.md DESTINATION "${CMAKE_INSTALL_DOCDIR}")

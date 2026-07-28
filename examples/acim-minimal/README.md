@@ -153,10 +153,42 @@ zone API is the direct host path; it should not be used to fabricate historical 
 zones at drain time.
 
 The trace unit test exercises ABI layout, event ordering, overflow reporting, invalid
-clock samples, and a known two-nanosecond-per-cycle clock fit:
+clock samples, counter wrap and epoch boundaries, large timestamp precision, outlier
+reporting, randomized samples, and a known two-nanosecond-per-cycle clock fit. The
+complete byte-order, framing, compatibility, and acquire/release ownership contract is
+documented in `docs/trace-abi.md`:
 
 ```console
 ctest --preset dev -L device-trace
+```
+
+## Consume the installed CMake package
+
+Installation exports `acim::sim`, `acim::trace`, `acim::device_trace`, and
+`acim::profiling` through `acim_minimalConfig.cmake`. CI installs the project and then
+builds `tests/package-consumer` as a separate downstream project:
+
+```console
+cmake --install build/dev --prefix build/stage
+cmake -S tests/package-consumer -B build/consumer -G Ninja \
+  -DCMAKE_PREFIX_PATH="$PWD/build/stage"
+cmake --build build/consumer
+./build/consumer/acim_package_consumer
+```
+
+## Run the fuzz targets
+
+Clang builds bounded libFuzzer targets for the C trace-buffer producer and the clock
+correlation parser. The fuzzing CI job runs each target with ASan and UBSan:
+
+```console
+CC=clang CXX=clang++ cmake -S . -B build/fuzz -G Ninja \
+  -DBUILD_TESTING=OFF \
+  -DACIM_ENABLE_SANITIZERS=ON \
+  -DACIM_ENABLE_FUZZING=ON
+cmake --build build/fuzz --target acim_device_trace_fuzzer acim_trace_correlation_fuzzer
+./build/fuzz/acim_device_trace_fuzzer -max_total_time=20
+./build/fuzz/acim_trace_correlation_fuzzer -max_total_time=20
 ```
 
 ## Cross-compile the host runtime

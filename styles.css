@@ -6,6 +6,7 @@
   --muted: #5b6675;
   --line: #d8dee8;
   --accent: #126c5a;
+  --on-accent: #ffffff;
   --accent-strong: #0b4d40;
   --blue: #244d8f;
   --gold: #8a6200;
@@ -21,6 +22,7 @@
     --muted: #b7c1ce;
     --line: #313b49;
     --accent: #80d8be;
+    --on-accent: #07111f;
     --accent-strong: #a7e7d5;
     --blue: #9dbdff;
     --gold: #edcc79;
@@ -188,7 +190,7 @@ h3 {
 
 .button {
   background: var(--accent);
-  color: #ffffff;
+  color: var(--on-accent);
   border-color: var(--accent);
 }
 
@@ -933,7 +935,7 @@ footer p {
 
 .npu-page .qa-chip[aria-pressed="true"] {
   background: var(--accent);
-  color: #ffffff;
+  color: var(--on-accent);
   border-color: var(--accent);
 }
 
@@ -962,6 +964,7 @@ footer p {
 }
 
 .npu-page .qa-group {
+  min-width: 0;
   margin-top: 16px;
 }
 
@@ -975,10 +978,12 @@ footer p {
 
 .npu-page .qa-list {
   display: grid;
+  min-width: 0;
   gap: 8px;
 }
 
 .npu-page details.qa {
+  min-width: 0;
   border: 1px solid var(--line);
   border-radius: 8px;
   background: var(--panel);
@@ -1013,7 +1018,9 @@ footer p {
 }
 
 .npu-page details.qa .qa-q {
+  min-width: 0;
   flex: 1 1 auto;
+  overflow-wrap: anywhere;
 }
 
 .npu-page details.qa .qa-a {

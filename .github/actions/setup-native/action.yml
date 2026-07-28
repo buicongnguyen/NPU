@@ -1,0 +1,47 @@
+name: Set up ACiM native toolchain
+description: Install and report the native tools shared by ACiM CI jobs
+inputs:
+  apt-packages:
+    description: Additional Ubuntu packages to install
+    required: false
+    default: ''
+runs:
+  using: composite
+  steps:
+    - name: Enable the MSVC developer environment
+      if: runner.os == 'Windows'
+      uses: ilammy/msvc-dev-cmd@0b201ec74fa43914dc39ae48a89fd1d8cb592756 # v1
+
+    - name: Install Ubuntu native tools
+      if: runner.os == 'Linux'
+      shell: bash
+      env:
+        APT_PACKAGES: ${{ inputs.apt-packages }}
+      run: |
+        read -r -a extra_packages <<< "$APT_PACKAGES"
+        packages=(ninja-build)
+        for package in "${extra_packages[@]}"; do
+          if [[ ! "$package" =~ ^[a-z0-9][a-z0-9+.-]*$ ]]; then
+            echo "Invalid apt package name: $package" >&2
+            exit 2
+          fi
+          packages+=("$package")
+        done
+        sudo apt-get update
+        sudo apt-get install --yes --no-install-recommends "${packages[@]}"
+
+    - name: Record Unix toolchain
+      if: runner.os == 'Linux'
+      shell: bash
+      run: |
+        cmake --version
+        ninja --version
+        "${CXX:-c++}" --version
+
+    - name: Record Windows toolchain
+      if: runner.os == 'Windows'
+      shell: pwsh
+      run: |
+        cmake --version
+        ninja --version
+        cl /? | Select-Object -First 2

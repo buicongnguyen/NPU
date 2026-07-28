@@ -4,3 +4,8 @@
 **/.cache/
 **/.pytest_cache/
 **/__pycache__/
+.lighthouseci/
+.tmp-lighthouse/
+node_modules/
+playwright-report/
+test-results/

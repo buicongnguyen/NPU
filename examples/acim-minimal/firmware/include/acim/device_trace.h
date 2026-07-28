@@ -9,7 +9,8 @@
 extern "C" {
 #endif
 
-#define ACIM_TRACE_ABI_VERSION 1u
+#define ACIM_TRACE_ABI_VERSION 2u
+#define ACIM_TRACE_BYTE_ORDER_LITTLE_ENDIAN 1u
 #define ACIM_TRACE_KIND_ZONE_BEGIN ((uint8_t)1u)
 #define ACIM_TRACE_KIND_ZONE_END ((uint8_t)2u)
 #define ACIM_TRACE_KIND_COUNTER ((uint8_t)3u)
@@ -36,7 +37,7 @@ typedef struct AcimTraceBatchHeader {
     uint32_t dropped_records;
     uint32_t clock_domain_id;
     uint32_t event_dictionary_version;
-    uint32_t reserved;
+    uint32_t byte_order;
     uint64_t clock_hz;
     uint64_t clock_epoch;
     uint64_t capture_id;
@@ -56,10 +57,39 @@ typedef struct AcimTraceBuffer {
 #if defined(__cplusplus)
 static_assert(sizeof(AcimTraceRecord) == 32u, "ACiM trace record ABI changed");
 static_assert(sizeof(AcimTraceBatchHeader) == 56u, "ACiM trace header ABI changed");
+static_assert(offsetof(AcimTraceRecord, cycle) == 0u, "ACiM trace cycle offset changed");
+static_assert(offsetof(AcimTraceRecord, value) == 8u, "ACiM trace value offset changed");
+static_assert(offsetof(AcimTraceRecord, sequence) == 16u, "ACiM trace sequence offset changed");
+static_assert(offsetof(AcimTraceRecord, event_id) == 20u, "ACiM trace event offset changed");
+static_assert(offsetof(AcimTraceRecord, source_id) == 24u, "ACiM trace source offset changed");
+static_assert(offsetof(AcimTraceRecord, kind) == 26u, "ACiM trace kind offset changed");
+static_assert(offsetof(AcimTraceRecord, flags) == 27u, "ACiM trace flags offset changed");
+static_assert(offsetof(AcimTraceRecord, command_id) == 28u, "ACiM trace command offset changed");
+static_assert(offsetof(AcimTraceBatchHeader, clock_hz) == 32u, "ACiM trace clock offset changed");
+static_assert(offsetof(AcimTraceBatchHeader, capture_id) == 48u,
+              "ACiM trace capture offset changed");
 #else
 _Static_assert(sizeof(AcimTraceRecord) == 32u, "ACiM trace record ABI changed");
 _Static_assert(sizeof(AcimTraceBatchHeader) == 56u, "ACiM trace header ABI changed");
+_Static_assert(offsetof(AcimTraceRecord, cycle) == 0u, "ACiM trace cycle offset changed");
+_Static_assert(offsetof(AcimTraceRecord, value) == 8u, "ACiM trace value offset changed");
+_Static_assert(offsetof(AcimTraceRecord, sequence) == 16u, "ACiM trace sequence offset changed");
+_Static_assert(offsetof(AcimTraceRecord, event_id) == 20u, "ACiM trace event offset changed");
+_Static_assert(offsetof(AcimTraceRecord, source_id) == 24u, "ACiM trace source offset changed");
+_Static_assert(offsetof(AcimTraceRecord, kind) == 26u, "ACiM trace kind offset changed");
+_Static_assert(offsetof(AcimTraceRecord, flags) == 27u, "ACiM trace flags offset changed");
+_Static_assert(offsetof(AcimTraceRecord, command_id) == 28u, "ACiM trace command offset changed");
+_Static_assert(offsetof(AcimTraceBatchHeader, clock_hz) == 32u, "ACiM trace clock offset changed");
+_Static_assert(offsetof(AcimTraceBatchHeader, capture_id) == 48u,
+               "ACiM trace capture offset changed");
 #endif
+
+static inline bool acim_trace_native_byte_order_supported(void) {
+    const uint64_t marker = UINT64_C(0x0102030405060708);
+    const unsigned char *bytes = (const unsigned char *)&marker;
+    return bytes[0] == 0x08u && bytes[1] == 0x07u && bytes[2] == 0x06u && bytes[3] == 0x05u &&
+           bytes[4] == 0x04u && bytes[5] == 0x03u && bytes[6] == 0x02u && bytes[7] == 0x01u;
+}
 
 static inline bool acim_trace_buffer_init(AcimTraceBuffer *buffer, AcimTraceBatchHeader *header,
                                           AcimTraceRecord *records, uint32_t capacity,
@@ -67,8 +97,8 @@ static inline bool acim_trace_buffer_init(AcimTraceBuffer *buffer, AcimTraceBatc
                                           uint32_t event_dictionary_version, uint64_t clock_hz,
                                           uint64_t clock_epoch, uint64_t capture_id,
                                           uint32_t initial_command_id) {
-    if (buffer == NULL || header == NULL || records == NULL || capacity == 0u ||
-        event_dictionary_version == 0u || clock_hz == 0u) {
+    if (!acim_trace_native_byte_order_supported() || buffer == NULL || header == NULL ||
+        records == NULL || capacity == 0u || event_dictionary_version == 0u || clock_hz == 0u) {
         return false;
     }
 
@@ -79,7 +109,7 @@ static inline bool acim_trace_buffer_init(AcimTraceBuffer *buffer, AcimTraceBatc
     header->dropped_records = 0u;
     header->clock_domain_id = clock_domain_id;
     header->event_dictionary_version = event_dictionary_version;
-    header->reserved = 0u;
+    header->byte_order = ACIM_TRACE_BYTE_ORDER_LITTLE_ENDIAN;
     header->clock_hz = clock_hz;
     header->clock_epoch = clock_epoch;
     header->capture_id = capture_id;
@@ -109,6 +139,13 @@ static inline bool acim_trace_emit(AcimTraceBuffer *buffer, uint64_t cycle, uint
 
     header = buffer->header;
     if (header->record_count >= buffer->capacity) {
+        if (header->dropped_records != UINT32_MAX) {
+            ++header->dropped_records;
+        }
+        return false;
+    }
+
+    if (header->record_count > 0u && cycle < buffer->records[header->record_count - 1u].cycle) {
         if (header->dropped_records != UINT32_MAX) {
             ++header->dropped_records;
         }

@@ -4,8 +4,12 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="description" content="A self-study guide to AI accelerators, Mythic analog compute-in-memory, Tenstorrent reuse decisions, NPU/SoC software architecture, frameworks, compiler and ISA integration, deployment, LLVM/MLIR, and interview practice.">
+  <link rel="canonical" href="https://buicongnguyen.github.io/NPU/">
   <title>NPU, VPU &amp; LPU — AI Accelerator &amp; Compiler Study Guide | Bui Cong Nguyen</title>
   <link rel="stylesheet" href="styles.css">
+  <script src="scroll-accessibility.js" defer></script>
+  <link rel="stylesheet" href="book-shell.css">
+  <script src="book-shell.js"></script>
 </head>
 <body class="npu-page">
   <header class="site-header">
@@ -143,11 +147,13 @@
     <section id="analog-cim" class="section">
       <div class="section-heading">
         <p class="eyebrow">Analog compute-in-memory case study</p>
-        <h2>Mythic Architecture, Accuracy Evidence, Acquisition Strategy, and NPU Engineering</h2>
+        <h2>Mythic and iHW Architectures, Accuracy Evidence, and NPU Engineering</h2>
         <p class="section-note">
           A separate learning path traces Mythic's flash-based matrix engine from device physics through ADCs,
           tile dataflow, quantization, and graph compilation. It also audits Nature-family accuracy claims and keeps
-          measured results distinct from vendor roadmap statements, including the 2026 Videantis acquisition.
+          measured results distinct from vendor roadmap statements, including the 2026 Videantis acquisition and
+          iHW's positional digit-slice, adaptive-ADC, grouped-quantization, and signed-weight patent stack. The scale-out
+          design adds defect virtualization, multi-chip collectives, and a hybrid LLM execution architecture.
         </p>
       </div>
       <div class="evidence-grid compact">
@@ -176,6 +182,24 @@
           <a href="analog-cim-mythic-videantis.html">Open Mythic and Videantis study</a>
         </article>
         <article>
+          <span>Patent deep read</span>
+          <h3>How does iHW claim to improve ACiM accuracy?</h3>
+          <p>Trace positional digit-sliced weights, adaptive ADC range, grouped quantization, signed-current cancellation, their software consequences, and the product evidence still missing.</p>
+          <a href="analog-cim-ihw-patents.html">Open iHW patent study</a>
+        </article>
+        <article>
+          <span>SDK and toolchain</span>
+          <h3>How do I build the compiler and runtime?</h3>
+          <p>Follow one model through ONNX import, MLIR lowering, calibration, artifact packaging, a stable C API, simulator/HAL backends, framework integration, CI, and the first runnable MatMul slice.</p>
+          <a href="analog-cim-sdk-toolchain.html">Open SDK and compiler guide</a>
+        </article>
+        <article>
+          <span>Board bring-up</span>
+          <h3>How does the compiled model reach a real PCIe ACiM board?</h3>
+          <p>Implement host and device requirements, UMD/KMD ownership, BAR and queue contracts, DMA and MSI-X ordering, firmware boot, analog programming, YOLO dataflow, recovery, security, and staged validation.</p>
+          <a href="analog-cim-board-bringup.html">Open board bring-up guide</a>
+        </article>
+        <article>
           <span>Architecture translation</span>
           <h3>Learn Tenstorrent patterns for an ACiM stack</h3>
           <p>Trace one model through Tenstorrent's open stack, separate portable accelerator concepts from Tensix assumptions, and rebuild the path with ACiM contracts and implementation labs.</p>
@@ -186,6 +210,12 @@
           <h3>Structure the compiler, SDK, tests, CI, and debug tools</h3>
           <p>Use a TT-Metal-inspired repository tree with explicit ownership, CMake/GCC/Clang build lanes, a buildable MVM simulator, GoogleTest and pytest roles, smoke-to-qualification gates, and a practical debugging workflow.</p>
           <a href="accelerator-repository-blueprint.html">Open repository blueprint</a>
+        </article>
+        <article>
+          <span>Scale-out and LLM inference</span>
+          <h3>How does imperfect Analog CIM become a logical accelerator mesh?</h3>
+          <p>Design cell-to-cluster fault handling, logical/physical descriptors, fault-aware placement, collectives, recovery, four-bit execution, and a hybrid decoder LLM stack.</p>
+          <a href="analog-cim-scaleout-llm.html">Open scale-out and LLM design</a>
         </article>
         <article>
           <span>Interview</span>
@@ -769,12 +799,12 @@
       <div class="qa-toolbar">
         <input class="qa-search" type="search" placeholder="Search 50 questions and answers&hellip;" aria-label="Search questions">
         <div class="qa-chips" role="group" aria-label="Filter by category">
-            <button class="qa-chip" data-cat="all" aria-pressed="true">All 50</button>
-            <button class="qa-chip" data-cat="accelerators" aria-pressed="false">Accelerators (10)</button>
-            <button class="qa-chip" data-cat="deployment" aria-pressed="false">Deployment (10)</button>
-            <button class="qa-chip" data-cat="llvm" aria-pressed="false">LLVM (10)</button>
-            <button class="qa-chip" data-cat="mlir" aria-pressed="false">MLIR (10)</button>
-            <button class="qa-chip" data-cat="compilers" aria-pressed="false">NPU compilers (10)</button>
+            <button type="button" class="qa-chip" data-cat="all" aria-pressed="true">All 50</button>
+            <button type="button" class="qa-chip" data-cat="accelerators" aria-pressed="false">Accelerators (10)</button>
+            <button type="button" class="qa-chip" data-cat="deployment" aria-pressed="false">Deployment (10)</button>
+            <button type="button" class="qa-chip" data-cat="llvm" aria-pressed="false">LLVM (10)</button>
+            <button type="button" class="qa-chip" data-cat="mlir" aria-pressed="false">MLIR (10)</button>
+            <button type="button" class="qa-chip" data-cat="compilers" aria-pressed="false">NPU compilers (10)</button>
         </div>
         <div class="qa-tools">
           <button type="button" data-act="expand">Expand all</button>
@@ -1260,6 +1290,5 @@
     apply();
   })();
   </script>
-  <script src="./theme-toggle.js"></script>
 </body>
 </html>

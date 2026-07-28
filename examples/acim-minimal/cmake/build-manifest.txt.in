@@ -15,6 +15,7 @@ cxx_compiler=@CMAKE_CXX_COMPILER@
 cxx_feature=cxx_std_20
 warnings_as_errors=@ACIM_WARNINGS_AS_ERRORS@
 sanitizers=@ACIM_ENABLE_SANITIZERS@
+fuzzing=@ACIM_ENABLE_FUZZING@
 google_test=@ACIM_ENABLE_GTEST@
 fetch_google_test=@ACIM_FETCH_GTEST@
 tracy=@ACIM_ENABLE_TRACY@

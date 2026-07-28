@@ -45,7 +45,7 @@
     --deep-bg: #241a33;
     --deep-ink: #c39bff;
     --wrong-border: #5a2323;
-    --shadow: rgba(0, 0, 0, .35);
+    --topbtn-shadow-color: rgba(0, 0, 0, .35);
     --radius: 10px;
     --font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, "Noto Sans", sans-serif;
     --mono: ui-monospace, "SF Mono", "Cascadia Code", "Segoe UI Mono", Consolas, "Liberation Mono", monospace;
@@ -90,7 +90,7 @@
     --deep-bg: #f0eafc;
     --deep-ink: #6639ba;
     --wrong-border: #f0b0b0;
-    --shadow: rgba(140, 149, 159, .3);
+    --topbtn-shadow-color: rgba(140, 149, 159, .3);
   }
 
   * { box-sizing: border-box; }
@@ -178,9 +178,11 @@
     background: var(--panel);
   }
 
-  nav.toc h1 {
+  nav.toc .toc-title {
+    margin: 0;
     color: var(--accent);
     font-size: 1.08rem;
+    font-weight: 800;
   }
 
   nav.toc .sub {
@@ -237,13 +239,21 @@
 
   header.hero .role {
     margin: 0;
-    font-size: 1.8rem;
+    font-size: .82rem;
     font-weight: 800;
+    letter-spacing: .08em;
+    text-transform: uppercase;
   }
 
   header.hero .tag {
     color: var(--accent);
     font-weight: 700;
+  }
+
+  header.hero h1 {
+    margin-top: 8px;
+    font-size: clamp(2rem, 5vw, 3.6rem);
+    line-height: 1.06;
   }
 
   header.hero .pos {
@@ -297,6 +307,15 @@
     font-size: .9rem;
   }
 
+  .table-scroll {
+    max-width: 100%;
+    overflow-x: auto;
+  }
+
+  .table-scroll table {
+    min-width: 620px;
+  }
+
   th, td {
     border: 1px solid var(--line);
     padding: 8px 10px;
@@ -316,6 +335,10 @@
     border: 1px solid var(--line);
     border-radius: 8px;
     padding: 14px 16px;
+  }
+
+  .box code {
+    overflow-wrap: anywhere;
   }
 
   .box.info {
@@ -538,6 +561,11 @@
     color: var(--ink);
   }
 
+  .termdef a {
+    text-decoration: underline;
+    text-underline-offset: .15em;
+  }
+
   .grid2 {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -565,32 +593,8 @@
     color: var(--ink);
     cursor: pointer;
     font-size: 1.2rem;
-    box-shadow: 0 2px 10px var(--shadow);
+    box-shadow: 0 2px 10px var(--topbtn-shadow-color);
   }
-
-  .themebtn {
-    position: fixed;
-    right: 18px;
-    bottom: 68px;
-    z-index: 20;
-    display: inline-flex;
-    gap: 6px;
-    align-items: center;
-    height: 42px;
-    padding: 0 14px;
-    border: 1px solid var(--line);
-    border-radius: 21px;
-    background: var(--panel2);
-    color: var(--ink);
-    cursor: pointer;
-    font: inherit;
-    font-size: .82rem;
-    box-shadow: 0 2px 10px var(--shadow);
-  }
-
-  .themebtn:hover { border-color: var(--accent); }
-
-  .themebtn .theme-icon { font-size: 1rem; line-height: 1; }
 
   footer {
     padding: 10px 0 36px;
@@ -626,7 +630,7 @@
   }
 
   @media print {
-    nav.toc, .searchbar, .topbtn, .themebtn { display: none; }
+    nav.toc, .searchbar, .topbtn { display: none; }
     body { background: #fff; color: #111; }
     main { max-width: none; padding: 0; }
     section, header.hero, details.qa {
@@ -638,23 +642,14 @@
     details.qa { page-break-inside: avoid; }
   }
 </style>
-<script>
-  // Apply the saved (or system-preferred) theme before first paint to avoid a flash.
-  (function () {
-    try {
-      var t = localStorage.getItem("npu-theme");
-      if (!t) {
-        t = (window.matchMedia && window.matchMedia("(prefers-color-scheme: light)").matches) ? "light" : "dark";
-      }
-      if (t === "light") document.documentElement.setAttribute("data-theme", "light");
-    } catch (e) {}
-  })();
-</script>
+  <script src="scroll-accessibility.js" defer></script>
+  <link rel="stylesheet" href="book-shell.css">
+  <script src="book-shell.js"></script>
 </head>
 <body>
 <div class="wrap">
 <nav class="toc" aria-label="Table of contents">
-  <h1>AI Compiler Practice</h1>
+  <p class="toc-title">AI Compiler Practice</p>
   <p class="sub">Self-contained study notes and practice questions for AI compiler and NPU topics.</p>
   <ol>
     <li><a href="#overview">How to use</a></li>
@@ -680,7 +675,8 @@
 
 <main>
 <header class="hero">
-  <p class="role"><span class="tag">Practice</span> AI Compiler and NPU Practice Lab</p>
+  <p class="role"><span class="tag">Practice lab</span> · AI compiler · NPU</p>
+  <h1>AI Compiler and NPU Practice</h1>
   <p class="pos">A self-contained study page for multiple-choice and open-ended practice on graph compilers, Tenstorrent-style NPU programming, memory planning, MLIR-style lowering, quantization, runtime scheduling, and small coding drills.</p>
   <div class="meta">
     <span>Offline HTML</span>
@@ -717,6 +713,7 @@
     framework graph &rarr; graph optimization &rarr; high-level IR &rarr; layout and memory planning &rarr; target lowering &rarr; runtime packets and kernels.
   </div>
 
+  <div class="table-scroll" role="region" aria-label="AI compiler pipeline levels">
   <table>
     <tr><th>Level</th><th>Main information</th><th>Good optimizations here</th></tr>
     <tr><td>Graph</td><td>Operators, shapes, constants, dependencies</td><td>Fusion, folding, dead-node removal, partitioning</td></tr>
@@ -724,12 +721,14 @@
     <tr><td>Target IR</td><td>Memory spaces, DMA, hardware intrinsics, launch shape</td><td>SRAM placement, double buffering, sharding, kernel selection</td></tr>
     <tr><td>Runtime</td><td>Compiled programs, queues, synchronization, cache state</td><td>Warmup, program cache, async dispatch, profiling</td></tr>
   </table>
+  </div>
 </section>
 
 <section id="processor-map">
   <h2>Processor map</h2>
   <p>This is a public-study comparison of common processor labels used around AI systems. Exact architecture varies by vendor, so treat this as a mental model, not a hardware specification.</p>
 
+  <div class="table-scroll" role="region" aria-label="AI processor comparison">
   <table>
     <tr><th>Unit</th><th>Primary role</th><th>Strengths</th><th>Common AI use</th><th>Watch-outs</th></tr>
     <tr>
@@ -768,6 +767,7 @@
       <td>Not a generic standard like CPU/GPU. Treat it as a vendor architecture category unless another source defines it explicitly.</td>
     </tr>
   </table>
+  </div>
 
   <div class="box info">
     <span class="bt">How to choose a target</span>
@@ -806,6 +806,7 @@
     A token representation attends to other token representations. Attention builds context-aware vectors, then feed-forward layers transform each token independently.
   </div>
 
+  <div class="table-scroll" role="region" aria-label="Transformer component comparison">
   <table>
     <tr><th>Component</th><th>What it does</th><th>Compiler / NPU relevance</th></tr>
     <tr><td>Tokenization</td><td>Converts text into token IDs consumed by the model.</td><td>Usually CPU-side or preprocessing; affects sequence length.</td></tr>
@@ -815,6 +816,7 @@
     <tr><td>LayerNorm / RMSNorm</td><td>Normalizes activations for stable computation.</td><td>Reduction-heavy, often less matrix-engine-friendly than GEMM.</td></tr>
     <tr><td>KV cache</td><td>Stores past keys and values during autoregressive generation.</td><td>Critical for token latency and memory footprint.</td></tr>
   </table>
+  </div>
 
   <pre><code>Scaled dot-product attention:
 
@@ -872,6 +874,7 @@ Common LLM inference shape:
     <p><b>TT-Lang</b> is useful to watch as a kernel/programming-language layer for expressing Tenstorrent-style operations, dataflow buffers, simulation, and lower-level tutorials such as elementwise and matmul examples.</p>
   </div>
 
+  <div class="table-scroll" role="region" aria-label="Tenstorrent software stack layers">
   <table>
     <tr><th>Layer</th><th>Main role</th><th>When to study it</th></tr>
     <tr><td>TT-Forge</td><td>Current high-level compiler path from framework graphs toward Tenstorrent execution.</td><td>Model import, graph lowering, unsupported ops, compiler diagnostics, model bring-up.</td></tr>
@@ -881,7 +884,9 @@ Common LLM inference shape:
     <tr><td>TT-Lang</td><td>Kernel/programming-language layer with simulator and tutorials.</td><td>Learning dataflow-buffer concepts and experimenting with operation-level implementations.</td></tr>
     <tr><td>TT-BUDA</td><td>Legacy high-level compiler stack; useful historically, but archived.</td><td>Understanding older Tenstorrent terminology and why current material points to TT-Forge.</td></tr>
   </table>
+  </div>
 
+  <div class="table-scroll" role="region" aria-label="Tenstorrent architecture concepts">
   <table>
     <tr><th>Concept</th><th>Study meaning</th><th>Compiler angle</th></tr>
     <tr><td>Tensix-style core grid</td><td>Many local compute nodes with nearby memory and data-movement capability</td><td>Placement, sharding, synchronization, and load balance matter.</td></tr>
@@ -889,11 +894,13 @@ Common LLM inference shape:
     <tr><td>Circular buffers</td><td>Local producer-consumer queues between data movement and compute</td><td>Buffer depth controls overlap and SRAM pressure.</td></tr>
     <tr><td>TT-Metalium-style kernels</td><td>Explicit host programs plus device kernels for movement and compute</td><td>The compiler/runtime must emit launch configs, runtime args, and synchronization.</td></tr>
   </table>
+  </div>
 
   <div class="box info">
     <span class="bt">Kernel build and dispatch lifecycle</span>
     <p>In TT-Metalium, device-side kernel source is typically C++ compiled just-in-time for the programmable RISC-V processors in Tenstorrent cores. DeepWiki describes the JIT build system as translating kernel source into RISC-V binaries using the SFPI toolchain, then linking ELF images with architecture/core-specific settings. The runtime tracks whether program binaries have been written to device DRAM and uses command queues plus dispatch kernels to issue writes, synchronization, launch messages, and go signals.</p>
   </div>
+  <div class="table-scroll" role="region" aria-label="Tenstorrent kernel build and dispatch stages">
   <table>
     <tr><th>Stage</th><th>What happens</th><th>Why it matters</th></tr>
     <tr><td>Kernel source</td><td>Kernels can come from file paths or inline source; compile-time args and defines specialize the kernel.</td><td>Changing source, defines, or compile-time args should invalidate stale binaries.</td></tr>
@@ -902,6 +909,7 @@ Common LLM inference shape:
     <tr><td>Link</td><td>Objects are linked into ELF binaries using a linker script selected through the HAL/JIT build query.</td><td>The linker script controls text/data/stack placement and per-processor memory limits.</td></tr>
     <tr><td>Load and dispatch</td><td>The program command sequence stages binaries and commands; fast dispatch kernels process command pages and send go signals to workers.</td><td>Program launch overhead, binary transfer, runtime arguments, and synchronization affect first-run and steady-state timing.</td></tr>
   </table>
+  </div>
   <pre><code>Host program / TTNN op
         |
         v
@@ -1115,7 +1123,7 @@ time 2: compute consumes slot 1, reader fills slot 0
 time 3: compute consumes slot 0, reader fills slot 1
 
 Good when:
-  load_time <= compute_time
+  load_time &lt;= compute_time
 
 If load_time > compute_time:
   compute still stalls, even with ping-pong buffering</code></pre>
@@ -1562,6 +1570,7 @@ Same math, different hardware mapping.</code></pre>
     <p>Lower precision is useful when the model is limited by memory bandwidth, cache capacity, interconnect traffic, or matrix-engine throughput. The tradeoff is always numerical: smaller formats save bytes and energy, but they reduce range, precision, or both.</p>
   </div>
 
+  <div class="table-scroll" role="region" aria-label="Low-precision data type comparison">
   <table>
     <tr><th>Type</th><th>Good for</th><th>Main caveat</th></tr>
     <tr><td>FP32 / float32</td><td>Reference accuracy, debugging, numerically sensitive reductions, calibration baselines.</td><td>Large memory footprint and bandwidth cost; often overkill for inference.</td></tr>
@@ -1572,6 +1581,7 @@ Same math, different hardware mapping.</code></pre>
     <tr><td>INT4 / FP4-style formats</td><td>Weight compression and LLM memory-bandwidth reduction when accuracy survives.</td><td>Usually needs group scales, mixed precision, or QAT; activation quantization is harder than weight-only quantization.</td></tr>
     <tr><td>1-bit / binary</td><td>Research or special hardware paths where weights and/or activations can be represented as signs.</td><td>Not a drop-in replacement: accuracy, training method, hardware support, and operator coverage dominate.</td></tr>
   </table>
+  </div>
 
   <div class="box good">
     <span class="bt">Tenstorrent-specific note</span>
@@ -1582,6 +1592,7 @@ Same math, different hardware mapping.</code></pre>
     <span class="bt">Qualcomm AIMET for ONNX</span>
     <p><b>AIMET</b>, sometimes mistyped as AMET, is Qualcomm's AI Model Efficiency Toolkit. For ONNX, a common post-training quantization path is: start with a clean ONNX model, simplify/check it, create an <code>aimet_onnx.QuantizationSimModel</code>, run representative calibration data through <code>compute_encodings</code>, evaluate the simulated quantized model, then export model/encoding files or produce an ONNX QDQ graph with <code>to_onnx_qdq()</code>. If the starting point is an AIMET Torch <code>QuantizationSimModel</code>, <code>aimet_torch.onnx.export</code> can export ONNX with QuantizeLinear and DequantizeLinear nodes embedded.</p>
   </div>
+  <div class="table-scroll" role="region" aria-label="AIMET ONNX quantization workflow">
   <table>
     <tr><th>Step</th><th>Purpose</th><th>Practical check</th></tr>
     <tr><td>1. Baseline ONNX</td><td>Make sure the floating-point ONNX model is valid before quantization.</td><td>Run ONNX shape checks and compare baseline ONNX Runtime accuracy.</td></tr>
@@ -1590,6 +1601,7 @@ Same math, different hardware mapping.</code></pre>
     <tr><td>4. Validate</td><td>Compare floating-point and quantized outputs before deployment conversion.</td><td>If accuracy drops, inspect sensitive layers, outliers, unsupported ops, and mixed-precision candidates.</td></tr>
     <tr><td>5. Export</td><td>Use <code>export()</code> for model plus encodings or <code>to_onnx_qdq()</code> for QuantizeLinear/DequantizeLinear nodes embedded in ONNX.</td><td>Confirm whether the downstream runtime/compiler expects QDQ nodes or separate encoding files.</td></tr>
   </table>
+  </div>
   <pre><code>// Pseudocode only; check the installed AIMET version for exact imports.
 onnx_model = onnx.load("model.onnx")
 sim = aimet_onnx.QuantizationSimModel(
@@ -1987,7 +1999,7 @@ Ownership:
   <div class="ans">
     <p><b>Answer:</b> Compare the saved stall time against the extra SRAM used by the second buffer. Double buffering is valuable when DMA and compute can overlap and the extra buffer does not force worse tile sizes, spills, or lower occupancy.</p>
 <pre><code>Useful overlap:
-  load_time <= compute_time
+  load_time &lt;= compute_time
   extra SRAM does not shrink tile too much
   synchronization overhead is small
 
@@ -2514,8 +2526,7 @@ vector&lt;Tile&gt; tileGrid(int H, int W, int TH, int TW) {
 </main>
 </div>
 
-<button class="themebtn" id="themeBtn" type="button" title="Toggle light/dark theme" aria-label="Toggle light and dark theme"><span class="theme-icon" aria-hidden="true">&#9728;</span><span class="theme-label">Light</span></button>
-<button class="topbtn" id="topBtn" title="Back to top" aria-label="Back to top">&#8679;</button>
+<button class="topbtn" id="topBtn" type="button" title="Back to top" aria-label="Back to top">&#8679;</button>
 
 <script>
 (function () {
@@ -2524,28 +2535,6 @@ vector&lt;Tile&gt; tileGrid(int H, int W, int TH, int TW) {
   var topBtn = document.getElementById("topBtn");
   topBtn.addEventListener("click", function () {
     window.scrollTo({ top: 0, behavior: "smooth" });
-  });
-
-  // Theme toggle. The initial theme is applied by the inline <head> script.
-  var root = document.documentElement;
-  var themeBtn = document.getElementById("themeBtn");
-  var themeIcon = themeBtn.querySelector(".theme-icon");
-  var themeLabel = themeBtn.querySelector(".theme-label");
-
-  function syncThemeButton() {
-    var isLight = root.getAttribute("data-theme") === "light";
-    // Show the mode the button will switch to.
-    themeIcon.innerHTML = isLight ? "&#127769;" : "&#9728;";
-    themeLabel.textContent = isLight ? "Dark" : "Light";
-  }
-  syncThemeButton();
-
-  themeBtn.addEventListener("click", function () {
-    var next = root.getAttribute("data-theme") === "light" ? "dark" : "light";
-    if (next === "light") root.setAttribute("data-theme", "light");
-    else root.removeAttribute("data-theme");
-    try { localStorage.setItem("npu-theme", next); } catch (e) {}
-    syncThemeButton();
   });
 
   var q = document.getElementById("q");
