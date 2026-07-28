@@ -241,6 +241,8 @@ void test_outlier_is_reported() {
 }
 
 void test_randomized_clock_fit() {
+    // A fixed seed keeps fit regressions reproducible in CI.
+    // NOLINTNEXTLINE(bugprone-random-generator-seed)
     std::mt19937_64 generator(0xC10Cu);
     std::uniform_int_distribution<int> jitter(-10, 10);
     std::vector<acim::trace::ClockSyncSample> samples;

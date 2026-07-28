@@ -71,6 +71,8 @@ void test_wide_accumulation_before_clamp() {
 }
 
 void test_randomized_reference_model() {
+    // A fixed seed keeps differential failures reproducible in CI.
+    // NOLINTNEXTLINE(bugprone-random-generator-seed)
     std::mt19937 generator(0xAC1u);
     std::uniform_int_distribution<int> rows_distribution(1, 8);
     std::uniform_int_distribution<int> columns_distribution(1, 16);

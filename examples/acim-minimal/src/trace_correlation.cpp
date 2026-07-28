@@ -24,8 +24,14 @@ long double host_midpoint_offset_ns(const ClockSyncSample &sample,
     return send_offset + round_trip / 2.0L;
 }
 
-std::optional<std::uint64_t> add_rounded_offset(const std::uint64_t anchor,
-                                                const long double offset) {
+struct HostTimestampOffset {
+    std::uint64_t anchor_ns;
+    long double offset_ns;
+};
+
+std::optional<std::uint64_t> add_rounded_offset(const HostTimestampOffset &timestamp) {
+    const std::uint64_t anchor = timestamp.anchor_ns;
+    const long double offset = timestamp.offset_ns;
     if (!std::isfinite(offset)) {
         return std::nullopt;
     }
@@ -115,7 +121,7 @@ fit_clock_correlation(const std::span<const ClockSyncSample> samples) {
 
     const long double reference_host_offset =
         mean_midpoint_offset - nanoseconds_per_cycle * mean_cycle_delta;
-    if (!add_rounded_offset(host_time_anchor_ns, reference_host_offset).has_value()) {
+    if (!add_rounded_offset({host_time_anchor_ns, reference_host_offset}).has_value()) {
         return std::nullopt;
     }
 
@@ -153,7 +159,7 @@ device_cycle_to_host_timestamp_ns(const ClockCorrelation &correlation,
     const long double delta = integer_delta(correlation.reference_device_cycle, device_cycle);
     const long double offset = static_cast<long double>(correlation.reference_host_offset_ns) +
                                static_cast<long double>(correlation.nanoseconds_per_cycle) * delta;
-    return add_rounded_offset(correlation.host_time_anchor_ns, offset);
+    return add_rounded_offset({correlation.host_time_anchor_ns, offset});
 }
 
 } // namespace acim::trace
