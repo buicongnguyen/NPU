@@ -47,7 +47,6 @@
     root.dataset.bookTheme = nextTheme;
     root.dataset.siteTheme = nextTheme;
     root.dataset.theme = nextTheme;
-    root.style.colorScheme = nextTheme;
 
     if (persist) {
       try {
@@ -439,7 +438,15 @@
     readingProgress.setAttribute("aria-valuemin", "0");
     readingProgress.setAttribute("aria-valuemax", "100");
     readingProgress.setAttribute("aria-valuenow", "0");
-    readingProgress.append(makeElement("span", "book-reading-progress-value"));
+    const readingProgressValue = makeElement(
+      "span",
+      "book-reading-progress-value"
+    );
+    readingProgressValue.setAttribute(
+      "data-scroll-accessibility-ignore-mutations",
+      ""
+    );
+    readingProgress.append(readingProgressValue);
     topbar.append(readingProgress);
 
     const sidebar = makeElement("aside", "book-sidebar");
@@ -578,10 +585,7 @@
       const readingPercent =
         maxScroll === 0 ? 100 : Math.round((window.scrollY / maxScroll) * 100);
       const boundedPercent = Math.max(0, Math.min(100, readingPercent));
-      const progressValue = readingProgress.querySelector(
-        ".book-reading-progress-value"
-      );
-      progressValue.style.transform = `scaleX(${boundedPercent / 100})`;
+      readingProgressValue.style.transform = `scaleX(${boundedPercent / 100})`;
       if (boundedPercent !== lastReadingPercent) {
         readingProgress.setAttribute("aria-valuenow", String(boundedPercent));
         lastReadingPercent = boundedPercent;
@@ -595,6 +599,10 @@
 
     window.addEventListener("scroll", scheduleScrollUpdate, { passive: true });
     window.addEventListener("resize", scheduleScrollUpdate);
+    if (typeof ResizeObserver === "function") {
+      const readingLayoutObserver = new ResizeObserver(scheduleScrollUpdate);
+      readingLayoutObserver.observe(main);
+    }
     window.addEventListener("hashchange", () => {
       const id = decodeURIComponent(window.location.hash.slice(1));
       if (outlineLinks.has(id)) {
@@ -666,6 +674,7 @@
       topbar.inert = false;
       skipLink.inert = false;
       setBackgroundInert(false);
+      if (desktopCollapsed && restoreFocus) menuButton.focus();
     }
 
     function closeDrawer(restoreFocus = false) {
@@ -687,7 +696,18 @@
     backdrop.addEventListener("click", () => closeDrawer(true));
     sidebarClose.addEventListener("click", () => closeDrawer(true));
     sidebar.addEventListener("click", (event) => {
-      if (mobileSidebar.matches && event.target.closest("a")) closeDrawer(false);
+      const anchor = event.target.closest("a");
+      if (!mobileSidebar.matches || !anchor) return;
+      const keepsCurrentPage =
+        event.defaultPrevented ||
+        event.button !== 0 ||
+        event.altKey ||
+        event.ctrlKey ||
+        event.metaKey ||
+        event.shiftKey ||
+        (anchor.target && anchor.target.toLowerCase() !== "_self") ||
+        anchor.hasAttribute("download");
+      closeDrawer(keepsCurrentPage);
     });
 
     document.addEventListener("keydown", (event) => {
@@ -725,7 +745,8 @@
     });
 
     const handleSidebarBreakpoint = () => {
-      syncSidebarState();
+      const focusWillBeHidden = sidebar.contains(document.activeElement);
+      syncSidebarState({ restoreFocus: focusWillBeHidden });
       scheduleScrollUpdate();
     };
     if (typeof mobileSidebar.addEventListener === "function") {

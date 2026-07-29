@@ -10,7 +10,8 @@ runs:
   steps:
     - name: Enable the MSVC developer environment
       if: runner.os == 'Windows'
-      uses: ilammy/msvc-dev-cmd@0b201ec74fa43914dc39ae48a89fd1d8cb592756 # v1
+      shell: pwsh
+      run: '& "${{ github.action_path }}/Enable-MsvcEnvironment.ps1"'
 
     - name: Install Ubuntu native tools
       if: runner.os == 'Linux'

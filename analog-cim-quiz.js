@@ -71,13 +71,15 @@
     return container;
   }
 
-  function renderSummary() {
+  function renderSummary(shouldFocus) {
     updateStatus();
     var wrap = element('div', 'empty-state');
     var content = element('div');
+    var summaryTitle = element('h2', 'quiz-summary-title', score + ' correct out of ' + questions.length);
+    summaryTitle.tabIndex = -1;
     content.append(
       element('p', 'kicker', 'Set complete'),
-      element('h2', '', score + ' correct out of ' + questions.length),
+      summaryTitle,
       element('p', 'muted', score === questions.length
         ? 'Every answer is correct. Explain each tradeoff aloud before calling it mastered.'
         : 'Review the explanations, then run the same filtered set again or change the topic.')
@@ -85,14 +87,15 @@
     var restart = element('button', 'button', 'Run this set again');
     restart.type = 'button';
     restart.addEventListener('click', function () {
-      startSet(false);
+      startSet(false, true);
     });
     content.appendChild(restart);
     wrap.appendChild(content);
     body.replaceChildren(wrap);
+    if (shouldFocus) summaryTitle.focus();
   }
 
-  function renderQuestion() {
+  function renderQuestion(shouldFocus) {
     if (!questions.length) {
       body.replaceChildren(element('div', 'empty-state', 'No questions match these filters.'));
       updateStatus();
@@ -100,7 +103,7 @@
     }
 
     if (index >= questions.length) {
-      renderSummary();
+      renderSummary(shouldFocus);
       return;
     }
 
@@ -118,25 +121,51 @@
     );
 
     var title = element('h2', 'quiz-question', question.prompt);
+    title.id = 'quiz-question-title';
+    title.tabIndex = -1;
     var options = element('div', 'option-list');
     options.setAttribute('role', 'radiogroup');
-    options.setAttribute('aria-label', 'Answer choices');
+    options.setAttribute('aria-labelledby', title.id);
     var optionButtons = [];
     var letters = ['A', 'B', 'C', 'D', 'E', 'F'];
+
+    function selectOption(choiceIndex, moveFocus) {
+      if (locked) return;
+      selected = choiceIndex;
+      optionButtons.forEach(function (button, buttonIndex) {
+        var isSelected = buttonIndex === selected;
+        button.setAttribute('aria-checked', isSelected ? 'true' : 'false');
+        button.tabIndex = isSelected ? 0 : -1;
+      });
+      checkButton.disabled = false;
+      if (moveFocus) optionButtons[choiceIndex].focus();
+    }
 
     displayedChoices.forEach(function (choice, choiceIndex) {
       var option = element('button', 'option');
       option.type = 'button';
       option.setAttribute('role', 'radio');
       option.setAttribute('aria-checked', 'false');
+      option.tabIndex = choiceIndex === 0 ? 0 : -1;
       option.append(element('span', 'option-key', letters[choiceIndex]), element('span', '', choice.text));
       option.addEventListener('click', function () {
-        if (locked) return;
-        selected = choiceIndex;
-        optionButtons.forEach(function (button, buttonIndex) {
-          button.setAttribute('aria-checked', buttonIndex === selected ? 'true' : 'false');
-        });
-        checkButton.disabled = false;
+        selectOption(choiceIndex, false);
+      });
+      option.addEventListener('keydown', function (event) {
+        var nextIndex;
+        if (event.key === 'ArrowRight' || event.key === 'ArrowDown') {
+          nextIndex = (choiceIndex + 1) % displayedChoices.length;
+        } else if (event.key === 'ArrowLeft' || event.key === 'ArrowUp') {
+          nextIndex = (choiceIndex - 1 + displayedChoices.length) % displayedChoices.length;
+        } else if (event.key === 'Home') {
+          nextIndex = 0;
+        } else if (event.key === 'End') {
+          nextIndex = displayedChoices.length - 1;
+        } else {
+          return;
+        }
+        event.preventDefault();
+        selectOption(nextIndex, true);
       });
       optionButtons.push(option);
       options.appendChild(option);
@@ -163,9 +192,17 @@
       if (correct) score += 1;
 
       optionButtons.forEach(function (button, choiceIndex) {
+        var isCorrectAnswer = displayedChoices[choiceIndex].originalIndex === question.answer;
+        var isSelectedAnswer = choiceIndex === selected;
         button.disabled = true;
-        if (displayedChoices[choiceIndex].originalIndex === question.answer) button.classList.add('correct');
-        if (choiceIndex === selected && !correct) button.classList.add('incorrect');
+        if (isCorrectAnswer) button.classList.add('correct');
+        if (isSelectedAnswer && !correct) button.classList.add('incorrect');
+        if (isCorrectAnswer || isSelectedAnswer) {
+          var resultText = isCorrectAnswer
+            ? (isSelectedAnswer ? 'Your answer — correct' : 'Correct answer')
+            : 'Your answer — incorrect';
+          button.appendChild(element('span', 'option-result', resultText));
+        }
       });
 
       feedback.hidden = false;
@@ -183,12 +220,13 @@
     nextButton.addEventListener('click', function () {
       if (!locked) return;
       index += 1;
-      renderQuestion();
+      renderQuestion(true);
     });
 
     actions.append(checkButton, nextButton);
     body.replaceChildren(meta, title, options, feedback, actions);
     updateStatus();
+    if (shouldFocus) title.focus();
   }
 
   function matchingQuestions() {
@@ -200,7 +238,7 @@
     });
   }
 
-  function startSet(shouldShuffle) {
+  function startSet(shouldShuffle, shouldFocus) {
     questions = matchingQuestions();
     if (shouldShuffle) questions = shuffle(questions);
     index = 0;
@@ -208,7 +246,7 @@
     locked = false;
     score = 0;
     answered = 0;
-    renderQuestion();
+    renderQuestion(shouldFocus);
   }
 
   function loadQuiz() {

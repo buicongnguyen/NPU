@@ -54,10 +54,17 @@ npm run check:ci
 For a faster local pass that omits the dependency audit and Lighthouse, run
 `npm run check`.
 
+`npm run build:pages` stages the exact public site in `build/pages-site`.
+The build excludes repository tooling and native examples, canonicalizes selected
+text sources to UTF-8 with LF line endings, and gives runtime CSS, JavaScript, and
+JSON files one content-derived release suffix. JSON documents also receive stable
+aliases for human links so an already-open page remains useful across deployments.
+Every published content file is bound to its source in `asset-manifest.json`.
+
 The complete check covers dependency advisories, HTML structure, JSON schemas and
-source references, every rendered
-internal link and fragment, navigation and mobile smoke tests, JSON-backed views,
-practice filtering, quiz state transitions, chapter-manifest coverage, desktop
-and mobile reader behavior, theme persistence, axe WCAG A/AA rules in both the
-closed and open-drawer states, and Lighthouse performance, accessibility,
-best-practices, and SEO budgets.
+source references, deterministic Pages packaging, every rendered internal link
+and fragment, navigation and mobile smoke tests, JSON-backed views, practice
+filtering, quiz state transitions, chapter-manifest coverage, desktop and mobile
+reader behavior, theme persistence, axe WCAG A/AA rules in both the closed and
+open-drawer states, and Lighthouse performance, accessibility, best-practices,
+and SEO budgets.

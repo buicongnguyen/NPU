@@ -33,7 +33,7 @@ cl                 # MSVC Developer PowerShell
 cmake --preset gcc
 cmake --build --preset gcc
 ctest --preset gcc
-./build/gcc/acim_smoke
+./build/gcc/acim_smoke-debug
 ```
 
 ## Build with Clang on Linux
@@ -49,6 +49,8 @@ ctest --preset asan-clang
 ```
 
 The sanitizer preset enables AddressSanitizer and UndefinedBehaviorSanitizer.
+Sanitizer diagnostics are non-recovering, and the sanitizer test suite verifies
+that a detected undefined operation terminates the instrumented process.
 ThreadSanitizer should be a separate preset because major sanitizers cannot all be
 combined in one binary.
 
@@ -60,7 +62,7 @@ Open a Visual Studio Developer PowerShell so `cl.exe`, CMake, and Ninja are avai
 cmake --preset msvc
 cmake --build --preset msvc
 ctest --preset msvc
-build\msvc\acim_smoke.exe
+build\msvc\acim_smoke-debug.exe
 ```
 
 ## Portable command without presets
@@ -115,7 +117,7 @@ ctest --preset tracy
 ```
 
 Start the Tracy profiler application, connect to `127.0.0.1`, and then run
-`build/tracy/acim_smoke` (`.exe` on Windows). The sample records host zones for the
+`build/tracy/acim_smoke-debug` (`.exe` on Windows). The sample records host zones for the
 request, validation, MVM/ADC work, clock fitting, frame completion, and numerical
 counters. `include/acim/profiling.hpp` keeps Tracy-specific macros out of product code.
 The FetchContent target builds and links `TracyClient`; obtain or build the desktop
@@ -171,10 +173,19 @@ builds `tests/package-consumer` as a separate downstream project:
 ```console
 cmake --install build/dev --prefix build/stage
 cmake -S tests/package-consumer -B build/consumer -G Ninja \
+  -DCMAKE_BUILD_TYPE=Debug \
   -DCMAKE_PREFIX_PATH="$PWD/build/stage"
 cmake --build build/consumer
 ./build/consumer/acim_package_consumer
+./build/consumer/acim_device_trace_c_consumer
 ```
+
+The installed `acim::device_trace` target propagates the C11 and C++11 language
+requirements of its public header. Debug, RelWithDebInfo, MinSizeRel, and Release
+artifacts have distinct names in both single- and multi-config build trees, so
+multiple configurations can be installed into and consumed from one prefix. Package
+configuration fails clearly when a consumer requests a configuration that has not
+been installed instead of silently linking a different configuration.
 
 ## Run the fuzz targets
 

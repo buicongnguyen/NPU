@@ -42,6 +42,9 @@ test('practice filtering narrows rendered questions', async ({ page }) => {
 
   await page.getByLabel('Search C questions').fill('volatile');
   await expect(page.locator('#stats')).toContainText('matching');
+  await expect(page.locator('.choices li.correct .answer-status').first()).toHaveText(
+    'Correct answer:'
+  );
   const visible = await page.locator('[data-search]:visible').count();
   expect(visible).toBeGreaterThan(0);
   expect(visible).toBeLessThan(total);
@@ -59,6 +62,57 @@ test('quiz can be filtered, answered, and advanced', async ({ page }) => {
   await expect(page.locator('#quiz-feedback')).toBeVisible();
   await expect(page.locator('#quiz-feedback')).toContainText(/Correct\.|Not quite\./);
   await expect(page.getByRole('button', { name: 'Next question' })).toBeEnabled();
+});
+
+test('quiz radios support roving keyboard selection and textual result states', async ({ page }) => {
+  await page.goto('/analog-cim-quiz.html');
+  const radios = page.locator('#quiz-body [role="radio"]');
+  await expect(radios).toHaveCount(4);
+  await expect(page.locator('.option-list')).toHaveAttribute(
+    'aria-labelledby',
+    'quiz-question-title'
+  );
+  expect(await radios.evaluateAll((options) => options.map((option) => option.tabIndex))).toEqual([
+    0,
+    -1,
+    -1,
+    -1
+  ]);
+
+  await radios.first().focus();
+  await page.keyboard.press('ArrowRight');
+  await expect(radios.nth(1)).toBeFocused();
+  await expect(radios.first()).toHaveAttribute('aria-checked', 'false');
+  await expect(radios.nth(1)).toHaveAttribute('aria-checked', 'true');
+  expect(await radios.evaluateAll((options) => options.map((option) => option.tabIndex))).toEqual([
+    -1,
+    0,
+    -1,
+    -1
+  ]);
+
+  await page.getByRole('button', { name: 'Check answer' }).click();
+  const resultLabels = await page.locator('.option-result').allTextContents();
+  expect(resultLabels.some((label) => /correct/i.test(label))).toBeTruthy();
+  expect(resultLabels.filter((label) => label.startsWith('Your answer'))).toHaveLength(1);
+
+  await page.getByRole('button', { name: 'Next question' }).click();
+  await expect(page.locator('.quiz-question')).toBeFocused();
+});
+
+test('quiz summary and restart return focus to newly rendered content', async ({ page }) => {
+  await page.goto('/analog-cim-quiz.html');
+  await expect(page.locator('#quiz-body [role="radio"]')).toHaveCount(4);
+  await page.getByLabel('Topic').selectOption({ label: 'Compiler and mapping' });
+  await expect(page.locator('#progress-label')).toContainText('/ 1');
+
+  await page.locator('#quiz-body [role="radio"]').first().click();
+  await page.getByRole('button', { name: 'Check answer' }).click();
+  await page.getByRole('button', { name: 'Finish set' }).click();
+  await expect(page.locator('.quiz-summary-title')).toBeFocused();
+
+  await page.getByRole('button', { name: 'Run this set again' }).click();
+  await expect(page.locator('.quiz-question')).toBeFocused();
 });
 
 test('all pages contain horizontal scrolling within mobile-width regions', async ({ page }) => {

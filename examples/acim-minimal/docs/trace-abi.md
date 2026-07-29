@@ -55,7 +55,9 @@ Host clock fitting keeps the absolute host-time anchor as `uint64_t` and fits on
 small offsets, so nanosecond deltas remain stable beyond `2^53`. Use
 `device_cycle_to_host_timestamp_ns` for a checked integer timestamp;
 `device_cycle_to_host_ns` is a floating-point convenience and cannot represent every
-integer nanosecond at very large absolute times.
+integer nanosecond at very large absolute times. The checked path splits a full-width
+cycle delta into exactly representable limbs and retains the floating-point product
+residual, including on MSVC where `long double` has the precision of `double`.
 
 ## Compatibility
 

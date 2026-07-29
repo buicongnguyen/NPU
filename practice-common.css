@@ -105,6 +105,14 @@ summary:hover { background: var(--panel2); }
 .choices { margin: 0; padding-left: 24px; }
 .choices li { margin: 5px 0; padding: 4px 6px; border-radius: 6px; }
 .choices li.correct { background: var(--good-bg); color: var(--good); }
+.answer-status {
+  display: inline-block;
+  border: 1px solid currentColor;
+  border-radius: 999px;
+  padding: 1px 7px;
+  font-size: .78rem;
+  line-height: 1.5;
+}
 .why {
   margin-top: 10px;
   border-left: 3px solid var(--accent);

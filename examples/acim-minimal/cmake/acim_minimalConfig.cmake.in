@@ -8,4 +8,72 @@ endif()
 
 include("${CMAKE_CURRENT_LIST_DIR}/acim_minimalTargets.cmake")
 
+if(CMAKE_CONFIGURATION_TYPES)
+    set(_acim_minimal_requested_configs ${CMAKE_CONFIGURATION_TYPES})
+elseif(CMAKE_BUILD_TYPE)
+    set(_acim_minimal_requested_configs "${CMAKE_BUILD_TYPE}")
+else()
+    set(_acim_minimal_requested_configs NOCONFIG)
+endif()
+
+get_target_property(
+    _acim_minimal_available_configs
+    acim::sim
+    IMPORTED_CONFIGURATIONS
+)
+set(_acim_minimal_available_configs_upper)
+foreach(_acim_minimal_config IN LISTS _acim_minimal_available_configs)
+    string(TOUPPER "${_acim_minimal_config}" _acim_minimal_config_upper)
+    list(APPEND _acim_minimal_available_configs_upper "${_acim_minimal_config_upper}")
+endforeach()
+
+set(_acim_minimal_missing_configs)
+foreach(_acim_minimal_config IN LISTS _acim_minimal_requested_configs)
+    string(TOUPPER "${_acim_minimal_config}" _acim_minimal_config_upper)
+    if(NOT _acim_minimal_config_upper IN_LIST _acim_minimal_available_configs_upper)
+        list(APPEND _acim_minimal_missing_configs "${_acim_minimal_config}")
+    endif()
+endforeach()
+
+if(_acim_minimal_missing_configs)
+    string(JOIN ", " _acim_minimal_missing_text ${_acim_minimal_missing_configs})
+    string(JOIN ", " _acim_minimal_available_text ${_acim_minimal_available_configs})
+    set(acim_minimal_FOUND FALSE)
+    string(
+        CONCAT
+        acim_minimal_NOT_FOUND_MESSAGE
+        "The acim_minimal package does not contain artifacts for requested "
+        "configuration(s): ${_acim_minimal_missing_text}. Available "
+        "configuration(s): ${_acim_minimal_available_text}. Install every "
+        "required configuration into the same prefix."
+    )
+    return()
+endif()
+
+# CMake otherwise permits an imported target to fall back to the first installed
+# configuration. Keep every consumer configuration mapped to its exact artifact.
+foreach(_acim_minimal_target IN ITEMS acim::sim acim::trace acim::acim_smoke)
+    foreach(_acim_minimal_config IN LISTS _acim_minimal_requested_configs)
+        if(NOT _acim_minimal_config STREQUAL "NOCONFIG")
+            string(TOUPPER "${_acim_minimal_config}" _acim_minimal_config_upper)
+            set_property(
+                TARGET "${_acim_minimal_target}"
+                PROPERTY
+                    "MAP_IMPORTED_CONFIG_${_acim_minimal_config_upper}"
+                    "${_acim_minimal_config_upper}"
+            )
+        endif()
+    endforeach()
+endforeach()
+
+unset(_acim_minimal_available_configs)
+unset(_acim_minimal_available_configs_upper)
+unset(_acim_minimal_available_text)
+unset(_acim_minimal_config)
+unset(_acim_minimal_config_upper)
+unset(_acim_minimal_missing_configs)
+unset(_acim_minimal_missing_text)
+unset(_acim_minimal_requested_configs)
+unset(_acim_minimal_target)
+
 check_required_components(acim_minimal)

@@ -870,7 +870,7 @@ body.book-shell-active.book-family-npu-practice main {
 
 @media print {
   :root[data-book-theme] {
-    color-scheme: light;
+    color-scheme: light !important;
     --book-canvas: #ffffff;
     --book-sidebar: #ffffff;
     --book-surface: #ffffff;
@@ -972,10 +972,29 @@ body.book-shell-active.book-family-npu-practice main {
   body.book-shell-active pre,
   body.book-shell-active code,
   body.book-shell-active th,
-  body.book-shell-active td {
+  body.book-shell-active td,
+  body.book-family-practice nav:not(.book-chapter-nav):not(.book-page-outline-nav):not(.book-pager) a,
+  body.book-family-practice .chip,
+  body.book-family-practice .toolbar,
+  body.book-family-practice input,
+  body.book-family-practice select,
+  body.book-family-practice textarea,
+  body.book-family-practice .why {
     background: #ffffff !important;
     color: #111111 !important;
     box-shadow: none !important;
+  }
+
+  body.book-family-practice input,
+  body.book-family-practice select,
+  body.book-family-practice textarea {
+    border-color: #555555 !important;
+  }
+
+  body.book-family-practice input::placeholder,
+  body.book-family-practice textarea::placeholder {
+    color: #444444 !important;
+    opacity: 1;
   }
 
   body.book-shell-active h1,
@@ -998,14 +1017,22 @@ body.book-shell-active.book-family-npu-practice main {
     color: #111111 !important;
   }
 
-  body.book-shell-active details:not([open]) > :not(summary),
+  details:not([open]) > :not(summary),
   body.book-family-practice details .answer,
   body.book-family-npu-practice details.qa .ans,
   body.book-family-npu-practice .qa.mcq .ans > *:not(.mcq-hint) {
     display: block !important;
   }
 
-  body.book-family-npu-practice .mcq-hint {
+  details:not([open])::details-content {
+    content-visibility: visible !important;
+  }
+
+  .qa.mcq .ans > *:not(.mcq-hint) {
+    display: block !important;
+  }
+
+  .qa.mcq .mcq-hint {
     display: none !important;
   }
 }

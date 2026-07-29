@@ -61,6 +61,9 @@
         ol.type = "A";
         q.choices.forEach((choice, index) => {
           const li = node("li", index === q.answer ? "correct" : "", choice);
+          if (index === q.answer) {
+            li.prepend(node("strong", "answer-status", "Correct answer:"), " ");
+          }
           ol.appendChild(li);
         });
         answer.appendChild(ol);

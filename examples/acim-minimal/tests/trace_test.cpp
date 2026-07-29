@@ -3,6 +3,7 @@
 #include "acim/trace_correlation.hpp"
 
 #include <array>
+#include <cfloat>
 #include <cmath>
 #include <cstdint>
 #include <initializer_list>
@@ -195,6 +196,36 @@ void test_large_cycle_and_timestamp_precision() {
     }
 }
 
+void test_checked_timestamp_preserves_full_uint64_cycle_deltas() {
+    constexpr std::uint64_t beyond_double_integer = UINT64_C(9007199254740993);
+    constexpr std::array<acim::trace::ClockSyncSample, 2> beyond_double_samples{
+        acim::trace::ClockSyncSample{0u, 0u, 0u},
+        acim::trace::ClockSyncSample{beyond_double_integer, beyond_double_integer,
+                                     beyond_double_integer},
+    };
+    const auto beyond_double_correlation =
+        acim::trace::fit_clock_correlation(beyond_double_samples);
+    expect(beyond_double_correlation.has_value(), "a full-width slope-one clock should fit");
+    if (beyond_double_correlation) {
+        expect(acim::trace::device_cycle_to_host_timestamp_ns(
+                   *beyond_double_correlation, beyond_double_integer) == beyond_double_integer,
+               "checked conversion must preserve cycle deltas beyond double integer precision");
+    }
+
+    constexpr std::uint64_t maximum = std::numeric_limits<std::uint64_t>::max();
+    constexpr std::array<acim::trace::ClockSyncSample, 2> maximum_samples{
+        acim::trace::ClockSyncSample{0u, 0u, 0u},
+        acim::trace::ClockSyncSample{maximum, maximum, maximum},
+    };
+    const auto maximum_correlation = acim::trace::fit_clock_correlation(maximum_samples);
+    expect(maximum_correlation.has_value(), "a uint64 boundary clock should fit");
+    if (maximum_correlation) {
+        expect(acim::trace::device_cycle_to_host_timestamp_ns(*maximum_correlation, maximum) ==
+                   maximum,
+               "checked conversion must preserve the maximum uint64 timestamp");
+    }
+}
+
 void test_checked_timestamp_boundaries() {
     constexpr acim::trace::ClockCorrelation zero_anchored{
         1.0, 100u, 0u, 0.0, 0.0, 0.0, 2u,
@@ -213,15 +244,98 @@ void test_checked_timestamp_boundaries() {
     expect(!acim::trace::device_cycle_to_host_timestamp_ns(maximum_anchored, 101u).has_value(),
            "timestamp conversion should reject uint64 overflow");
 
+    constexpr acim::trace::ClockCorrelation maximum_delta{
+        1.0, 0u, 0u, 0.0, 0.0, 0.0, 2u,
+    };
+    expect(acim::trace::device_cycle_to_host_timestamp_ns(
+               maximum_delta, std::numeric_limits<std::uint64_t>::max()) ==
+               std::numeric_limits<std::uint64_t>::max(),
+           "a maximum-width positive cycle delta should remain exact");
+
+    constexpr acim::trace::ClockCorrelation maximum_negative_delta{
+        1.0,
+        std::numeric_limits<std::uint64_t>::max(),
+        std::numeric_limits<std::uint64_t>::max(),
+        0.0,
+        0.0,
+        0.0,
+        2u,
+    };
+    expect(acim::trace::device_cycle_to_host_timestamp_ns(maximum_negative_delta, 0u) == 0u,
+           "a maximum-width negative cycle delta should remain exact");
+
+    constexpr acim::trace::ClockCorrelation overflowing_maximum_delta{
+        1.0, 0u, 1u, 0.0, 0.0, 0.0, 2u,
+    };
+    expect(!acim::trace::device_cycle_to_host_timestamp_ns(
+                overflowing_maximum_delta, std::numeric_limits<std::uint64_t>::max())
+                .has_value(),
+           "a full-width delta plus a nonzero anchor should reject uint64 overflow");
+
+    acim::trace::ClockCorrelation rounding = zero_anchored;
+    rounding.host_time_anchor_ns = 10u;
+    rounding.reference_host_offset_ns = 0.5;
+    expect(acim::trace::device_cycle_to_host_timestamp_ns(rounding, 100u) == 11u,
+           "positive half-nanosecond offsets should round away from zero");
+    rounding.reference_host_offset_ns = 1.5;
+    expect(acim::trace::device_cycle_to_host_timestamp_ns(rounding, 100u) == 12u,
+           "positive one-and-a-half offsets should round away from zero");
+    rounding.reference_host_offset_ns = -0.5;
+    expect(acim::trace::device_cycle_to_host_timestamp_ns(rounding, 100u) == 9u,
+           "negative half-nanosecond offsets should round away from zero");
+    rounding.reference_host_offset_ns = -1.5;
+    expect(acim::trace::device_cycle_to_host_timestamp_ns(rounding, 100u) == 8u,
+           "negative one-and-a-half offsets should round away from zero");
+
     acim::trace::ClockCorrelation nonfinite_slope = zero_anchored;
     nonfinite_slope.nanoseconds_per_cycle = std::numeric_limits<double>::quiet_NaN();
     expect(!acim::trace::device_cycle_to_host_timestamp_ns(nonfinite_slope, 101u).has_value(),
            "timestamp conversion should reject a nonfinite slope");
 
+    nonfinite_slope.nanoseconds_per_cycle = std::numeric_limits<double>::infinity();
+    expect(!acim::trace::device_cycle_to_host_timestamp_ns(nonfinite_slope, 101u).has_value(),
+           "timestamp conversion should reject an infinite slope");
+
     acim::trace::ClockCorrelation nonfinite_offset = zero_anchored;
     nonfinite_offset.reference_host_offset_ns = std::numeric_limits<double>::infinity();
     expect(!acim::trace::device_cycle_to_host_timestamp_ns(nonfinite_offset, 100u).has_value(),
            "timestamp conversion should reject a nonfinite offset");
+}
+
+void test_checked_timestamp_randomized_against_extended_precision() {
+#if LDBL_MANT_DIG > DBL_MANT_DIG
+    // Keep the exact binary-rational product within the 64-bit significand of the
+    // extended-precision reference while exercising deltas above 2^53.
+    // NOLINTNEXTLINE(bugprone-random-generator-seed)
+    std::mt19937_64 generator(0xD0B1ED0u);
+    constexpr std::uint64_t delta_mask = (UINT64_C(1) << 56u) - 1u;
+    constexpr std::uint64_t host_anchor = UINT64_C(1) << 62u;
+
+    for (int trial = 0; trial < 2'000; ++trial) {
+        const std::uint64_t delta = generator() & delta_mask;
+        const double slope = static_cast<double>((generator() % 255u) + 1u) / 1024.0;
+        const auto offset_quarters = static_cast<std::int64_t>(generator() % 8'193u) - 4'096;
+        const double reference_offset = static_cast<double>(offset_quarters) / 4.0;
+        const bool is_forward = (generator() & 1u) != 0u;
+        const std::uint64_t reference_cycle = is_forward ? 0u : delta;
+        const std::uint64_t device_cycle = is_forward ? delta : 0u;
+        const acim::trace::ClockCorrelation correlation{
+            slope, reference_cycle, host_anchor, reference_offset, 0.0, 0.0, 2u,
+        };
+
+        const long double signed_delta =
+            is_forward ? static_cast<long double>(delta) : -static_cast<long double>(delta);
+        const long double exact_offset = static_cast<long double>(reference_offset) +
+                                         static_cast<long double>(slope) * signed_delta;
+        const long double rounded_offset = std::round(exact_offset);
+        const std::uint64_t expected =
+            rounded_offset >= 0.0L ? host_anchor + static_cast<std::uint64_t>(rounded_offset)
+                                   : host_anchor - static_cast<std::uint64_t>(-rounded_offset);
+        expect(acim::trace::device_cycle_to_host_timestamp_ns(correlation, device_cycle) ==
+                   expected,
+               "checked conversion must match an extended-precision reference");
+    }
+#endif
 }
 
 void test_outlier_is_reported() {
@@ -271,7 +385,9 @@ int main() {
     test_clock_epoch_rearms_a_completed_slot();
     test_invalid_clock_samples();
     test_large_cycle_and_timestamp_precision();
+    test_checked_timestamp_preserves_full_uint64_cycle_deltas();
     test_checked_timestamp_boundaries();
+    test_checked_timestamp_randomized_against_extended_precision();
     test_outlier_is_reported();
     test_randomized_clock_fit();
 

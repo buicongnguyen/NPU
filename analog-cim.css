@@ -822,6 +822,12 @@ tbody th {
   line-height: 1.25;
 }
 
+.quiz-question:focus-visible,
+.quiz-summary-title:focus-visible {
+  outline: 3px solid var(--blue);
+  outline-offset: 4px;
+}
+
 .option-list {
   display: grid;
   gap: 8px;
@@ -860,6 +866,11 @@ tbody th {
   background: var(--soft-red);
 }
 
+.option:disabled {
+  cursor: default;
+  opacity: 1;
+}
+
 .option-key {
   width: 30px;
   height: 30px;
@@ -868,6 +879,18 @@ tbody th {
   border: 1px solid var(--line);
   border-radius: 50%;
   font-weight: 800;
+}
+
+.option-result {
+  grid-column: 2;
+  justify-self: start;
+  border: 1px solid currentColor;
+  border-radius: 999px;
+  padding: 2px 8px;
+  color: var(--ink);
+  font-size: 12px;
+  font-weight: 850;
+  line-height: 1.4;
 }
 
 .quiz-feedback {

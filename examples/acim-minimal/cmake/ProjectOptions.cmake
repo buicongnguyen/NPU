@@ -35,12 +35,18 @@ function(acim_configure_target target_name)
                 ${target_name}
                 PRIVATE
                     -fsanitize=address,undefined
+                    -fno-sanitize-recover=all
                     -fno-omit-frame-pointer
             )
 
             get_target_property(target_type ${target_name} TYPE)
             if(NOT target_type STREQUAL "STATIC_LIBRARY")
-                target_link_options(${target_name} PRIVATE -fsanitize=address,undefined)
+                target_link_options(
+                    ${target_name}
+                    PRIVATE
+                        -fsanitize=address,undefined
+                        -fno-sanitize-recover=all
+                )
             endif()
         else()
             message(

@@ -186,6 +186,35 @@ test("mobile chapter drawer traps focus, closes with Escape and backdrop, and re
   await expect(menu).toBeFocused();
 });
 
+test("sidebar focus is restored when responsive and page-retaining links hide the drawer", async ({
+  context,
+  page
+}) => {
+  await page.setViewportSize({ width: 1280, height: 720 });
+  await page.goto("/npu-framework-compiler-skills.html");
+  await waitForBookShell(page);
+
+  const menu = page.getByRole("button", { name: "Toggle study chapters" });
+  const currentChapter = page.locator('.book-chapter-link[aria-current="page"]');
+  await currentChapter.focus();
+  await expect(currentChapter).toBeFocused();
+
+  await page.setViewportSize({ width: 1000, height: 720 });
+  await expect(page.locator(".book-sidebar")).toHaveAttribute("inert", "");
+  await expect(menu).toBeFocused();
+
+  await menu.click();
+  await expect(currentChapter).toBeFocused();
+  const [popup] = await Promise.all([
+    context.waitForEvent("page"),
+    currentChapter.click({ modifiers: ["Control"] })
+  ]);
+  await popup.close();
+
+  await expect(page.locator("body")).not.toHaveClass(/book-drawer-open/);
+  await expect(menu).toBeFocused();
+});
+
 test("theme follows the system until selected, then persists across page families", async ({
   page
 }) => {
@@ -210,6 +239,9 @@ test("theme follows the system until selected, then persists across page familie
 
   await toggle.click();
   await expect(page.locator("html")).toHaveAttribute("data-book-theme", "dark");
+  await expect
+    .poll(() => page.locator("html").evaluate((element) => element.style.colorScheme))
+    .toBe("");
   await expect(toggle).toHaveAttribute("aria-label", "Switch to light theme");
   await expect(toggle).not.toHaveAttribute("aria-pressed", /.+/);
 
@@ -259,6 +291,119 @@ test("the in-page outline tracks scrolling without rewriting the URL", async ({ 
   expect(page.url()).toBe(originalUrl);
 });
 
+test("reading progress ignores its own style mutations and tracks dynamic document height", async ({
+  page
+}) => {
+  await page.addInitScript(() => {
+    const querySelectorAll = Element.prototype.querySelectorAll;
+    window.__bodyWideScrollabilityScans = 0;
+    Element.prototype.querySelectorAll = function (selector) {
+      if (this === document.body && selector === "*") {
+        window.__bodyWideScrollabilityScans += 1;
+      }
+      return querySelectorAll.apply(this, arguments);
+    };
+  });
+
+  await page.goto("/c-practice.html", { waitUntil: "networkidle" });
+  await waitForBookShell(page);
+  await page.evaluate(
+    () =>
+      new Promise((resolve) => {
+        requestAnimationFrame(() => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+      })
+  );
+  await page.evaluate(() => {
+    window.__bodyWideScrollabilityScans = 0;
+  });
+
+  const scanCount = await page.evaluate(async () => {
+    const maxScroll = document.documentElement.scrollHeight - window.innerHeight;
+    for (let step = 1; step <= 30; step += 1) {
+      window.scrollTo({ top: (maxScroll * step) / 30, behavior: "instant" });
+      await new Promise((resolve) => requestAnimationFrame(resolve));
+    }
+    await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+    return window.__bodyWideScrollabilityScans;
+  });
+  expect(scanCount).toBeLessThanOrEqual(2);
+
+  await page.goto("/npu-practice.html", { waitUntil: "networkidle" });
+  await waitForBookShell(page);
+  await page.evaluate(() => window.scrollTo({ top: 3000, behavior: "instant" }));
+  await page.locator("#q").evaluate((input) => {
+    input.value = "no-result-layout-regression-token";
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+  });
+  await expect
+    .poll(() => page.locator("details.qa.nohit, .termdef.nohit").count())
+    .toBeGreaterThan(100);
+  await expect
+    .poll(() =>
+      page.evaluate(() => {
+        const maxScroll = Math.max(
+          0,
+          document.documentElement.scrollHeight - window.innerHeight
+        );
+        const expected =
+          maxScroll === 0 ? 100 : Math.round((window.scrollY / maxScroll) * 100);
+        const actual = Number(
+          document.querySelector(".book-reading-progress").getAttribute("aria-valuenow")
+        );
+        return actual - expected;
+      })
+    )
+    .toBe(0);
+});
+
+test("back-to-top honors the reduced-motion preference", async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await page.goto("/npu-practice.html");
+  await waitForBookShell(page);
+  await page.evaluate(() => {
+    window.scrollTo({ top: 5000, behavior: "instant" });
+    const nativeScrollTo = window.scrollTo.bind(window);
+    window.__lastScrollBehavior = "";
+    window.scrollTo = function () {
+      const firstArgument = arguments[0];
+      if (firstArgument && typeof firstArgument === "object") {
+        window.__lastScrollBehavior = firstArgument.behavior;
+      }
+      return nativeScrollTo(...arguments);
+    };
+  });
+
+  await page.getByRole("button", { name: "Back to top" }).click();
+  expect(await page.evaluate(() => window.__lastScrollBehavior)).toBe("auto");
+  expect(await page.evaluate(() => window.scrollY)).toBe(0);
+});
+
+test("NPU practice choices expose selected and correct results as text", async ({ page }) => {
+  await page.goto("/npu-practice.html");
+  await waitForBookShell(page);
+
+  const card = page.locator("details.qa.mcq").first();
+  await card.locator("summary").click();
+  await card.locator(".choices li").nth(1).click();
+
+  await expect(card.locator(".choices li.chosen .mcq-result-label")).toHaveText(
+    "Your answer — incorrect"
+  );
+  await expect(card.locator(".choices li.correct .mcq-result-label")).toHaveText(
+    "Correct answer"
+  );
+  await expect(card.locator(".mcq-result-label")).toHaveCount(2);
+  await expect(card.locator(".choices li[aria-disabled='true']")).toHaveCount(4);
+  expect(
+    await card.locator(".choices li").evaluateAll((choices) =>
+      choices.map((choice) => choice.tabIndex)
+    )
+  ).toEqual([-1, -1, -1, -1]);
+  await expect(card.locator(".mcq-result-status")).toContainText(
+    "Incorrect. Correct answer:"
+  );
+});
+
 test("the existing NPU practice TOC remains available without JavaScript", async ({
   browser,
   baseURL
@@ -270,6 +415,14 @@ test("the existing NPU practice TOC remains available without JavaScript", async
   await expect(page.locator("nav.toc")).toBeVisible();
   await expect(page.locator(".book-topbar")).toHaveCount(0);
   await expect(page.locator("main")).toBeVisible();
+  const closedAnswer = page.locator("details.qa:not([open]) .ans").first();
+  const closedExplanation = page.locator("details.qa:not([open]) .ans .why").first();
+  await expect(closedAnswer).toBeHidden();
+  await expect(closedExplanation).toBeHidden();
+
+  await page.emulateMedia({ media: "print" });
+  await expect(closedAnswer).toBeVisible();
+  await expect(closedExplanation).toBeVisible();
 
   await context.close();
 });

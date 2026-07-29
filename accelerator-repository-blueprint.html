@@ -419,7 +419,7 @@
       <div class="callout verdict top-gap">
         <h3>A working minimal build is included</h3>
         <p>
-          <a href="examples/acim-minimal/README.md"><code>examples/acim-minimal/</code></a> contains a dependency-free
+          <a href="https://github.com/buicongnguyen/NPU/tree/main/examples/acim-minimal"><code>examples/acim-minimal/</code></a> contains a dependency-free
           C++20 functional MVM simulator, ADC clamp, CMake target policy, Ninja presets for GCC/Clang/MSVC, CTest unit
           and smoke lanes, optional GoogleTest discovery, clang-format/clang-tidy configuration, installation rules,
           and an AArch64 Linux toolchain example. It is a software reference model, not an analog circuit model.
@@ -907,8 +907,8 @@ cmake --build --preset tracy
 ctest --preset tracy
 
 # Start the Tracy profiler, connect locally, then run:
-./build/tracy/acim_smoke             # Linux
-build\tracy\acim_smoke.exe           # Windows</code></pre>
+./build/tracy/acim_smoke-debug       # Linux
+build\tracy\acim_smoke-debug.exe     # Windows</code></pre>
       </div>
       <p class="command-note">The fetched CMake target builds and links <code>TracyClient</code>; obtain or build the desktop Profiler from the same Tracy version separately. With on-demand collection and broadcast disabled, connect to <code>127.0.0.1</code> before starting the workload.</p>
 
@@ -1360,7 +1360,7 @@ acim-triage compare --left functional --right hardware --first-divergence</code>
         <article class="source-card"><a href="https://github.com/tenstorrent/tracy">Tenstorrent Tracy fork</a><span>The maintained TT-Metalium profiler fork, showing that unified accelerator visualization is a deliberate integration component.</span></article>
         <article class="source-card"><a href="https://github.com/wolfpld/tracy">Upstream Tracy</a><span>Profiler source, C/C++ instrumentation APIs, client library, server applications, documentation and supported platform integrations.</span></article>
         <article class="source-card"><a href="https://github.com/wolfpld/tracy/releases/tag/v0.13.1">Tracy 0.13.1 release</a><span>The exact upstream release pinned by the minimal example at commit <code>05cceee0df3b8d7c6fa87e9638af311dbabc63cb</code>.</span></article>
-        <article class="source-card"><a href="https://perfetto.dev/docs/instrumentation/trace-sdk">Perfetto Trace SDK</a><span>Primary documentation for writing timestamped trace events when an accurate portable device timeline is preferable to a custom Tracy bridge.</span></article>
+        <article class="source-card"><a href="https://perfetto.dev/docs/instrumentation/tracing-sdk">Perfetto Trace SDK</a><span>Primary documentation for writing timestamped trace events when an accurate portable device timeline is preferable to a custom Tracy bridge.</span></article>
         <article class="source-card"><a href="https://docs.tenstorrent.com/tt-metal/latest/tt-metalium/get_started/get_started.html">TT-Metalium getting started</a><span>Current high-level component, example, documentation and contributor entry points.</span></article>
         <article class="source-card"><a href="https://github.com/tenstorrent/tt-metal/blob/main/METALIUM_GUIDE.md">TT-Metalium architecture guide</a><span>Programming model, hardware concepts, host workflow and low-level execution context.</span></article>
         <article class="source-card"><a href="https://cmake.org/cmake/help/latest/guide/tutorial/index.html">CMake tutorial</a><span>Official target-oriented configure, build, library, testing, installation and packaging progression.</span></article>
@@ -1379,7 +1379,7 @@ acim-triage compare --left functional --right hardware --first-divergence</code>
         <article class="source-card"><a href="https://scikit-build-core.readthedocs.io/en/latest/">scikit-build-core</a><span><code>pyproject.toml</code>-based CMake wheel and editable-install integration.</span></article>
         <article class="source-card"><a href="https://cmake.org/cmake/help/latest/module/FindDoxygen.html">CMake FindDoxygen</a><span>Imported Doxygen/Graphviz tools and explicit API-documentation build targets.</span></article>
         <article class="source-card"><a href="https://docs.kernel.org/kbuild/index.html">Linux Kbuild</a><span>Official kernel build system used for an ACiM Linux kernel-mode driver.</span></article>
-        <article class="source-card"><a href="examples/acim-minimal/README.md">Minimal ACiM build example</a><span>Working C++20 simulator, CMake/Ninja presets, CTest, optional GoogleTest and Tracy, device trace ABI, clock correlation, installation and cross-build notes.</span></article>
+        <article class="source-card"><a href="https://github.com/buicongnguyen/NPU/tree/main/examples/acim-minimal">Minimal ACiM build example</a><span>Working C++20 simulator, CMake/Ninja presets, CTest, optional GoogleTest and Tracy, device trace ABI, clock correlation, installation and cross-build notes.</span></article>
         <article class="source-card"><a href="analog-cim-sdk-toolchain.html">ACiM SDK and compiler implementation</a><span>Target, IR, artifact, HAL, runtime, calibration, simulator and vertical-slice contracts used by this repository blueprint.</span></article>
         <article class="source-card"><a href="analog-cim-board-bringup.html">ACiM board bring-up guide</a><span>KMD, UMD, PCIe, DMA, interrupts, firmware, reset, analog lifecycle and YOLO bring-up requirements.</span></article>
       </div>

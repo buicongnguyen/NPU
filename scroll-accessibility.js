@@ -184,7 +184,16 @@
   window.addEventListener('resize', scheduleRefresh);
   document.fonts?.ready.then(scheduleRefresh);
 
-  new MutationObserver(scheduleRefresh).observe(document.documentElement, {
+  const mutationNeedsRefresh = (mutation) =>
+    !(
+      mutation.type === 'attributes' &&
+      mutation.attributeName === 'style' &&
+      mutation.target.closest('[data-scroll-accessibility-ignore-mutations]')
+    );
+
+  new MutationObserver((mutations) => {
+    if (mutations.some(mutationNeedsRefresh)) scheduleRefresh();
+  }).observe(document.documentElement, {
     attributeFilter: ['class', 'hidden', 'open', 'style'],
     attributes: true,
     childList: true,

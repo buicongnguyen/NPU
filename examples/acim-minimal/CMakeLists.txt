@@ -75,6 +75,12 @@ target_include_directories(
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/firmware/include>
         $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
 )
+target_compile_features(
+    acim_device_trace
+    INTERFACE
+        c_std_11
+        cxx_std_11
+)
 
 configure_file(
     cmake/build-manifest.txt.in
@@ -113,6 +119,14 @@ add_executable(acim_smoke apps/acim_smoke.cpp)
 target_link_libraries(acim_smoke PRIVATE acim::sim acim::profiling)
 acim_configure_target(acim_smoke)
 
+set_target_properties(
+    acim_sim acim_trace acim_smoke
+    PROPERTIES
+        DEBUG_POSTFIX "-debug"
+        RELWITHDEBINFO_POSTFIX "-relwithdebinfo"
+        MINSIZEREL_POSTFIX "-minsizerel"
+)
+
 if(BUILD_TESTING)
     add_executable(acim_unit_tests tests/simulator_test.cpp)
     target_link_libraries(acim_unit_tests PRIVATE acim::sim)
@@ -130,6 +144,22 @@ if(BUILD_TESTING)
     add_executable(acim_profiling_interface_test tests/profiling_interface_test.cpp)
     target_link_libraries(acim_profiling_interface_test PRIVATE acim::profiling)
     acim_configure_target(acim_profiling_interface_test)
+
+    if(ACIM_ENABLE_SANITIZERS)
+        add_executable(acim_ubsan_must_fail tests/ubsan_must_fail.cpp)
+        acim_configure_target(acim_ubsan_must_fail)
+        add_test(
+            NAME acim.sanitizer.undefined_behavior_must_terminate
+            COMMAND
+                ${CMAKE_COMMAND}
+                "-DTEST_PROGRAM=$<TARGET_FILE:acim_ubsan_must_fail>"
+                -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/ExpectUbsanFailure.cmake"
+        )
+        set_tests_properties(
+            acim.sanitizer.undefined_behavior_must_terminate
+            PROPERTIES LABELS "sanitizer" TIMEOUT 10
+        )
+    endif()
 
     add_test(NAME acim.unit.functional_simulator COMMAND acim_unit_tests)
     set_tests_properties(

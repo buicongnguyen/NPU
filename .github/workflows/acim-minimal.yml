@@ -43,7 +43,7 @@ jobs:
         working-directory: examples/acim-minimal
     steps:
       - name: Checkout
-        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Set up native toolchain
         uses: ./.github/actions/setup-native
@@ -83,10 +83,11 @@ jobs:
             -DCMAKE_PREFIX_PATH="$PWD/build/stage-${{ matrix.cc }}-${{ matrix.sanitizers }}"
           cmake --build build/consumer-${{ matrix.cc }}-${{ matrix.sanitizers }} --parallel
           ./build/consumer-${{ matrix.cc }}-${{ matrix.sanitizers }}/acim_package_consumer
+          ./build/consumer-${{ matrix.cc }}-${{ matrix.sanitizers }}/acim_device_trace_c_consumer
 
       - name: Run staged smoke
         if: matrix.sanitizers == 'OFF'
-        run: ./build/stage-${{ matrix.cc }}-${{ matrix.sanitizers }}/bin/acim_smoke
+        run: ./build/stage-${{ matrix.cc }}-${{ matrix.sanitizers }}/bin/acim_smoke-debug
 
   windows-msvc:
     name: MSVC Debug
@@ -96,7 +97,7 @@ jobs:
         working-directory: examples/acim-minimal
     steps:
       - name: Checkout
-        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Set up MSVC and native tools
         uses: ./.github/actions/setup-native
@@ -120,9 +121,57 @@ jobs:
             -DCMAKE_PREFIX_PATH="$PWD/build/stage-msvc"
           cmake --build build/consumer-msvc --parallel
           .\build\consumer-msvc\acim_package_consumer.exe
+          .\build\consumer-msvc\acim_device_trace_c_consumer.exe
 
       - name: Run staged smoke
-        run: .\build\stage-msvc\bin\acim_smoke.exe
+        run: .\build\stage-msvc\bin\acim_smoke-debug.exe
+
+      - name: Reject an incompatible installed configuration
+        run: |
+          cmake `
+            -DCONSUMER_SOURCE_DIR="$PWD/tests/package-consumer" `
+            -DCONSUMER_BINARY_DIR="$PWD/build/consumer-release-rejected-msvc" `
+            -DPACKAGE_PREFIX="$PWD/build/stage-msvc" `
+            -P cmake/ExpectPackageConfigureFailure.cmake
+
+      - name: Validate single-config package coexistence
+        run: |
+          cmake -S . -B build/release-msvc -G Ninja `
+            -DCMAKE_BUILD_TYPE=Release `
+            -DBUILD_TESTING=OFF `
+            -DACIM_WARNINGS_AS_ERRORS=ON
+          cmake --build build/release-msvc --parallel
+          cmake --install build/release-msvc --prefix build/stage-msvc
+          cmake -S tests/package-consumer -B build/consumer-release-msvc -G Ninja `
+            -DCMAKE_BUILD_TYPE=Release `
+            -DCMAKE_PREFIX_PATH="$PWD/build/stage-msvc"
+          cmake --build build/consumer-release-msvc --parallel
+          .\build\consumer-release-msvc\acim_package_consumer.exe
+          .\build\consumer-release-msvc\acim_device_trace_c_consumer.exe
+          .\build\stage-msvc\bin\acim_smoke-debug.exe
+          .\build\stage-msvc\bin\acim_smoke.exe
+
+      - name: Validate multi-config package consumers
+        run: |
+          cmake -S . -B build/multi-msvc -G "Ninja Multi-Config" `
+            "-DCMAKE_CONFIGURATION_TYPES=Debug;Release" `
+            -DBUILD_TESTING=OFF `
+            -DACIM_WARNINGS_AS_ERRORS=ON
+          cmake --build build/multi-msvc --config Debug --parallel
+          cmake --build build/multi-msvc --config Release --parallel
+          cmake --install build/multi-msvc --config Debug --prefix build/stage-multi-msvc
+          cmake --install build/multi-msvc --config Release --prefix build/stage-multi-msvc
+          cmake -S tests/package-consumer -B build/consumer-multi-msvc -G "Ninja Multi-Config" `
+            "-DCMAKE_CONFIGURATION_TYPES=Debug;Release" `
+            -DCMAKE_PREFIX_PATH="$PWD/build/stage-multi-msvc"
+          cmake --build build/consumer-multi-msvc --config Debug --parallel
+          .\build\consumer-multi-msvc\Debug\acim_package_consumer.exe
+          .\build\consumer-multi-msvc\Debug\acim_device_trace_c_consumer.exe
+          cmake --build build/consumer-multi-msvc --config Release --parallel
+          .\build\consumer-multi-msvc\Release\acim_package_consumer.exe
+          .\build\consumer-multi-msvc\Release\acim_device_trace_c_consumer.exe
+          .\build\stage-multi-msvc\bin\acim_smoke-debug.exe
+          .\build\stage-multi-msvc\bin\acim_smoke.exe
 
   google-test:
     name: GoogleTest discovery
@@ -132,7 +181,7 @@ jobs:
         working-directory: examples/acim-minimal
     steps:
       - name: Checkout
-        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Set up native toolchain
         uses: ./.github/actions/setup-native
@@ -160,7 +209,7 @@ jobs:
         working-directory: examples/acim-minimal
     steps:
       - name: Checkout
-        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Set up native toolchain
         uses: ./.github/actions/setup-native
@@ -190,6 +239,7 @@ jobs:
             -DCMAKE_PREFIX_PATH="$PWD/build/stage-tracy"
           cmake --build build/consumer-tracy --parallel
           ./build/consumer-tracy/acim_package_consumer
+          ./build/consumer-tracy/acim_device_trace_c_consumer
 
   fuzzing:
     name: Clang libFuzzer smoke
@@ -199,7 +249,7 @@ jobs:
         working-directory: examples/acim-minimal
     steps:
       - name: Checkout
-        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Set up Clang
         uses: ./.github/actions/setup-native
@@ -237,7 +287,7 @@ jobs:
         working-directory: examples/acim-minimal
     steps:
       - name: Checkout
-        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Set up Clang tools
         uses: ./.github/actions/setup-native
@@ -261,6 +311,8 @@ jobs:
           tests/profiling_interface_test.cpp
           tests/trace_test.cpp
           tests/package-consumer/main.cpp
+          tests/package-consumer/device_trace_c_consumer.c
+          tests/ubsan_must_fail.cpp
           fuzz/acim_device_trace_fuzzer.cpp
           fuzz/acim_trace_correlation_fuzzer.cpp
 
