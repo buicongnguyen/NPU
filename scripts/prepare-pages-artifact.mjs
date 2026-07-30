@@ -18,6 +18,12 @@ const buildRoot = path.join(repositoryRoot, "build");
 const defaultArtifactRoot = path.join(buildRoot, "pages-site");
 const manifestName = "asset-manifest.json";
 const releaseLength = 16;
+const publicSiteUrl = "https://buicongnguyen.github.io/NPU/";
+const quizDownloadJsonPaths = new Set([
+  "data/analog-cim-architecture.json",
+  "data/analog-cim-evidence.json",
+  "data/analog-cim-mcq.json",
+]);
 const versionedHtmlAssetExtensions = new Set([".css", ".js", ".json"]);
 const htmlReferencePattern =
   /(\b(?:href|src)\s*=\s*)(?:(["'])([^"']*)\2|([^\s"'=<>`]+))/gi;
@@ -33,11 +39,16 @@ const strictUtf8Decoder = new TextDecoder("utf-8", {
 const deployableRules = [
   {
     kind: "root",
-    extensions: [".css", ".html", ".js"],
+    extensions: [".css", ".html", ".js", ".svg"],
   },
   {
     kind: "tree",
     directory: "data",
+    extensions: [".json"],
+  },
+  {
+    kind: "tree",
+    directory: "schemas",
     extensions: [".json"],
   },
 ];
@@ -641,6 +652,91 @@ function assertSamePaths(actual, expected, label) {
   }
 }
 
+async function validateStableJsonAliases(
+  artifactRoot,
+  publicationPlan,
+  manifest,
+) {
+  const recordsByPath = new Map(
+    manifest.files.map((file) => [file.path, file]),
+  );
+  const stableEntries = publicationPlan.filter(
+    (entry) => entry.publicationKind === "stable-json",
+  );
+  if (stableEntries.length === 0) {
+    throw new Error("Pages artifact must publish at least one stable JSON alias");
+  }
+
+  for (const stableEntry of stableEntries) {
+    const runtimePath = publishedPath(stableEntry.sourcePath, manifest.release);
+    const stableRecord = recordsByPath.get(stableEntry.publishedPath);
+    const runtimeRecord = recordsByPath.get(runtimePath);
+    if (!stableRecord || !runtimeRecord) {
+      throw new Error(
+        `Stable JSON alias is missing its runtime pair: ${stableEntry.sourcePath}`,
+      );
+    }
+    if (
+      stableRecord.bytes !== runtimeRecord.bytes ||
+      stableRecord.sha256 !== runtimeRecord.sha256
+    ) {
+      throw new Error(
+        `Stable JSON alias does not match its runtime record: ${stableEntry.sourcePath}`,
+      );
+    }
+
+    const [stableContents, runtimeContents] = await Promise.all([
+      readFile(
+        path.join(
+          artifactRoot,
+          ...stableEntry.publishedPath.split("/"),
+        ),
+      ),
+      readFile(path.join(artifactRoot, ...runtimePath.split("/"))),
+    ]);
+    if (!stableContents.equals(runtimeContents)) {
+      throw new Error(
+        `Stable JSON alias does not match its runtime bytes: ${stableEntry.sourcePath}`,
+      );
+    }
+  }
+}
+
+async function validatePublicSchemaIds(artifactRoot, publicationPlan) {
+  const schemaEntries = publicationPlan.filter(
+    (entry) =>
+      entry.publicationKind === "stable-json" &&
+      entry.sourcePath.startsWith("schemas/") &&
+      entry.sourcePath.endsWith(".schema.json"),
+  );
+  if (schemaEntries.length === 0) {
+    throw new Error("Pages artifact must publish its public JSON Schemas");
+  }
+
+  for (const entry of schemaEntries) {
+    const schemaPath = path.join(
+      artifactRoot,
+      ...entry.publishedPath.split("/"),
+    );
+    let schema;
+    try {
+      schema = JSON.parse(await readFile(schemaPath, "utf8"));
+    } catch (error) {
+      throw new Error(
+        `Published JSON Schema is not valid JSON: ${entry.publishedPath}`,
+        { cause: error },
+      );
+    }
+
+    const expectedId = new URL(entry.sourcePath, publicSiteUrl).href;
+    if (schema.$id !== expectedId) {
+      throw new Error(
+        `Published JSON Schema ${entry.publishedPath} must declare $id ${expectedId}`,
+      );
+    }
+  }
+}
+
 async function validateArtifact(artifactRoot) {
   const sourcePaths = await collectDeployablePaths();
   const manifestPath = path.join(artifactRoot, manifestName);
@@ -678,6 +774,9 @@ async function validateArtifact(artifactRoot) {
   const artifactFiles = await collectArtifactFiles(artifactRoot);
   const expectedArtifactFiles = [...publishedPaths, manifestName].sort(comparePaths);
   assertSamePaths(artifactFiles, expectedArtifactFiles, "Artifact file list");
+
+  await validateStableJsonAliases(artifactRoot, publicationPlan, manifest);
+  await validatePublicSchemaIds(artifactRoot, publicationPlan);
 
   await validateStampedAssetReferences(
     artifactRoot,
@@ -923,12 +1022,11 @@ async function testArtifactPreparation() {
     );
     const stableJsonRecords = secondManifest.files.filter(
       (file) =>
-        file.path.startsWith("data/") &&
         file.path.endsWith(".json") &&
         !file.path.endsWith(`.${secondManifest.release}.json`),
     );
-    if (stableJsonRecords.length !== 3) {
-      throw new Error("Artifact test requires three stable JSON aliases");
+    if (stableJsonRecords.length === 0) {
+      throw new Error("Artifact test requires stable JSON aliases");
     }
     for (const stableRecord of stableJsonRecords) {
       const runtimePath = publishedPath(
@@ -949,20 +1047,42 @@ async function testArtifactPreparation() {
 
     const quizHtmlPath = path.join(secondRoot, "analog-cim-quiz.html");
     const quizHtml = await readFile(quizHtmlPath, "utf8");
-    for (const stableRecord of stableJsonRecords) {
-      if (!quizHtml.includes(`href="${stableRecord.path}"`)) {
+    for (const downloadPath of quizDownloadJsonPaths) {
+      if (!secondRecordsByPath.has(downloadPath)) {
+        throw new Error(`Quiz download is not a stable JSON alias: ${downloadPath}`);
+      }
+      if (!quizHtml.includes(`href="${downloadPath}"`)) {
         throw new Error(
-          `Human JSON link is not release-independent: ${stableRecord.path}`,
+          `Human JSON link is not release-independent: ${downloadPath}`,
         );
       }
       const runtimePath = publishedPath(
-        stableRecord.path,
+        downloadPath,
         secondManifest.release,
       );
       if (quizHtml.includes(`href="${runtimePath}"`)) {
         throw new Error(`Human JSON link uses a runtime path: ${runtimePath}`);
       }
     }
+
+    const stableAliasToTamper = stableJsonRecords[0];
+    const stableAliasPath = path.join(
+      secondRoot,
+      ...stableAliasToTamper.path.split("/"),
+    );
+    await writeFile(
+      stableAliasPath,
+      Buffer.concat([
+        await readFile(stableAliasPath),
+        Buffer.from("\n", "utf8"),
+      ]),
+    );
+    await expectValidationFailure(
+      () => validateArtifact(secondRoot),
+      "stable JSON bytes that differ from the runtime copy",
+      /does not match its runtime bytes/,
+    );
+    await prepareArtifact(secondRoot, temporaryRoot);
 
     const evidenceScriptPath = publishedPath(
       "analog-cim-evidence.js",

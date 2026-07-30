@@ -1,0 +1,429 @@
+{
+  "schemaVersion": 1,
+  "title": "NPU Engineering Study Guide",
+  "groups": [
+    {
+      "id": "start",
+      "title": "Start here",
+      "description": "Orient yourself to accelerator families, compiler layers, and the study paths.",
+      "pages": [
+        {
+          "path": "index.html",
+          "aliases": [
+            "npu.html"
+          ],
+          "title": "Accelerator and compiler overview",
+          "summary": "Compare NPU, GPU, TPU, VPU, and LPU systems and map the guide's architecture, compiler, runtime, and Analog CIM studies.",
+          "keywords": [
+            "accelerator",
+            "NPU",
+            "GPU",
+            "TPU",
+            "VPU",
+            "LPU",
+            "LLVM",
+            "MLIR"
+          ],
+          "prerequisites": []
+        }
+      ]
+    },
+    {
+      "id": "foundations",
+      "title": "Foundations",
+      "description": "Build the model, programming, operating-system, and embedded knowledge used by the role studies.",
+      "pages": [
+        {
+          "path": "deep-learning-practice.html",
+          "title": "Deep learning practice",
+          "summary": "Review neural-network execution, modern model architectures, transformers, profiling, quantization, and deployment parity.",
+          "keywords": [
+            "deep learning",
+            "transformer",
+            "attention",
+            "quantization",
+            "inference",
+            "profiling"
+          ],
+          "prerequisites": [
+            "index.html"
+          ]
+        },
+        {
+          "path": "c-practice.html",
+          "title": "C programming practice",
+          "summary": "Practice the C language, memory, pointers, concurrency, and systems-level reasoning needed at runtime and driver boundaries.",
+          "keywords": [
+            "C",
+            "pointers",
+            "memory",
+            "concurrency",
+            "systems programming"
+          ],
+          "prerequisites": [
+            "index.html"
+          ]
+        },
+        {
+          "path": "git-practice.html",
+          "title": "Git practice",
+          "summary": "Practice repository history, collaboration, debugging, release, and recovery workflows.",
+          "keywords": [
+            "Git",
+            "branch",
+            "merge",
+            "rebase",
+            "bisect",
+            "release"
+          ],
+          "prerequisites": []
+        },
+        {
+          "path": "os-practice.html",
+          "title": "Operating systems practice",
+          "summary": "Study processes, threads, virtual memory, synchronization, scheduling, I/O, and kernel interfaces.",
+          "keywords": [
+            "operating system",
+            "process",
+            "thread",
+            "virtual memory",
+            "scheduling",
+            "synchronization"
+          ],
+          "prerequisites": [
+            "c-practice.html"
+          ]
+        },
+        {
+          "path": "embedded-practice.html",
+          "title": "Embedded systems practice",
+          "summary": "Study firmware, interrupts, buses, DMA, memory-mapped I/O, real-time behavior, and board-level debugging.",
+          "keywords": [
+            "embedded",
+            "firmware",
+            "interrupt",
+            "DMA",
+            "MMIO",
+            "real time"
+          ],
+          "prerequisites": [
+            "c-practice.html",
+            "os-practice.html"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "core-role",
+      "title": "Core NPU role",
+      "description": "Follow data from model operators through architecture, compiler, runtime, and product integration contracts.",
+      "pages": [
+        {
+          "path": "npu-architecture-performance-study.html",
+          "title": "Architecture, operators, and verification",
+          "summary": "Design NPU and AI-accelerator architecture, define ISA contracts, optimize Conv, GEMM, and Attention, and verify performance.",
+          "keywords": [
+            "NPU architecture",
+            "ISA",
+            "Conv",
+            "GEMM",
+            "Attention",
+            "SystemC",
+            "TLM",
+            "performance verification",
+            "fabless semiconductor",
+            "AI accelerator commercialization",
+            "low-precision inference"
+          ],
+          "prerequisites": [
+            "deep-learning-practice.html",
+            "c-practice.html"
+          ]
+        },
+        {
+          "path": "npu-framework-compiler-skills.html",
+          "title": "Frontend compiler, IR, and code generation",
+          "summary": "Design graph optimization and lowering passes, IR pipelines, frontend/backend boundaries, DSL integrations, and accelerator code generation.",
+          "keywords": [
+            "frontend compiler",
+            "graph optimization",
+            "lowering",
+            "IR",
+            "MLIR",
+            "LLVM",
+            "TVM",
+            "XLA",
+            "DSL",
+            "code generation",
+            "frontend backend compiler boundary",
+            "deep learning accelerator compiler"
+          ],
+          "prerequisites": [
+            "deep-learning-practice.html",
+            "git-practice.html",
+            "npu-architecture-performance-study.html"
+          ]
+        },
+        {
+          "path": "npu-soc-software-architecture.html",
+          "title": "Runtime and SoC software",
+          "summary": "Connect compiled artifacts to runtime, memory management, drivers, firmware, profiling, and NPU execution.",
+          "keywords": [
+            "runtime",
+            "memory management",
+            "resource management",
+            "device driver",
+            "firmware",
+            "profiling",
+            "SoC"
+          ],
+          "prerequisites": [
+            "os-practice.html",
+            "embedded-practice.html",
+            "npu-framework-compiler-skills.html"
+          ]
+        },
+        {
+          "path": "accelerator-repository-blueprint.html",
+          "title": "Product repository blueprint",
+          "summary": "Turn architecture and software interfaces into a product-ready repository, validation strategy, and commercialization workflow.",
+          "keywords": [
+            "product development",
+            "commercialization",
+            "repository",
+            "CI",
+            "verification",
+            "cross-functional"
+          ],
+          "prerequisites": [
+            "git-practice.html",
+            "npu-architecture-performance-study.html",
+            "npu-framework-compiler-skills.html",
+            "npu-soc-software-architecture.html"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "applied-practice",
+      "title": "Applied practice",
+      "description": "Turn the core lessons into recall, design, debugging, and interview evidence.",
+      "pages": [
+        {
+          "path": "npu-practice.html",
+          "title": "AI compiler and NPU practice",
+          "summary": "Practice graph transformations, scheduling, memory hierarchy, compiler stacks, runtimes, low-precision inference, and accelerator optimization.",
+          "keywords": [
+            "AI compiler",
+            "NPU",
+            "fusion",
+            "tiling",
+            "memory hierarchy",
+            "runtime",
+            "low precision",
+            "inference"
+          ],
+          "prerequisites": [
+            "npu-architecture-performance-study.html",
+            "npu-framework-compiler-skills.html",
+            "npu-soc-software-architecture.html"
+          ]
+        },
+        {
+          "path": "interview-practice.html",
+          "title": "Interview practice hub",
+          "summary": "Rehearse cross-layer architecture, compiler, runtime, systems, and collaboration questions.",
+          "keywords": [
+            "interview",
+            "architecture",
+            "compiler",
+            "runtime",
+            "debugging",
+            "collaboration"
+          ],
+          "prerequisites": [
+            "npu-practice.html"
+          ],
+          "nextPath": null
+        }
+      ]
+    },
+    {
+      "id": "analog-cim",
+      "title": "Optional: Analog CIM specialization",
+      "description": "Branch into analog compute-in-memory architecture, evidence, co-design, bring-up, and scale-out deployment.",
+      "optional": true,
+      "pages": [
+        {
+          "path": "analog-cim-architecture.html",
+          "title": "Architecture and execution model",
+          "summary": "Trace data and control through an Analog CIM accelerator and identify ownership, mapping, and bottleneck boundaries.",
+          "keywords": [
+            "Analog CIM",
+            "compute in memory",
+            "architecture",
+            "execution model",
+            "mapping"
+          ],
+          "prerequisites": [
+            "npu-architecture-performance-study.html"
+          ]
+        },
+        {
+          "path": "analog-cim-evidence.html",
+          "title": "Accuracy evidence and open issues",
+          "summary": "Separate measured evidence from claims and study accuracy, variation, endurance, and calibration limits.",
+          "keywords": [
+            "accuracy",
+            "evidence",
+            "variation",
+            "calibration",
+            "endurance"
+          ],
+          "prerequisites": [
+            "analog-cim-architecture.html"
+          ]
+        },
+        {
+          "path": "analog-cim-hardware-software-codesign.html",
+          "title": "Hardware and software co-design",
+          "summary": "Partition responsibilities across arrays, digital logic, compiler, runtime, firmware, and model adaptation.",
+          "keywords": [
+            "hardware software co-design",
+            "partitioning",
+            "compiler",
+            "runtime",
+            "firmware"
+          ],
+          "prerequisites": [
+            "analog-cim-architecture.html",
+            "analog-cim-evidence.html"
+          ]
+        },
+        {
+          "path": "analog-cim-ihw-patents.html",
+          "title": "iHW patent study",
+          "summary": "Read patent claims critically and connect proposed Analog CIM techniques to implementable architecture.",
+          "keywords": [
+            "iHW",
+            "patent",
+            "claims",
+            "Analog CIM",
+            "accuracy"
+          ],
+          "prerequisites": [
+            "analog-cim-evidence.html"
+          ]
+        },
+        {
+          "path": "analog-cim-sdk-toolchain.html",
+          "title": "SDK and compiler toolchain",
+          "summary": "Design the compiler, SDK, runtime, simulator, packaging, and developer interfaces for an Analog CIM product.",
+          "keywords": [
+            "SDK",
+            "compiler",
+            "runtime",
+            "simulator",
+            "toolchain"
+          ],
+          "prerequisites": [
+            "npu-framework-compiler-skills.html",
+            "analog-cim-hardware-software-codesign.html"
+          ]
+        },
+        {
+          "path": "analog-cim-board-bringup.html",
+          "title": "Board bring-up",
+          "summary": "Plan PCIe board initialization, firmware, diagnostics, observability, qualification, and failure triage.",
+          "keywords": [
+            "board bring-up",
+            "PCIe",
+            "firmware",
+            "diagnostics",
+            "qualification"
+          ],
+          "prerequisites": [
+            "embedded-practice.html",
+            "analog-cim-sdk-toolchain.html"
+          ]
+        },
+        {
+          "path": "analog-cim-scaleout-llm.html",
+          "title": "Scale-out and LLM inference",
+          "summary": "Map LLM inference across Analog CIM devices and reason about communication, memory, precision, and throughput.",
+          "keywords": [
+            "LLM",
+            "scale out",
+            "inference",
+            "communication",
+            "throughput"
+          ],
+          "prerequisites": [
+            "deep-learning-practice.html",
+            "analog-cim-architecture.html"
+          ]
+        },
+        {
+          "path": "analog-cim-tenstorrent-reuse.html",
+          "title": "Tenstorrent reuse patterns",
+          "summary": "Study reusable accelerator software patterns from Tenstorrent without assuming architectural equivalence.",
+          "keywords": [
+            "Tenstorrent",
+            "reuse",
+            "compiler",
+            "runtime",
+            "accelerator"
+          ],
+          "prerequisites": [
+            "analog-cim-sdk-toolchain.html"
+          ]
+        },
+        {
+          "path": "analog-cim-mythic-videantis.html",
+          "title": "Mythic and Videantis case study",
+          "summary": "Analyze product and acquisition evidence around Mythic and Videantis as a bounded industry case study.",
+          "keywords": [
+            "Mythic",
+            "Videantis",
+            "case study",
+            "product",
+            "fabless semiconductor"
+          ],
+          "prerequisites": [
+            "analog-cim-evidence.html"
+          ]
+        },
+        {
+          "path": "analog-cim-interview.html",
+          "title": "Analog CIM interview study",
+          "summary": "Rehearse source-grounded Analog CIM architecture, evidence, compiler, runtime, and product questions.",
+          "keywords": [
+            "Analog CIM",
+            "interview",
+            "architecture",
+            "compiler",
+            "product"
+          ],
+          "prerequisites": [
+            "analog-cim-architecture.html",
+            "analog-cim-sdk-toolchain.html"
+          ]
+        },
+        {
+          "path": "analog-cim-quiz.html",
+          "title": "Analog CIM quiz lab",
+          "summary": "Test recall and reasoning across the Analog CIM specialization with source-linked feedback.",
+          "keywords": [
+            "Analog CIM",
+            "quiz",
+            "practice",
+            "evidence"
+          ],
+          "prerequisites": [
+            "analog-cim-interview.html"
+          ]
+        }
+      ]
+    }
+  ]
+}

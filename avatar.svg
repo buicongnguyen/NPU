@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-labelledby="title">
+  <title id="title">NPU Study Guide mark</title>
+  <defs>
+    <linearGradient id="background" x1="8" y1="8" x2="56" y2="56" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#24c8a5"/>
+      <stop offset="1" stop-color="#5477ff"/>
+    </linearGradient>
+  </defs>
+  <rect width="64" height="64" rx="16" fill="#101827"/>
+  <path d="M17 45V19l15 19V19M38 45V19h6.5a8.5 8.5 0 0 1 0 17H38" fill="none" stroke="url(#background)" stroke-linecap="round" stroke-linejoin="round" stroke-width="5"/>
+  <circle cx="52" cy="48" r="3" fill="#24c8a5"/>
+</svg>

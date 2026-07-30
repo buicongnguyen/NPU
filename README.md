@@ -6,8 +6,9 @@ Live site: https://buicongnguyen.github.io/NPU/
 
 Every study page uses the same book-style reader: a fixed chapter rail on
 desktop, an accessible off-canvas chapter drawer on mobile, an in-page outline,
-previous/next chapter links, reading position, and a persisted light/dark theme.
-`index.html` is the canonical overview; `npu.html` remains a supported alias.
+whole-book search, chapter bookmarks, previous/next chapter links, reading
+position, and a persisted light/dark theme. `index.html` is the canonical
+overview; `npu.html` remains a supported alias.
 
 The guide covers NPU, VPU, LPU, GPU, and TPU accelerator tradeoffs, AI model
 deployment paths, LLVM/MLIR compiler concepts, Tenstorrent notes, and related
@@ -31,7 +32,9 @@ The Analog CIM learning path adds a source-critical Mythic case study:
 - Interactive MCQ lab: https://buicongnguyen.github.io/NPU/analog-cim-quiz.html
 
 Reusable learning data lives in `data/analog-cim-architecture.json`,
-`data/analog-cim-evidence.json`, and `data/analog-cim-mcq.json`.
+`data/analog-cim-evidence.json`, and `data/analog-cim-mcq.json`. The ordered
+reader structure and generated search corpus live in `data/book-manifest.json`
+and `data/book-search-index.json`.
 
 The NPU platform engineering path adds two English-only references without
 duplicating the existing accelerator, LLVM/MLIR, graph, C, Git, or Analog CIM

@@ -36,7 +36,7 @@
 </style>
   <script src="scroll-accessibility.js" defer></script>
   <link rel="stylesheet" href="book-shell.css">
-  <script src="book-shell.js"></script>
+  <script src="book-shell.js" defer></script>
 </head>
 <body>
 <header>
@@ -250,21 +250,23 @@ function make(tag, className, text) {
 function render() {
   const root = document.getElementById("qa-root");
   let total = 0;
-  for (const section of data) {
+  data.forEach((section, sectionIndex) => {
     const sec = make("section", "section-head");
     sec.id = section.id;
     sec.appendChild(make("h2", "", section.title));
     sec.appendChild(make("p", "", section.intro));
     let local = 0;
-    for (const group of section.groups) {
+    section.groups.forEach((group, groupIndex) => {
       const wrap = make("div", "group");
+      wrap.id = `interview-group-${sectionIndex + 1}-${groupIndex + 1}`;
       wrap.dataset.section = section.title.toLowerCase();
       wrap.dataset.group = group.name.toLowerCase();
       wrap.appendChild(make("h3", "", group.name));
-      for (const item of group.items) {
+      group.items.forEach((item, itemIndex) => {
         total += 1;
         local += 1;
         const details = make("details", "qa-card");
+        details.id = `interview-question-${sectionIndex + 1}-${groupIndex + 1}-${itemIndex + 1}`;
         details.dataset.search = `${section.title} ${group.name} ${item[0]} ${item[1]}`.toLowerCase();
         const summary = make("summary", "", `${section.title} ${local}. ${item[0]}`);
         const meta = make("span", "meta", group.tag);
@@ -274,11 +276,11 @@ function render() {
         details.appendChild(summary);
         details.appendChild(answer);
         wrap.appendChild(details);
-      }
+      });
       sec.appendChild(wrap);
-    }
+    });
     root.appendChild(sec);
-  }
+  });
   document.getElementById("stats").textContent = `${total} questions across ${data.length} interview domains`;
 }
 

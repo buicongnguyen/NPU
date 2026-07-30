@@ -476,8 +476,16 @@ h3 {
   font-size: 13px;
 }
 
+.stage-detail-host {
+  min-width: 0;
+}
+
 .stage-detail {
   min-height: 420px;
+}
+
+.stage-detail[hidden] {
+  display: none;
 }
 
 .detail-meta {

@@ -2,10 +2,60 @@
   "use strict";
 
   const root = document.documentElement;
+  if (!document.head.querySelector('link[rel~="icon"]')) {
+    const icon = document.createElement("link");
+    icon.rel = "icon";
+    icon.type = "image/svg+xml";
+    icon.href = new URL(
+      "avatar.svg",
+      document.currentScript?.src || document.baseURI,
+    ).href;
+    document.head.append(icon);
+  }
+  const fallbackAttributeState = new Map();
+  let shellEventController;
+
+  function failOpen(error) {
+    root.classList.remove("book-shell-booting");
+    root.dataset.bookShellReady = "error";
+    shellEventController?.abort();
+    shellEventController = undefined;
+
+    const body = document.body;
+    if (body) {
+      body.classList.remove(
+        "book-shell-active",
+        "book-sidebar-collapsed",
+        "book-drawer-open",
+        "book-family-practice",
+        "book-family-npu-practice"
+      );
+      for (const heading of body.querySelectorAll("[data-book-shell-generated-id]")) {
+        heading.removeAttribute("id");
+        heading.removeAttribute("data-book-shell-generated-id");
+      }
+      for (const element of body.querySelectorAll("[data-book-shell-owned]")) {
+        element.remove();
+      }
+    }
+
+    for (const [element, ariaHidden] of fallbackAttributeState) {
+      if (ariaHidden === null) element.removeAttribute("aria-hidden");
+      else element.setAttribute("aria-hidden", ariaHidden);
+    }
+    fallbackAttributeState.clear();
+
+    console.error("The study guide shell could not be initialized.", error);
+  }
+
+  root.classList.add("book-shell-booting");
+  try {
   const themeKey = "site-color-theme";
   const legacyThemeKeys = ["npu-theme"];
+  const bookmarksKey = "npu-study-guide-bookmarks-v1";
   const themeMedia = window.matchMedia("(prefers-color-scheme: dark)");
   let themeButton;
+  let searchIndexPromise;
 
   function readStoredTheme() {
     try {
@@ -73,125 +123,84 @@
     themeMedia.addListener(handleSystemThemeChange);
   }
 
-  const chapterGroups = [
-    {
-      title: "Start here",
-      pages: [
-        {
-          path: "index.html",
-          aliases: ["npu.html"],
-          title: "Accelerator and compiler overview"
-        }
-      ]
-    },
-    {
-      title: "NPU architecture and compiler",
-      pages: [
-        {
-          path: "npu-architecture-performance-study.html",
-          title: "Architecture, operators, and verification"
-        },
-        {
-          path: "npu-framework-compiler-skills.html",
-          title: "Frontend compiler, IR, and code generation"
-        },
-        {
-          path: "npu-soc-software-architecture.html",
-          title: "Runtime and SoC software"
-        },
-        {
-          path: "accelerator-repository-blueprint.html",
-          title: "Product repository blueprint"
-        }
-      ]
-    },
-    {
-      title: "Analog compute-in-memory",
-      pages: [
-        {
-          path: "analog-cim-architecture.html",
-          title: "Architecture and execution model"
-        },
-        {
-          path: "analog-cim-evidence.html",
-          title: "Accuracy evidence and open issues"
-        },
-        {
-          path: "analog-cim-hardware-software-codesign.html",
-          title: "Hardware and software co-design"
-        },
-        {
-          path: "analog-cim-ihw-patents.html",
-          title: "iHW patent study"
-        },
-        {
-          path: "analog-cim-sdk-toolchain.html",
-          title: "SDK and compiler toolchain"
-        },
-        {
-          path: "analog-cim-board-bringup.html",
-          title: "Board bring-up"
-        },
-        {
-          path: "analog-cim-scaleout-llm.html",
-          title: "Scale-out and LLM inference"
-        },
-        {
-          path: "analog-cim-tenstorrent-reuse.html",
-          title: "Tenstorrent reuse patterns"
-        },
-        {
-          path: "analog-cim-mythic-videantis.html",
-          title: "Mythic and Videantis case study"
-        },
-        {
-          path: "analog-cim-interview.html",
-          title: "Analog CIM interview study"
-        },
-        {
-          path: "analog-cim-quiz.html",
-          title: "Analog CIM quiz lab"
-        }
-      ]
-    },
-    {
-      title: "Practice labs",
-      pages: [
-        {
-          path: "interview-practice.html",
-          title: "Interview practice hub"
-        },
-        {
-          path: "deep-learning-practice.html",
-          title: "Deep learning practice"
-        },
-        {
-          path: "npu-practice.html",
-          title: "AI compiler and NPU practice"
-        },
-        {
-          path: "os-practice.html",
-          title: "Operating systems practice"
-        },
-        {
-          path: "embedded-practice.html",
-          title: "Embedded systems practice"
-        },
-        {
-          path: "c-practice.html",
-          title: "C programming practice"
-        },
-        {
-          path: "git-practice.html",
-          title: "Git practice"
-        }
-      ]
-    }
-  ];
+  let chapterGroups = [];
+  let chapters = [];
 
-  const chapters = chapterGroups.flatMap((group) =>
-    group.pages.map((page) => ({ ...page, groupTitle: group.title }))
-  );
+  async function loadBookManifest() {
+    const response = await fetch("./data/book-manifest.json");
+    if (!response.ok) {
+      throw new Error(`Book manifest request failed with HTTP ${response.status}`);
+    }
+    const manifest = await response.json();
+    if (
+      manifest?.schemaVersion !== 1 ||
+      !Array.isArray(manifest.groups) ||
+      manifest.groups.length === 0
+    ) {
+      throw new Error("Book manifest has an unsupported shape");
+    }
+
+    const canonicalPaths = new Set();
+    const seenRoutes = new Set();
+    const seenGroupIds = new Set();
+    const pathPattern = /^[a-z0-9-]+\.html$/;
+    chapterGroups = manifest.groups.map((group) => {
+      if (
+        typeof group?.id !== "string" ||
+        !/^[a-z0-9-]+$/.test(group.id) ||
+        seenGroupIds.has(group.id) ||
+        typeof group?.title !== "string" ||
+        !Array.isArray(group.pages) ||
+        group.pages.length === 0
+      ) {
+        throw new Error("Book manifest contains an invalid chapter group");
+      }
+      seenGroupIds.add(group.id);
+      const pages = group.pages.map((page) => {
+        const aliases = page?.aliases || [];
+        if (
+          typeof page?.path !== "string" ||
+          !pathPattern.test(page.path) ||
+          typeof page.title !== "string" ||
+          seenRoutes.has(page.path) ||
+          !Array.isArray(aliases) ||
+          new Set(aliases).size !== aliases.length ||
+          aliases.some(
+            (alias) =>
+              typeof alias !== "string" ||
+              !pathPattern.test(alias) ||
+              alias === page.path ||
+              seenRoutes.has(alias)
+          )
+        ) {
+          throw new Error("Book manifest contains an invalid or duplicate chapter");
+        }
+        canonicalPaths.add(page.path);
+        seenRoutes.add(page.path);
+        for (const alias of aliases) seenRoutes.add(alias);
+        return { ...page };
+      });
+      return { ...group, pages };
+    });
+    chapters = chapterGroups.flatMap((group) =>
+      group.pages.map((page) => ({
+        ...page,
+        groupId: group.id,
+        groupTitle: group.title
+      }))
+    );
+    for (const page of chapters) {
+      for (const property of ["nextPath", "previousPath"]) {
+        if (
+          Object.hasOwn(page, property) &&
+          page[property] !== null &&
+          !canonicalPaths.has(page[property])
+        ) {
+          throw new Error(`Book manifest contains an unknown ${property}`);
+        }
+      }
+    }
+  }
 
   function currentFilename() {
     const pathname = decodeURIComponent(window.location.pathname);
@@ -211,79 +220,164 @@
     return element;
   }
 
+  function markOwned(element) {
+    element.setAttribute("data-book-shell-owned", "");
+    return element;
+  }
+
+  function headingSlug(value) {
+    return value
+      .normalize("NFKD")
+      .replace(/\p{M}/gu, "")
+      .toLowerCase()
+      .replace(/&/g, " and ")
+      .replace(/[^\p{L}\p{N}]+/gu, "-")
+      .replace(/^-+|-+$/g, "")
+      .slice(0, 72);
+  }
+
+  function assignHeadingIds(main) {
+    const usedIds = new Set(
+      Array.from(main.querySelectorAll("[id]"), (element) => element.id)
+    );
+    for (const heading of main.querySelectorAll("h2, h3")) {
+      if (heading.id) continue;
+      const stem = `book-${headingSlug(heading.textContent.trim()) || "section"}`;
+      let candidate = stem;
+      let suffix = 2;
+      while (usedIds.has(candidate)) {
+        candidate = `${stem}-${suffix}`;
+        suffix += 1;
+      }
+      heading.id = candidate;
+      heading.setAttribute("data-book-shell-generated-id", "");
+      usedIds.add(candidate);
+    }
+  }
+
+  function revealTarget(target) {
+    if (!target) return null;
+
+    let closedDetails = target.closest("details:not([open])");
+    while (closedDetails) {
+      closedDetails.open = true;
+      closedDetails = closedDetails.parentElement?.closest("details:not([open])") || null;
+    }
+
+    let hiddenPanel = target.closest('[role="tabpanel"][hidden]');
+    while (hiddenPanel) {
+      const tabset = hiddenPanel.closest("[data-tabset]");
+      const tabs = tabset ? Array.from(tabset.querySelectorAll('[role="tab"]')) : [];
+      const panels = tabset
+        ? Array.from(tabset.querySelectorAll('[role="tabpanel"]'))
+        : [];
+      const controllingTab = tabs.find(
+        (tab) => tab.getAttribute("aria-controls") === hiddenPanel.id
+      );
+
+      if (controllingTab) {
+        for (const tab of tabs) {
+          const selected = tab === controllingTab;
+          tab.setAttribute("aria-selected", String(selected));
+          tab.tabIndex = selected ? 0 : -1;
+        }
+        for (const panel of panels) {
+          panel.hidden = panel !== hiddenPanel;
+        }
+      } else {
+        hiddenPanel.hidden = false;
+      }
+
+      hiddenPanel = target.closest('[role="tabpanel"][hidden]');
+    }
+
+    return target;
+  }
+
+  function revealHashTarget() {
+    if (window.location.hash.length < 2) return null;
+    try {
+      const requestedId = decodeURIComponent(window.location.hash.slice(1));
+      return revealTarget(document.getElementById(requestedId));
+    } catch {
+      return null;
+    }
+  }
+
+  function scrollToTarget(target, { focus = false } = {}) {
+    const revealedTarget = revealTarget(target);
+    if (!revealedTarget) return;
+    window.requestAnimationFrame(() => {
+      if (focus && revealedTarget instanceof HTMLElement) {
+        if (!revealedTarget.hasAttribute("tabindex")) revealedTarget.tabIndex = -1;
+        revealedTarget.focus({ preventScroll: true });
+      }
+      revealedTarget.scrollIntoView();
+    });
+  }
+
   function addHeadingAnchor(heading, targetId) {
     if (!heading || heading.querySelector(":scope > .book-heading-anchor")) return;
     if (!heading.hasAttribute("aria-label")) {
       heading.setAttribute("aria-label", heading.textContent.trim());
     }
-    const anchor = makeElement("a", "book-heading-anchor", "#");
+    const anchor = markOwned(makeElement("a", "book-heading-anchor", "#"));
     anchor.href = `#${encodeURIComponent(targetId)}`;
     anchor.setAttribute("aria-label", `Link to ${heading.textContent.trim()}`);
     heading.append(" ", anchor);
   }
 
-  function explicitSectionLabels(main) {
-    const labels = new Map();
-    const selectors = [
-      "nav.toc a[href^='#']",
-      "body > header:not(.book-topbar) nav a[href^='#']"
-    ];
-    for (const anchor of document.querySelectorAll(selectors.join(","))) {
-      let url;
-      try {
-        url = new URL(anchor.href, window.location.href);
-      } catch {
-        continue;
-      }
-      if (url.pathname !== window.location.pathname || url.hash.length < 2) continue;
-      const id = decodeURIComponent(url.hash.slice(1));
-      if (main.querySelector(`#${CSS.escape(id)}`) && !labels.has(id)) {
-        labels.set(id, anchor.textContent.trim());
-      }
-    }
-    return labels;
-  }
-
   function discoverSections(main) {
-    const explicitLabels = explicitSectionLabels(main);
-    const sectionCandidates = Array.from(
-      main.querySelectorAll("section[id], article[id]")
-    ).filter((candidate) => {
-      const ancestor = candidate.parentElement?.closest("section[id], article[id]");
-      return !ancestor || !main.contains(ancestor);
-    });
-
-    let targets = sectionCandidates;
-    if (targets.length < 2 && explicitLabels.size > 1) {
-      targets = Array.from(explicitLabels.keys())
-        .map((id) => document.getElementById(id))
-        .filter(Boolean);
-    }
-
     const seen = new Set();
-    return targets
-      .filter((target) => {
-        if (!target.id || seen.has(target.id)) return false;
-        seen.add(target.id);
+    return Array.from(main.querySelectorAll("h2, h3"))
+      .filter((heading) => {
+        if (heading.closest("details, dialog, [hidden], [aria-hidden='true']")) {
+          return false;
+        }
+        if (
+          heading.tagName === "H3" &&
+          heading.closest(
+            "[class*='-card'], [class*='-item'], .qa, .question, .quiz-question"
+          )
+        ) {
+          return false;
+        }
         return true;
       })
-      .map((target) => {
-        const heading = target.querySelector("h2, h3");
-        const label =
-          explicitLabels.get(target.id) ||
-          heading?.textContent.trim() ||
-          target.id.replace(/[-_]+/g, " ");
-        addHeadingAnchor(heading, target.id);
-        return { id: target.id, label, target };
+      .map((heading) => {
+        const label = heading.textContent.trim();
+        const structuralContainer = heading.closest("section[id], article[id]");
+        const isPrimaryContainerHeading =
+          heading.tagName === "H2" &&
+          structuralContainer?.querySelector("h2, h3") === heading;
+        const target = isPrimaryContainerHeading ? structuralContainer : heading;
+        return {
+          id: target.id,
+          label,
+          level: Number(heading.tagName.slice(1)),
+          target,
+          heading
+        };
+      })
+      .filter((section) => {
+        if (!section.id || seen.has(section.id)) return false;
+        seen.add(section.id);
+        addHeadingAnchor(section.heading, section.id);
+        return true;
       });
   }
 
   function createPageOutline(main, sections) {
     if (sections.length < 2) return { outline: null, links: new Map() };
 
-    const outline = makeElement("details", "book-page-outline");
+    const outline = markOwned(makeElement("details", "book-page-outline"));
     outline.id = "book-page-outline";
-    if (window.location.hash.length > 1) outline.open = true;
+    if (
+      window.location.hash.length > 1 ||
+      window.matchMedia("(min-width: 1181px)").matches
+    ) {
+      outline.open = true;
+    }
 
     const summary = makeElement("summary", "book-page-outline-summary");
     summary.append(makeElement("span", "", "On this page"));
@@ -300,13 +394,29 @@
     navigation.setAttribute("aria-label", "On this page");
     const list = makeElement("ol", "book-page-outline-list");
     const links = new Map();
+    let currentPrimaryItem = null;
+    let currentNestedList = null;
 
     for (const section of sections) {
-      const item = makeElement("li", "book-page-outline-item");
+      const item = makeElement(
+        "li",
+        `book-page-outline-item book-page-outline-level-${section.level}`
+      );
       const anchor = makeElement("a", "book-page-outline-link", section.label);
       anchor.href = `#${encodeURIComponent(section.id)}`;
       item.append(anchor);
-      list.append(item);
+
+      if (section.level === 3 && currentPrimaryItem) {
+        if (!currentNestedList) {
+          currentNestedList = makeElement("ol", "book-page-outline-sublist");
+          currentPrimaryItem.append(currentNestedList);
+        }
+        currentNestedList.append(item);
+      } else {
+        list.append(item);
+        currentPrimaryItem = item;
+        currentNestedList = null;
+      }
       links.set(section.id, anchor);
     }
 
@@ -323,11 +433,21 @@
   }
 
   function createPager(currentIndex) {
-    const previous = chapters[currentIndex - 1];
-    const next = chapters[currentIndex + 1];
+    const currentPage = chapters[currentIndex];
+    const adjacentPage = (property, fallbackIndex) => {
+      if (Object.hasOwn(currentPage, property)) {
+        const targetPath = currentPage[property];
+        return targetPath
+          ? chapters.find((page) => page.path === targetPath) || null
+          : null;
+      }
+      return chapters[fallbackIndex] || null;
+    };
+    const previous = adjacentPage("previousPath", currentIndex - 1);
+    const next = adjacentPage("nextPath", currentIndex + 1);
     if (!previous && !next) return null;
 
-    const pager = makeElement("nav", "book-pager");
+    const pager = markOwned(makeElement("nav", "book-pager"));
     pager.setAttribute("aria-label", "Previous and next study chapters");
 
     function createPagerLink(page, direction) {
@@ -350,17 +470,420 @@
     return pager;
   }
 
-  function initializeBookShell() {
+  function normalizeSearchText(value) {
+    return value
+      .normalize("NFKD")
+      .replace(/\p{M}/gu, "")
+      .toLowerCase()
+      .replace(/\s+/g, " ")
+      .trim();
+  }
+
+  async function loadSearchIndex() {
+    if (!searchIndexPromise) {
+      searchIndexPromise = fetch("./data/book-search-index.json")
+        .then((response) => {
+          if (!response.ok) {
+            throw new Error(`Search index request failed with HTTP ${response.status}`);
+          }
+          return response.json();
+        })
+        .then((index) => {
+          if (
+            index?.schemaVersion !== 1 ||
+            index.chapterCount !== chapters.length ||
+            !Array.isArray(index.entries)
+          ) {
+            throw new Error("Search index has an unsupported shape");
+          }
+          const canonicalPaths = new Set(chapters.map((page) => page.path));
+          const isValid = index.entries.every(
+            (entry) =>
+              entry &&
+              typeof entry.id === "string" &&
+              typeof entry.path === "string" &&
+              canonicalPaths.has(entry.path) &&
+              typeof entry.anchor === "string" &&
+              typeof entry.heading === "string" &&
+              typeof entry.chapterTitle === "string" &&
+              typeof entry.groupTitle === "string" &&
+              Number.isInteger(entry.chapterIndex) &&
+              entry.chapterIndex >= 1 &&
+              entry.chapterIndex <= chapters.length &&
+              Array.isArray(entry.keywords) &&
+              typeof entry.text === "string"
+          );
+          if (!isValid) {
+            throw new Error("Search index contains an invalid or non-canonical entry");
+          }
+          for (const entry of index.entries) {
+            const heading = normalizeSearchText(entry.heading);
+            const chapter = normalizeSearchText(entry.chapterTitle);
+            const keywords = normalizeSearchText((entry.keywords || []).join(" "));
+            const content = normalizeSearchText(entry.text || "");
+            Object.defineProperty(entry, "normalizedSearch", {
+              configurable: false,
+              enumerable: false,
+              writable: false,
+              value: {
+                heading,
+                chapter,
+                keywords,
+                content,
+                combined: `${heading} ${chapter} ${keywords} ${content}`
+              }
+            });
+          }
+          return index.entries;
+        })
+        .catch((error) => {
+          searchIndexPromise = undefined;
+          throw error;
+        });
+    }
+    return searchIndexPromise;
+  }
+
+  function excerptForQuery(text, terms) {
+    const source = String(text || "").replace(/\s+/g, " ").trim();
+    if (!source) return "";
+    const normalized = normalizeSearchText(source);
+    const firstMatch = terms
+      .map((term) => normalized.indexOf(term))
+      .filter((index) => index >= 0)
+      .sort((left, right) => left - right)[0];
+    const start = Math.max(0, (firstMatch ?? 0) - 72);
+    const end = Math.min(source.length, start + 230);
+    return `${start > 0 ? "…" : ""}${source.slice(start, end).trim()}${
+      end < source.length ? "…" : ""
+    }`;
+  }
+
+  function createSearchDialog(searchButton) {
+    const dialog = markOwned(makeElement("dialog", "book-search-dialog"));
+    dialog.setAttribute("aria-labelledby", "book-search-title");
+
+    const shell = makeElement("div", "book-search-shell");
+    const header = makeElement("div", "book-search-header");
+    const titleGroup = makeElement("div", "book-search-title-group");
+    const title = makeElement("h2", "", "Search the study guide");
+    title.id = "book-search-title";
+    titleGroup.append(title);
+    titleGroup.append(
+      makeElement(
+        "p",
+        "",
+        "Search all canonical chapters and jump directly to a topic."
+      )
+    );
+    const closeForm = makeElement("form", "book-search-close-form");
+    closeForm.method = "dialog";
+    const closeButton = makeElement("button", "book-search-close", "×");
+    closeButton.type = "submit";
+    closeButton.setAttribute("aria-label", "Close study guide search");
+    closeForm.append(closeButton);
+    header.append(titleGroup, closeForm);
+
+    const searchRegion = makeElement("div", "book-search-region");
+    searchRegion.setAttribute("role", "search");
+    const label = makeElement("label", "book-search-label", "Search topics");
+    label.htmlFor = "book-search-input";
+    const input = makeElement("input", "book-search-input");
+    input.id = "book-search-input";
+    input.type = "search";
+    input.autocomplete = "off";
+    input.spellcheck = false;
+    input.placeholder = "Try “Attention”, “MLIR”, “runtime”, or “SystemC”";
+    const shortcut = makeElement("span", "book-search-shortcut", "Ctrl K");
+    shortcut.setAttribute("aria-hidden", "true");
+    const inputRow = makeElement("div", "book-search-input-row");
+    inputRow.append(input, shortcut);
+    searchRegion.append(label, inputRow);
+
+    const status = makeElement(
+      "p",
+      "book-search-status",
+      "Type at least two characters to search."
+    );
+    status.setAttribute("role", "status");
+    status.setAttribute("aria-live", "polite");
+    const results = makeElement("ol", "book-search-results");
+
+    shell.append(header, searchRegion, status, results);
+    dialog.append(shell);
+
+    let entries = null;
+    let searchUnavailable = false;
+    let returnFocus = searchButton;
+
+    const renderResults = () => {
+      results.replaceChildren();
+      const query = input.value.trim();
+      const normalizedQuery = normalizeSearchText(query);
+      if (normalizedQuery.length < 2) {
+        status.textContent = "Type at least two characters to search.";
+        return;
+      }
+      if (!entries) {
+        status.textContent = searchUnavailable
+          ? "Search is temporarily unavailable. Chapter navigation still works."
+          : "Loading the search index…";
+        return;
+      }
+
+      const terms = normalizedQuery.split(" ").filter(Boolean);
+      const matches = entries
+        .map((entry) => {
+          const { heading, chapter, keywords, content, combined } =
+            entry.normalizedSearch;
+          const entrySpecific = `${heading} ${content}`;
+          const searchable = entry.anchor ? entrySpecific : combined;
+          if (!terms.every((term) => searchable.includes(term))) return null;
+
+          let score = 0;
+          if (heading === normalizedQuery) score += 120;
+          if (heading.startsWith(normalizedQuery)) score += 70;
+          if (heading.includes(normalizedQuery)) score += 45;
+          if (chapter.includes(normalizedQuery)) score += 30;
+          if (keywords.includes(normalizedQuery)) score += 22;
+          score += terms.filter((term) => heading.includes(term)).length * 12;
+          score += terms.filter((term) => content.includes(term)).length * 2;
+          return { entry, score };
+        })
+        .filter(Boolean)
+        .sort(
+          (left, right) =>
+            right.score - left.score ||
+            left.entry.chapterIndex - right.entry.chapterIndex ||
+            left.entry.id.localeCompare(right.entry.id)
+        )
+        .slice(0, 30);
+
+      status.textContent =
+        matches.length === 0
+          ? `No topics found for “${query}”.`
+          : `${matches.length} ${matches.length === 1 ? "result" : "results"} shown.`;
+
+      for (const { entry } of matches) {
+        const item = makeElement("li", "book-search-result");
+        const anchor = makeElement("a", "book-search-result-link");
+        anchor.href = `${entry.path}${
+          entry.anchor ? `#${encodeURIComponent(entry.anchor)}` : ""
+        }`;
+        anchor.append(
+          makeElement(
+            "span",
+            "book-search-result-meta",
+            `Chapter ${entry.chapterIndex} · ${entry.groupTitle}`
+          )
+        );
+        anchor.append(makeElement("strong", "", entry.heading));
+        if (entry.heading !== entry.chapterTitle) {
+          anchor.append(
+            makeElement("span", "book-search-result-chapter", entry.chapterTitle)
+          );
+        }
+        const excerpt = excerptForQuery(entry.text, terms);
+        if (excerpt) {
+          anchor.append(makeElement("span", "book-search-result-excerpt", excerpt));
+        }
+        item.append(anchor);
+        results.append(item);
+      }
+    };
+
+    const ensureIndex = async () => {
+      if (entries) return;
+      searchUnavailable = false;
+      try {
+        entries = await loadSearchIndex();
+        renderResults();
+      } catch (error) {
+        searchUnavailable = true;
+        renderResults();
+        console.error("The study guide search index could not be loaded.", error);
+      }
+    };
+
+    const openSearch = () => {
+      if (document.body?.classList.contains("book-drawer-open")) return;
+      returnFocus =
+        document.activeElement instanceof HTMLElement
+          ? document.activeElement
+          : searchButton;
+      if (!dialog.open) dialog.showModal();
+      input.focus();
+      input.select();
+      void ensureIndex();
+      renderResults();
+    };
+
+    searchButton.addEventListener("click", openSearch);
+    input.addEventListener("input", renderResults);
+    results.addEventListener("click", (event) => {
+      const anchor = event.target.closest("a");
+      if (
+        !anchor ||
+        event.defaultPrevented ||
+        event.button !== 0 ||
+        event.altKey ||
+        event.ctrlKey ||
+        event.metaKey ||
+        event.shiftKey
+      ) {
+        return;
+      }
+
+      const destination = new URL(anchor.href, window.location.href);
+      const isSameDocument =
+        destination.origin === window.location.origin &&
+        destination.pathname === window.location.pathname &&
+        destination.search === window.location.search;
+      returnFocus = null;
+      dialog.close();
+      if (!isSameDocument || !destination.hash) return;
+
+      event.preventDefault();
+      const targetId = decodeURIComponent(destination.hash.slice(1));
+      const target = document.getElementById(targetId);
+      if (window.location.hash !== destination.hash) {
+        window.location.hash = destination.hash;
+      }
+      scrollToTarget(target, { focus: true });
+    });
+    dialog.addEventListener("click", (event) => {
+      if (event.target === dialog) dialog.close();
+    });
+    dialog.addEventListener("close", () => {
+      if (returnFocus?.isConnected) returnFocus.focus();
+    });
+    document.addEventListener(
+      "keydown",
+      (event) => {
+        if (
+          event.key.toLocaleLowerCase() === "k" &&
+          (event.ctrlKey || event.metaKey) &&
+          !event.altKey
+        ) {
+          event.preventDefault();
+          openSearch();
+        }
+      },
+      { signal: shellEventController.signal }
+    );
+
+    return dialog;
+  }
+
+  function readBookmarks() {
+    try {
+      const stored = JSON.parse(localStorage.getItem(bookmarksKey) || "[]");
+      if (!Array.isArray(stored)) return new Set();
+      const canonicalPaths = new Set(chapters.map((page) => page.path));
+      return new Set(
+        stored.filter((path) => typeof path === "string" && canonicalPaths.has(path))
+      );
+    } catch {
+      return new Set();
+    }
+  }
+
+  function writeBookmarks(bookmarks) {
+    try {
+      localStorage.setItem(bookmarksKey, JSON.stringify([...bookmarks].sort()));
+    } catch {
+      // Bookmarks remain available for this page when storage is unavailable.
+    }
+  }
+
+  function createBookmarksExperience({
+    currentPage,
+    bookmarkButton,
+    chapterLinks,
+    panel,
+    count,
+    list,
+    empty
+  }) {
+    let bookmarks = readBookmarks();
+    const icon = bookmarkButton.querySelector(".book-bookmark-icon");
+    const label = bookmarkButton.querySelector(".book-action-label");
+
+    const render = () => {
+      const currentIsBookmarked = bookmarks.has(currentPage.path);
+      bookmarkButton.setAttribute("aria-pressed", String(currentIsBookmarked));
+      bookmarkButton.setAttribute(
+        "aria-label",
+        currentIsBookmarked ? "Remove chapter bookmark" : "Bookmark this chapter"
+      );
+      bookmarkButton.title = currentIsBookmarked
+        ? "Remove chapter bookmark"
+        : "Bookmark this chapter";
+      icon.textContent = currentIsBookmarked ? "★" : "☆";
+      label.textContent = currentIsBookmarked ? "Saved" : "Bookmark";
+
+      for (const [path, anchor] of chapterLinks) {
+        anchor.classList.toggle("book-chapter-bookmarked", bookmarks.has(path));
+      }
+
+      list.replaceChildren();
+      const savedPages = chapters.filter((page) => bookmarks.has(page.path));
+      count.textContent = String(savedPages.length);
+      empty.hidden = savedPages.length > 0;
+      panel.classList.toggle("book-bookmarks-empty", savedPages.length === 0);
+      for (const page of savedPages) {
+        const item = makeElement("li", "book-bookmark-item");
+        const anchor = makeElement("a", "book-bookmark-link", page.title);
+        anchor.href = page.path;
+        if (page.path === currentPage.path) {
+          anchor.setAttribute("aria-current", "page");
+        }
+        item.append(anchor);
+        list.append(item);
+      }
+    };
+
+    bookmarkButton.addEventListener("click", () => {
+      if (bookmarks.has(currentPage.path)) bookmarks.delete(currentPage.path);
+      else bookmarks.add(currentPage.path);
+      writeBookmarks(bookmarks);
+      render();
+    });
+    window.addEventListener(
+      "storage",
+      (event) => {
+        if (event.key !== bookmarksKey && event.key !== null) return;
+        bookmarks = readBookmarks();
+        render();
+      },
+      { signal: shellEventController.signal }
+    );
+    render();
+  }
+
+  async function initializeBookShell() {
     const body = document.body;
     const main = document.querySelector("main");
-    if (!body || !main || body.classList.contains("book-shell-active")) return;
+    if (!body || !main) {
+      root.classList.remove("book-shell-booting");
+      root.dataset.bookShellReady = "unsupported";
+      return;
+    }
+    if (body.classList.contains("book-shell-active")) {
+      root.classList.remove("book-shell-booting");
+      return;
+    }
+
+    await loadBookManifest();
 
     const filename = currentFilename();
     const currentIndex = chapters.findIndex((page) => pageMatches(page, filename));
     if (currentIndex < 0) {
+      root.classList.remove("book-shell-booting");
       root.dataset.bookShellReady = "unsupported";
       return;
     }
+    shellEventController = new AbortController();
 
     const currentPage = chapters[currentIndex];
     if (/^(?:c|deep-learning|embedded|git|interview|os)-practice\.html$/.test(filename)) {
@@ -371,13 +894,15 @@
     if (!main.id) main.id = "book-main";
     if (!main.hasAttribute("tabindex")) main.tabIndex = -1;
 
-    const skipLink = makeElement("a", "book-skip-link", "Skip to study content");
+    const skipLink = markOwned(
+      makeElement("a", "book-skip-link", "Skip to study content")
+    );
     skipLink.href = `#${encodeURIComponent(main.id)}`;
     skipLink.addEventListener("click", () => {
       window.setTimeout(() => main.focus({ preventScroll: true }), 0);
     });
 
-    const topbar = makeElement("div", "book-topbar");
+    const topbar = markOwned(makeElement("div", "book-topbar"));
     const menuButton = makeElement("button", "book-menu-toggle", "☰");
     menuButton.type = "button";
     menuButton.setAttribute("aria-label", "Toggle study chapters");
@@ -393,23 +918,33 @@
     const position = makeElement("div", "book-chapter-position");
     position.setAttribute("aria-label", `Chapter ${currentIndex + 1} of ${chapters.length}`);
     position.append(makeElement("span", "book-chapter-group", currentPage.groupTitle));
-    const progressRow = makeElement("span", "book-chapter-progress-row");
-    const chapterProgress = makeElement("progress", "book-chapter-progress");
-    chapterProgress.max = chapters.length;
-    chapterProgress.value = currentIndex + 1;
-    chapterProgress.setAttribute("aria-label", "Current chapter position");
-    progressRow.append(chapterProgress);
-    progressRow.append(
+    position.append(
       makeElement(
         "strong",
-        "book-chapter-progress-text",
-        `${currentIndex + 1} / ${chapters.length}`
+        "book-chapter-index",
+        `Chapter ${currentIndex + 1} / ${chapters.length}`
       )
     );
-    position.append(progressRow);
 
     const actions = makeElement("nav", "book-topbar-actions");
     actions.setAttribute("aria-label", "Study guide controls");
+    const searchButton = makeElement("button", "book-search-toggle");
+    searchButton.type = "button";
+    searchButton.setAttribute("aria-label", "Search the study guide");
+    searchButton.setAttribute("aria-keyshortcuts", "Control+K Meta+K");
+    const searchIcon = makeElement("span", "book-action-icon", "⌕");
+    searchIcon.setAttribute("aria-hidden", "true");
+    searchButton.append(searchIcon);
+    searchButton.append(makeElement("span", "book-action-label", "Search"));
+
+    const bookmarkButton = makeElement("button", "book-bookmark-toggle");
+    bookmarkButton.type = "button";
+    bookmarkButton.setAttribute("aria-pressed", "false");
+    const bookmarkIcon = makeElement("span", "book-bookmark-icon", "☆");
+    bookmarkIcon.setAttribute("aria-hidden", "true");
+    bookmarkButton.append(bookmarkIcon);
+    bookmarkButton.append(makeElement("span", "book-action-label", "Bookmark"));
+
     const sourceLink = makeElement("a", "book-source-link", "GitHub");
     sourceLink.href = "https://github.com/buicongnguyen/NPU";
     sourceLink.setAttribute("aria-label", "Open the NPU Study Guide source on GitHub");
@@ -425,8 +960,7 @@
     });
     updateThemeButton(root.dataset.bookTheme);
 
-    actions.append(sourceLink);
-    actions.append(themeButton);
+    actions.append(searchButton, bookmarkButton, sourceLink, themeButton);
     topbar.append(menuButton);
     topbar.append(homeLink);
     topbar.append(position);
@@ -449,7 +983,7 @@
     readingProgress.append(readingProgressValue);
     topbar.append(readingProgress);
 
-    const sidebar = makeElement("aside", "book-sidebar");
+    const sidebar = markOwned(makeElement("aside", "book-sidebar"));
     sidebar.id = "book-sidebar";
     sidebar.setAttribute("aria-label", "NPU Study Guide chapters");
     sidebar.tabIndex = -1;
@@ -457,7 +991,11 @@
     const sidebarHeader = makeElement("div", "book-sidebar-header");
     sidebarHeader.append(makeElement("strong", "", "Study chapters"));
     sidebarHeader.append(
-      makeElement("span", "", `${chapters.length} chapters · architecture to runtime`)
+      makeElement(
+        "span",
+        "",
+        `${chapters.length} chapters · foundations to specialization`
+      )
     );
     const sidebarClose = makeElement("button", "book-sidebar-close", "×");
     sidebarClose.type = "button";
@@ -465,8 +1003,25 @@
     sidebarHeader.append(sidebarClose);
     sidebar.append(sidebarHeader);
 
+    const bookmarksPanel = makeElement("section", "book-bookmarks-panel");
+    bookmarksPanel.setAttribute("aria-labelledby", "book-bookmarks-title");
+    const bookmarksHeading = makeElement("h2", "book-bookmarks-title");
+    bookmarksHeading.id = "book-bookmarks-title";
+    bookmarksHeading.append("Bookmarks ");
+    const bookmarksCount = makeElement("span", "book-bookmarks-count", "0");
+    bookmarksHeading.append(bookmarksCount);
+    const bookmarksEmpty = makeElement(
+      "p",
+      "book-bookmarks-empty-message",
+      "Save a chapter to pin it here."
+    );
+    const bookmarksList = makeElement("ol", "book-bookmarks-list");
+    bookmarksPanel.append(bookmarksHeading, bookmarksEmpty, bookmarksList);
+    sidebar.append(bookmarksPanel);
+
     const chapterNavigation = makeElement("nav", "book-chapter-nav");
     chapterNavigation.setAttribute("aria-label", "Study chapters");
+    const chapterLinks = new Map();
     let currentChapterLink;
     let chapterNumber = 0;
 
@@ -484,6 +1039,10 @@
           makeElement("span", "book-chapter-number", String(chapterNumber).padStart(2, "0"))
         );
         anchor.append(makeElement("span", "book-chapter-title", page.title));
+        const marker = makeElement("span", "book-chapter-bookmark-marker", "★");
+        marker.setAttribute("aria-hidden", "true");
+        anchor.append(marker);
+        chapterLinks.set(page.path, anchor);
         if (pageMatches(page, filename)) {
           anchor.setAttribute("aria-current", "page");
           currentChapterLink = anchor;
@@ -504,15 +1063,33 @@
     sidebarFooter.append(repositoryLink);
     sidebar.append(sidebarFooter);
 
-    const backdrop = makeElement("div", "book-drawer-backdrop");
+    const searchDialog = createSearchDialog(searchButton);
+    createBookmarksExperience({
+      currentPage,
+      bookmarkButton,
+      chapterLinks,
+      panel: bookmarksPanel,
+      count: bookmarksCount,
+      list: bookmarksList,
+      empty: bookmarksEmpty
+    });
+
+    const backdrop = markOwned(makeElement("div", "book-drawer-backdrop"));
     backdrop.setAttribute("aria-hidden", "true");
 
+    body.append(searchDialog);
     body.prepend(backdrop);
     body.prepend(sidebar);
     body.prepend(topbar);
     body.prepend(skipLink);
     body.classList.add("book-shell-active");
+    root.classList.remove("book-shell-booting");
 
+    assignHeadingIds(main);
+    const requestedTarget = revealHashTarget();
+    if (requestedTarget) {
+      scrollToTarget(requestedTarget);
+    }
     const sections = discoverSections(main);
     const { outline, links: outlineLinks } = createPageOutline(main, sections);
     const pager = createPager(currentIndex);
@@ -547,7 +1124,10 @@
     if (printMedia.matches) enterPrintMode();
 
     const originalToc = document.querySelector("nav.toc");
-    if (originalToc) originalToc.setAttribute("aria-hidden", "true");
+    if (originalToc) {
+      fallbackAttributeState.set(originalToc, originalToc.getAttribute("aria-hidden"));
+      originalToc.setAttribute("aria-hidden", "true");
+    }
 
     let activeSectionId = "";
     function setActiveSection(id) {
@@ -604,7 +1184,11 @@
       readingLayoutObserver.observe(main);
     }
     window.addEventListener("hashchange", () => {
-      const id = decodeURIComponent(window.location.hash.slice(1));
+      const requestedTarget = revealHashTarget();
+      const id = requestedTarget?.id || "";
+      if (requestedTarget) {
+        scrollToTarget(requestedTarget);
+      }
       if (outlineLinks.has(id)) {
         if (outline) outline.open = true;
         setActiveSection(id);
@@ -758,11 +1342,15 @@
 
     window.requestAnimationFrame(() => {
       if (currentChapterLink) {
+        const linkBounds = currentChapterLink.getBoundingClientRect();
+        const navigationBounds = chapterNavigation.getBoundingClientRect();
         const targetTop =
-          currentChapterLink.offsetTop -
-          sidebar.clientHeight / 2 +
-          currentChapterLink.clientHeight / 2;
-        sidebar.scrollTop = Math.max(0, targetTop);
+          chapterNavigation.scrollTop +
+          linkBounds.top -
+          navigationBounds.top -
+          navigationBounds.height / 2 +
+          linkBounds.height / 2;
+        chapterNavigation.scrollTop = Math.max(0, targetTop);
       }
       scheduleScrollUpdate();
       root.dataset.bookShellReady = "true";
@@ -770,9 +1358,20 @@
     });
   }
 
+  async function startBookShell() {
+    try {
+      await initializeBookShell();
+    } catch (error) {
+      failOpen(error);
+    }
+  }
+
   if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", initializeBookShell, { once: true });
+    document.addEventListener("DOMContentLoaded", startBookShell, { once: true });
   } else {
-    initializeBookShell();
+    startBookShell();
+  }
+  } catch (error) {
+    failOpen(error);
   }
 })();

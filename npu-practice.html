@@ -419,6 +419,14 @@
     font: inherit;
   }
 
+  .search-label {
+    display: block;
+    margin: 0 0 6px;
+    color: var(--ink);
+    font-size: .84rem;
+    font-weight: 750;
+  }
+
   .searchbar input:focus {
     outline: none;
     border-color: var(--accent);
@@ -428,6 +436,13 @@
     margin-top: 5px;
     color: var(--ink-dim);
     font-size: .76rem;
+  }
+
+  .search-status {
+    margin: 7px 0 0;
+    color: var(--ink-dim);
+    font-size: .8rem;
+    font-weight: 650;
   }
 
   details.qa {
@@ -666,7 +681,7 @@
 </style>
   <script src="scroll-accessibility.js" defer></script>
   <link rel="stylesheet" href="book-shell.css">
-  <script src="book-shell.js"></script>
+  <script src="book-shell.js" defer></script>
 </head>
 <body>
 <div class="wrap">
@@ -710,9 +725,11 @@
 
 <section id="overview">
   <h2>How to use</h2>
-  <div class="searchbar">
-    <input id="q" type="search" placeholder="Search questions, answers, tags, or terms..." aria-label="Search questions">
-    <div class="hint">Examples: Tenstorrent, Tensix, circular buffer, GEMM, core grid, fusion, SRAM, bufferization, quantization. Press Escape to clear.</div>
+  <div class="searchbar" role="search" aria-labelledby="practice-search-label">
+    <label id="practice-search-label" class="search-label" for="q">Filter practice questions and study terms</label>
+    <input id="q" type="search" placeholder="Search questions, answers, tags, or terms..." aria-describedby="practice-search-hint">
+    <div id="practice-search-hint" class="hint">Examples: Tenstorrent, Tensix, circular buffer, GEMM, core grid, fusion, SRAM, bufferization, quantization. Press Escape to clear.</div>
+    <p id="practice-search-status" class="search-status" role="status" aria-live="polite" aria-atomic="true"></p>
   </div>
   <div class="box info">
     <span class="bt">Study flow</span>
@@ -2562,6 +2579,11 @@ vector&lt;Tile&gt; tileGrid(int H, int W, int TH, int TW) {
 
   var q = document.getElementById("q");
   var cards = Array.prototype.slice.call(document.querySelectorAll("details.qa, .termdef"));
+  var disclosures = cards.filter(function (card) {
+    return card.tagName.toLowerCase() === "details";
+  });
+  var searchStatus = document.getElementById("practice-search-status");
+  var disclosureState = null;
 
   cards.forEach(function (card) {
     card.dataset.text = card.textContent.toLowerCase();
@@ -2579,25 +2601,58 @@ vector&lt;Tile&gt; tileGrid(int H, int W, int TH, int TW) {
     };
   }
 
-  var run = debounce(function () {
-    var term = q.value.trim().toLowerCase();
+  function updateSearchStatus(matchCount, rawTerm) {
+    if (!searchStatus) return;
+    if (!rawTerm) {
+      searchStatus.textContent = "Showing all " + cards.length + " study items.";
+      return;
+    }
+    searchStatus.textContent =
+      "Showing " +
+      matchCount +
+      " of " +
+      cards.length +
+      " study items matching \u201c" +
+      rawTerm +
+      "\u201d.";
+  }
+
+  function filterCards() {
+    var rawTerm = q.value.trim();
+    var term = rawTerm.toLowerCase();
+    var matchCount = 0;
+
+    if (term && disclosureState === null) {
+      disclosureState = disclosures.map(function (card) {
+        return { card: card, open: card.open };
+      });
+    }
+
     cards.forEach(function (card) {
       if (!term) {
         card.classList.remove("nohit");
-        if (card.tagName.toLowerCase() === "details" && card !== document.querySelector("#coding details.qa")) {
-          card.removeAttribute("open");
-        }
+        matchCount += 1;
         return;
       }
 
       var hit = card.dataset.text.indexOf(term) !== -1;
+      if (hit) matchCount += 1;
       card.classList.toggle("nohit", !hit);
       if (card.tagName.toLowerCase() === "details") {
-        if (hit) card.setAttribute("open", "");
-        else card.removeAttribute("open");
+        card.open = hit;
       }
     });
-  }, 120);
+
+    if (!term && disclosureState !== null) {
+      disclosureState.forEach(function (state) {
+        state.card.open = state.open;
+      });
+      disclosureState = null;
+    }
+    updateSearchStatus(matchCount, rawTerm);
+  }
+
+  var run = debounce(filterCards, 120);
 
   q.addEventListener("input", run);
   q.addEventListener("keydown", function (event) {
@@ -2606,6 +2661,7 @@ vector&lt;Tile&gt; tileGrid(int H, int W, int TH, int TW) {
       run();
     }
   });
+  filterCards();
 
   // Interactive multiple choice: reveal the answer only after an option is picked.
   Array.prototype.slice.call(document.querySelectorAll("details.qa")).forEach(function (card) {

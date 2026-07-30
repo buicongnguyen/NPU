@@ -20,39 +20,42 @@
   function renderPlan() {
     const root = document.getElementById("plan-root");
     if (!root) return;
-    for (const item of data.plans) {
+    data.plans.forEach((item, index) => {
       const card = node("article", "card");
+      card.id = `practice-plan-${index + 1}`;
       card.dataset.search = `${item.title} ${item.text}`.toLowerCase();
       card.appendChild(node("span", "tag", item.phase));
       card.appendChild(node("h3", "", item.title));
       card.appendChild(node("p", "", item.text));
       root.appendChild(card);
-    }
+    });
   }
 
   function renderKnowledge() {
     const root = document.getElementById("knowledge-root");
     if (!root) return;
-    for (const item of data.knowledge) {
+    data.knowledge.forEach((item, index) => {
       const card = node("article", "card");
+      card.id = `practice-knowledge-${index + 1}`;
       card.dataset.search = `${item.title} ${item.text}`.toLowerCase();
       card.appendChild(node("h3", "", item.title));
       card.appendChild(node("p", "", item.text));
       root.appendChild(card);
-    }
+    });
   }
 
   function renderQuestions() {
     const root = document.getElementById("questions-root");
     if (!root) return;
     let count = 0;
-    for (const group of data.groups) {
+    data.groups.forEach((group, groupIndex) => {
       const groupWrap = node("section", "qa-group");
       groupWrap.id = group.id;
       groupWrap.appendChild(node("h3", "", group.title));
-      for (const q of group.questions) {
+      group.questions.forEach((q, questionIndex) => {
         count += 1;
         const card = node("details", "qa");
+        card.id = `practice-question-${groupIndex + 1}-${questionIndex + 1}`;
         card.dataset.search = `${group.title} ${q.q} ${q.choices.join(" ")} ${q.why}`.toLowerCase();
         const summary = node("summary", "", `${count}. ${q.q}`);
         summary.appendChild(node("span", "tag", group.tag));
@@ -72,16 +75,17 @@
         card.appendChild(summary);
         card.appendChild(answer);
         groupWrap.appendChild(card);
-      }
+      });
       root.appendChild(groupWrap);
-    }
+    });
   }
 
   function renderResources() {
     const root = document.getElementById("resources-root");
     if (!root) return;
-    for (const item of data.resources) {
+    data.resources.forEach((item, index) => {
       const card = node("article", "card");
+      card.id = `practice-resource-${index + 1}`;
       card.appendChild(node("h3", "", item.title));
       const p = node("p", "");
       p.appendChild(document.createTextNode(item.text + " "));
@@ -91,7 +95,7 @@
       });
       card.appendChild(p);
       root.appendChild(card);
-    }
+    });
   }
 
   function totalQuestions() {

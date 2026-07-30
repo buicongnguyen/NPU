@@ -5,17 +5,20 @@
   "description": "Validation and browser smoke tests for the NPU Study Guide",
   "type": "module",
   "scripts": {
-    "build:pages": "node scripts/prepare-pages-artifact.mjs build",
-    "check": "npm run check:html && npm run check:json && npm run test:pages-artifact && npm run test:links && npm run test:site && npm run test:a11y",
+    "build:pages": "npm run build:search-index && node scripts/prepare-pages-artifact.mjs build",
+    "build:search-index": "node scripts/generate-book-search-index.mjs write",
+    "check": "npm run check:html && npm run check:json && npm run check:search-index && npm run test:pages-artifact && npm run test:pages-site && npm run test:links && npm run test:site && npm run test:a11y",
     "check:ci": "npm run check:dependencies && npm run check && npm run test:lighthouse",
     "check:dependencies": "npm audit --audit-level=high",
     "check:html": "html-validate \"*.html\"",
     "check:json": "node scripts/validate-json.mjs",
+    "check:search-index": "node scripts/generate-book-search-index.mjs check",
     "test:pages-artifact": "node scripts/prepare-pages-artifact.mjs test",
+    "test:pages-site": "npm run build:pages && playwright test --config playwright.pages.config.mjs",
     "test:links": "playwright test tests/site/links.spec.mjs",
     "test:site": "playwright test tests/site/smoke.spec.mjs tests/site/book-shell.spec.mjs",
     "test:a11y": "playwright test tests/site/accessibility.spec.mjs",
-    "test:lighthouse": "node scripts/run-lighthouse.mjs",
+    "test:lighthouse": "npm run build:pages && node scripts/run-lighthouse.mjs",
     "validate:pages": "node scripts/prepare-pages-artifact.mjs validate"
   },
   "devDependencies": {

@@ -10,12 +10,12 @@
   <script src="analog-cim-architecture.js?v=2026-07-12-noc-congestion" defer></script>
   <script src="scroll-accessibility.js" defer></script>
   <link rel="stylesheet" href="book-shell.css">
-  <script src="book-shell.js"></script>
+  <script src="book-shell.js" defer></script>
 </head>
 <body>
   <header class="site-header">
     <a class="brand" href="index.html" aria-label="NPU Study Guide home">
-      <img src="https://avatars.githubusercontent.com/u/72680210?v=4" alt="Bui Cong Nguyen avatar">
+      <img src="avatar.svg" alt="NPU Study Guide mark" width="38" height="38">
       <span>NPU Study Guide</span>
     </a>
     <nav class="site-nav" aria-label="Analog CIM learning path">
@@ -650,8 +650,8 @@
         <p class="section-note">Select a layer to see its responsibility, dominant failure mode, mitigation pattern, evidence, and interview prompt.</p>
       </div>
       <div class="architecture-explorer">
-        <div id="stage-list" class="stage-list" role="tablist" aria-label="Architecture stages"></div>
-        <article id="stage-detail" class="panel stage-detail" role="tabpanel" aria-live="polite"></article>
+        <div id="stage-list" class="stage-list" aria-label="Architecture stages"></div>
+        <div id="stage-detail" class="stage-detail-host"></div>
       </div>
     </section>
 

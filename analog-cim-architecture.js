@@ -51,39 +51,77 @@
 
   function renderStages(data, sources) {
     var list = document.getElementById('stage-list');
-    var detail = document.getElementById('stage-detail');
-    if (!list || !detail) return;
-    var stageButtons = [];
-
-    function selectStage(stage, selectedButton, moveFocus) {
-      Array.prototype.forEach.call(list.querySelectorAll('button'), function (button) {
-        button.setAttribute('aria-selected', button === selectedButton ? 'true' : 'false');
-        button.tabIndex = button === selectedButton ? 0 : -1;
-      });
-      renderStageDetail(stage, sources, detail);
-      if (moveFocus) selectedButton.focus();
+    var detailHost = document.getElementById('stage-detail');
+    if (!list || !detailHost) return;
+    if (!Array.isArray(data.signalPath) || data.signalPath.length === 0) {
+      throw new Error('Architecture stages are missing');
     }
 
+    var stageButtons = [];
+    var stagePanels = [];
+    var usedStageTokens = Object.create(null);
+
+    function stageToken(stage, index) {
+      var source = typeof stage.id === 'string' && stage.id.trim()
+        ? stage.id
+        : 'stage-' + (index + 1);
+      var stem = source
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-+|-+$/g, '') || 'stage-' + (index + 1);
+      var token = stem;
+      var suffix = 2;
+      while (usedStageTokens[token]) {
+        token = stem + '-' + suffix;
+        suffix += 1;
+      }
+      usedStageTokens[token] = true;
+      return token;
+    }
+
+    function selectStage(selectedIndex, moveFocus) {
+      stageButtons.forEach(function (button, index) {
+        var selected = index === selectedIndex;
+        button.setAttribute('aria-selected', selected ? 'true' : 'false');
+        button.tabIndex = selected ? 0 : -1;
+        stagePanels[index].hidden = !selected;
+      });
+      if (moveFocus) stageButtons[selectedIndex].focus();
+    }
+
+    list.replaceChildren();
+    list.setAttribute('role', 'tablist');
+    list.setAttribute('aria-orientation', 'vertical');
+    detailHost.replaceChildren();
+
     data.signalPath.forEach(function (stage, index) {
+      var token = stageToken(stage, index);
       var button = element('button', 'stage-button');
       button.type = 'button';
+      button.id = 'stage-tab-' + token;
       button.setAttribute('role', 'tab');
-      button.setAttribute('aria-controls', 'stage-detail');
-      button.setAttribute('aria-selected', index === 0 ? 'true' : 'false');
-      button.tabIndex = index === 0 ? 0 : -1;
+
+      var panel = element('div', 'panel stage-detail');
+      panel.id = 'stage-panel-' + token;
+      panel.setAttribute('role', 'tabpanel');
+      panel.setAttribute('aria-labelledby', button.id);
+      panel.tabIndex = 0;
+      renderStageDetail(stage, sources, panel);
+
+      button.setAttribute('aria-controls', panel.id);
 
       var number = element('span', 'stage-number', String(stage.order));
       var copy = element('span');
       copy.append(element('strong', '', stage.label), element('span', '', stage.domain));
       button.append(number, copy);
       button.addEventListener('click', function () {
-        selectStage(stage, button, false);
+        selectStage(index, false);
       });
       button.addEventListener('keydown', function (event) {
         var targetIndex = -1;
-        if (event.key === 'ArrowDown' || event.key === 'ArrowRight') {
+        if (event.key === 'ArrowDown') {
           targetIndex = (index + 1) % data.signalPath.length;
-        } else if (event.key === 'ArrowUp' || event.key === 'ArrowLeft') {
+        } else if (event.key === 'ArrowUp') {
           targetIndex = (index - 1 + data.signalPath.length) % data.signalPath.length;
         } else if (event.key === 'Home') {
           targetIndex = 0;
@@ -92,15 +130,15 @@
         }
         if (targetIndex < 0) return;
         event.preventDefault();
-        selectStage(data.signalPath[targetIndex], stageButtons[targetIndex], true);
+        selectStage(targetIndex, true);
       });
       stageButtons.push(button);
+      stagePanels.push(panel);
       list.appendChild(button);
+      detailHost.appendChild(panel);
     });
 
-    if (data.signalPath.length) {
-      renderStageDetail(data.signalPath[0], sources, detail);
-    }
+    selectStage(0, false);
   }
 
   function renderMetrics(data, sources) {
@@ -158,7 +196,12 @@
   function showError(error) {
     ['stage-list', 'stage-detail', 'mythic-metrics', 'architecture-sources'].forEach(function (id) {
       var root = document.getElementById(id);
-      if (root) root.replaceChildren(element('p', 'muted', 'Learning data could not be loaded: ' + error.message));
+      if (!root) return;
+      if (id === 'stage-list') {
+        root.removeAttribute('role');
+        root.removeAttribute('aria-orientation');
+      }
+      root.replaceChildren(element('p', 'muted', 'Learning data could not be loaded: ' + error.message));
     });
   }
 

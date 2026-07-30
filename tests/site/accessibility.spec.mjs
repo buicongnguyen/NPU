@@ -39,6 +39,25 @@ for (const path of pages) {
   }
 }
 
+test("dynamic architecture tabs use ARIA roles permitted for their elements", async ({
+  page
+}) => {
+  await page.goto("/analog-cim-architecture.html", { waitUntil: "networkidle" });
+  await expect(page.locator("#stage-list [role=tab]")).toHaveCount(8);
+
+  const results = await new AxeBuilder({ page })
+    .include("#signal-path")
+    .withRules(["aria-allowed-role"])
+    .analyze();
+  const summary = results.violations.map((violation) => ({
+    id: violation.id,
+    impact: violation.impact,
+    description: violation.description,
+    targets: violation.nodes.map((node) => node.target.join(" "))
+  }));
+  expect(summary, JSON.stringify(summary, null, 2)).toEqual([]);
+});
+
 test("book shell dark theme and open mobile drawer meet WCAG A/AA", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/npu-framework-compiler-skills.html");
@@ -48,6 +67,40 @@ test("book shell dark theme and open mobile drawer meet WCAG A/AA", async ({ pag
     () => document.documentElement.dataset.bookShellReady === "true"
   );
   await page.getByRole("button", { name: "Toggle study chapters" }).click();
+
+  const results = await new AxeBuilder({ page })
+    .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"])
+    .analyze();
+  const summary = results.violations.map((violation) => ({
+    id: violation.id,
+    impact: violation.impact,
+    description: violation.description,
+    targets: violation.nodes.map((node) => node.target.join(" "))
+  }));
+  expect(summary, JSON.stringify(summary, null, 2)).toEqual([]);
+});
+
+test("book search and bookmark controls meet WCAG A/AA in dark mode", async ({
+  page
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/npu-framework-compiler-skills.html");
+  await page.evaluate(() => {
+    localStorage.setItem("site-color-theme", "dark");
+    localStorage.removeItem("npu-study-guide-bookmarks-v1");
+  });
+  await page.reload({ waitUntil: "networkidle" });
+  await page.waitForFunction(
+    () => document.documentElement.dataset.bookShellReady === "true"
+  );
+  await page.locator(".book-bookmark-toggle").click();
+  await page.getByRole("button", { name: "Search the study guide" }).click();
+  await page
+    .getByRole("searchbox", { name: "Search topics" })
+    .fill("Attention");
+  await expect(page.getByRole("dialog").getByRole("status")).toContainText(
+    /results? shown/
+  );
 
   const results = await new AxeBuilder({ page })
     .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"])
