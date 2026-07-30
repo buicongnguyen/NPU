@@ -18,6 +18,7 @@
   function renderStageDetail(stage, sources, detailRoot) {
     var kicker = element('p', 'kicker', stage.domain + ' layer');
     var title = element('h3', '', stage.order + '. ' + stage.label);
+    title.id = detailRoot.id + '-title';
     var summary = element('p', 'lede', stage.summary);
     var detail = element('p', '', stage.detail);
     var meta = element('div', 'detail-meta');

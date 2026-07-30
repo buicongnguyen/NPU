@@ -86,7 +86,8 @@ test('architecture stages expose linked vertical tabs with roving keyboard focus
       return {
         tabId: tab.id,
         panelId,
-        labelledBy: panel?.getAttribute('aria-labelledby') || null
+        labelledBy: panel?.getAttribute('aria-labelledby') || null,
+        titleId: panel?.querySelector('h3')?.id || null
       };
     })
   );
@@ -94,7 +95,8 @@ test('architecture stages expose linked vertical tabs with roving keyboard focus
     expectedTokens.map((token) => ({
       tabId: `stage-tab-${token}`,
       panelId: `stage-panel-${token}`,
-      labelledBy: `stage-tab-${token}`
+      labelledBy: `stage-tab-${token}`,
+      titleId: `stage-panel-${token}-title`
     }))
   );
   expect(await tabs.evaluateAll((items) => items.map((tab) => tab.tabIndex))).toEqual([

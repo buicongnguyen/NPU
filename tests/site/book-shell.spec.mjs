@@ -21,6 +21,21 @@ for (const entry of bookSearchIndex.entries) {
   searchAnchorsByPath.set(entry.path, entries);
 }
 
+test("the shell installs its pre-paint boot contract synchronously", async () => {
+  for (const file of htmlFiles) {
+    const html = await readFile(file, "utf8");
+    const scripts = html.match(
+      /<script\b[^>]*\bsrc=["']book-shell\.js["'][^>]*><\/script>/gi
+    );
+    expect(scripts, `${file} should load one book shell script`).toHaveLength(1);
+    expect(
+      scripts[0],
+      `${file} must not defer the shell and expose a layout-shifting legacy paint`
+    ).not.toMatch(/\b(?:async|defer)\b/i);
+    expect(html.indexOf(scripts[0])).toBeLessThan(html.indexOf("</head>"));
+  }
+});
+
 test("the generated index includes each dynamically rendered practice bank", () => {
   const expectedQuestions = new Map([
     [

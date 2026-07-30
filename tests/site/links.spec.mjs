@@ -11,10 +11,15 @@ test('all rendered internal links and anchors resolve', async ({ browser, baseUR
   const sourcePage = await context.newPage();
   const baseOrigin = new URL(baseURL).origin;
   const targetsByDocument = new Map();
+  const waitForBookShell = (page) =>
+    page.waitForFunction(
+      () => document.documentElement.dataset.bookShellReady === 'true'
+    );
 
   for (const file of htmlFiles) {
     const response = await sourcePage.goto(`${baseURL}/${file}`, { waitUntil: 'networkidle' });
     expect(response?.ok(), `${file} should load`).toBeTruthy();
+    await waitForBookShell(sourcePage);
     const links = await sourcePage.locator('a[href]').evaluateAll((anchors) =>
       anchors.map((anchor) => anchor.href)
     );
@@ -49,6 +54,7 @@ test('all rendered internal links and anchors resolve', async ({ browser, baseUR
       waitUntil: 'networkidle'
     });
     expect(response?.ok(), `${documentUrl} should load`).toBeTruthy();
+    await waitForBookShell(targetPage);
     for (const fragment of fragments) {
       if (fragment.length <= 1) continue;
       const id = decodeURIComponent(fragment.slice(1));
